@@ -1,0 +1,22 @@
+{
+  "name": "@melodyflix/videos",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "fastify": "^4.28.0",
+    "@fastify/multipart": "^8.3.0",
+    "@fastify/static": "^7.0.4",
+    "zod": "^3.23.8",
+    "@melodyflix/shared-config": "workspace:*",
+    "@melodyflix/shared-logger": "workspace:*",
+    "@melodyflix/shared-types": "workspace:*",
+    "@melodyflix/shared-db": "workspace:*",
+    "@melodyflix/shared-auth": "workspace:*",
+    "@melodyflix/shared-events": "workspace:*"
+  }
+}

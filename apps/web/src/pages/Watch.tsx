@@ -1,0 +1,410 @@
+import { useEffect, useState, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  api, formatViews, timeAgo,
+  likeVideo, recordView, followChannel, unfollowChannel, isFollowing,
+  toggleSaveVideo, isVideoSaved,
+  recordHistory, getResumePosition,
+  getCachedUser,
+  type Video, type Channel,
+} from '../lib/api';
+import HlsPlayer from '../components/HlsPlayer';
+import CommentSection from '../components/CommentSection';
+import ShareMenu from '../components/ShareMenu';
+import SaveToPlaylistModal from '../components/SaveToPlaylistModal';
+import { usePlayer } from '../components/PlayerContext';
+
+type Reaction = 'like' | 'dislike' | null;
+
+interface Props {
+  onSignIn: () => void;
+}
+
+export default function Watch({ onSignIn }: Props) {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const me = getCachedUser();
+  const { setMini, clearMini } = usePlayer();
+  const playerWrapRef = useRef<HTMLDivElement>(null);
+  const lastPlayerStateRef = useRef<{ currentTime: number; playing: boolean; ended: boolean }>({
+    currentTime: 0, playing: false, ended: false,
+  });
+  const historySavedAtRef = useRef(0);
+
+  const [video, setVideo] = useState<Video | null>(null);
+  const [channel, setChannel] = useState<Channel | null>(null);
+  const [related, setRelated] = useState<Video[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const [viewCount, setViewCount] = useState(0);
+  const [likeCount, setLikeCount] = useState(0);
+  const [dislikeCount, setDislikeCount] = useState(0);
+  const [reaction, setReaction] = useState<Reaction>(null);
+  const [subscribed, setSubscribed] = useState(false);
+  const [subscriberCount, setSubscriberCount] = useState(0);
+  const [saved, setSaved] = useState(false);
+  const [busyReaction, setBusyReaction] = useState(false);
+  const [busySub, setBusySub] = useState(false);
+  const [toast, setToast] = useState('');
+  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+  const [resumeAt, setResumeAt] = useState<number>(0);
+  const [resumedFrom, setResumedFrom] = useState<number>(0);
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(''), 2500);
+  }
+
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    setError('');
+    setVideo(null);
+    setChannel(null);
+    clearMini();
+
+    Promise.all([
+      api.getVideo(id),
+      api.listVideos(20, 0),
+    ])
+      .then(async ([v, list]) => {
+        setVideo(v);
+        setViewCount(v.view_count);
+        setLikeCount(v.like_count);
+        setDislikeCount(v.dislike_count ?? 0);
+        setReaction((v as any).user_reaction ?? null);
+        setRelated(list.videos.filter((x) => x.id !== id).slice(0, 10));
+
+        try {
+          const ch = await api.getChannel(v.channel_id);
+          setChannel(ch);
+          setSubscriberCount(ch.subscriber_count);
+
+          if (me && ch.owner_id !== me.id) {
+            try {
+              const res = await isFollowing(ch.id);
+              setSubscribed(res.following);
+            } catch {}
+          }
+        } catch {}
+
+        if (me) {
+          try {
+            const res = await isVideoSaved(v.id);
+            setSaved(res.saved);
+          } catch {}
+        }
+
+        recordView(v.id)
+          .then((res) => setViewCount(res.view_count))
+          .catch(() => {});
+
+        // Fetch resume position (logged-in user)
+        if (me) {
+          try {
+            const rp = await getResumePosition(v.id);
+            if (rp.position > 5) {
+              setResumeAt(rp.position);
+              setResumedFrom(rp.position);
+              const mins = Math.floor(rp.position / 60);
+              const secs = Math.floor(rp.position % 60);
+              const timeStr = mins > 0
+                ? `${mins}:${String(secs).padStart(2, '0')}`
+                : `${secs}s`;
+              showToast(`Resumed from ${timeStr}`);
+            }
+          } catch {}
+        }
+      })
+      .catch((err) => setError((err as Error).message))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  // Save history every ~10s while watching (if logged in)
+  useEffect(() => {
+    if (!me || !video) return;
+    const interval = setInterval(() => {
+      const st = lastPlayerStateRef.current;
+      if (st.currentTime < 2) return;
+      const now = Date.now();
+      if (now - historySavedAtRef.current < 8000) return;
+      historySavedAtRef.current = now;
+      recordHistory(video.id, st.currentTime).catch(() => {});
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [me?.id, video?.id]);
+
+  // On unmount: save history + set mini player
+  useEffect(() => {
+    return () => {
+      const state = lastPlayerStateRef.current;
+      if (!video) return;
+
+      // Save history (if user logged in and watched >1s)
+      if (me && !state.ended && state.currentTime > 1) {
+        recordHistory(video.id, state.currentTime).catch(() => {});
+      }
+
+      // Set mini player if playing
+      if (!state.ended && (state.currentTime > 1 || state.playing)) {
+        setMini({
+          video,
+          currentTime: state.currentTime,
+          wasPlaying: state.playing,
+          active: true,
+        });
+      }
+    };
+  }, [video?.id, me?.id]);
+
+  async function handleReaction(type: 'like' | 'dislike') {
+    if (!video || busyReaction) return;
+    if (!me) { onSignIn(); return; }
+
+    const nextType: 'like' | 'dislike' | 'none' = reaction === type ? 'none' : type;
+    setBusyReaction(true);
+    try {
+      const res = await likeVideo(video.id, nextType);
+      setLikeCount(res.likeCount);
+      setDislikeCount(res.dislikeCount);
+      setReaction(res.userReaction);
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setBusyReaction(false);
+    }
+  }
+
+  async function handleSubscribe() {
+    if (!channel || busySub) return;
+    if (!me) { onSignIn(); return; }
+
+    setBusySub(true);
+    try {
+      if (subscribed) {
+        const res = await unfollowChannel(channel.id);
+        setSubscribed(false);
+        setSubscriberCount(res.subscriberCount);
+      } else {
+        const res = await followChannel(channel.id);
+        setSubscribed(true);
+        setSubscriberCount(res.subscriberCount);
+      }
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setBusySub(false);
+    }
+  }
+
+  async function handleSave() {
+    if (!video) return;
+    if (!me) { onSignIn(); return; }
+    try {
+      const res = await toggleSaveVideo(video.id);
+      setSaved(res.saved);
+      showToast(res.saved ? 'Saved to Watch Later' : 'Removed from Watch Later');
+    } catch (err) {
+      alert((err as Error).message);
+    }
+  }
+
+  if (loading) return <div className="mf-loading">Loading...</div>;
+  if (error) return <div className="mf-container"><div className="mf-error">{error}</div></div>;
+  if (!video) return <div className="mf-empty">Video not found</div>;
+
+  const streamSrc = video.hls_master_url ?? `/api/v1/videos/${video.id}/stream/master.m3u8`;
+  const poster = video.thumbnail_url ? `/api/v1/videos/${video.id}/thumbnail.jpg` : undefined;
+
+  const isOwnChannel = !!(channel && me && channel.owner_id === me.id);
+  const channelName = channel?.name ?? `Channel ${video.channel_id.slice(0, 8)}`;
+  const channelInitial = (channelName[0] ?? 'M').toUpperCase();
+
+  return (
+    <>
+      <div className="mf-watch">
+        <div>
+          <div ref={playerWrapRef}>
+            {video.status === 'ready' ? (
+              <HlsPlayer
+                src={streamSrc}
+                poster={poster}
+                startTime={resumeAt}
+                onStateChange={(s) => { lastPlayerStateRef.current = s; }}
+              />
+            ) : (
+              <div className="mf-player">
+                <div className="mf-player-status">
+                  {video.status === 'processing' && '⏳ This video is still processing...'}
+                  {video.status === 'failed' && '⚠️ Processing failed for this video'}
+                  {video.status === 'uploading' && '⬆️ Upload in progress...'}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <h1 className="mf-watch-title">{video.title}</h1>
+
+          <div className="mf-watch-row">
+            <div className="mf-channel-row">
+              <div
+                className="mf-video-avatar"
+                style={{ width: 40, height: 40, cursor: 'pointer' }}
+                onClick={() => navigate(`/channel/${video.channel_id}`)}
+              >
+                {channelInitial}
+              </div>
+              <div
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(`/channel/${video.channel_id}`)}
+              >
+                <div style={{ fontWeight: 500 }}>{channelName}</div>
+                <div style={{ fontSize: 12, color: '#606060' }}>
+                  {subscriberCount} subscribers
+                </div>
+              </div>
+              {isOwnChannel ? (
+                <span className="mf-sub-btn subscribed" style={{ marginLeft: 12, cursor: 'default' }}>
+                  Your channel
+                </span>
+              ) : (
+                <button
+                  className={`mf-sub-btn ${subscribed ? 'subscribed' : ''}`}
+                  onClick={handleSubscribe}
+                  disabled={busySub}
+                  style={{ marginLeft: 12 }}
+                >
+                  {subscribed ? 'Subscribed' : 'Subscribe'}
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: '#f2f2f2',
+                  borderRadius: 20,
+                  overflow: 'hidden',
+                }}
+              >
+                <button
+                  onClick={() => handleReaction('like')}
+                  disabled={busyReaction}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '8px 14px',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontFamily: 'inherit',
+                    fontWeight: 500,
+                    color: reaction === 'like' ? '#065fd4' : '#0f0f0f',
+                    borderRight: '1px solid #e5e5e5',
+                  }}
+                >
+                  👍 {likeCount}
+                </button>
+                <button
+                  onClick={() => handleReaction('dislike')}
+                  disabled={busyReaction}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '8px 14px',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontFamily: 'inherit',
+                    fontWeight: 500,
+                    color: reaction === 'dislike' ? '#065fd4' : '#0f0f0f',
+                  }}
+                >
+                  👎 {dislikeCount}
+                </button>
+              </div>
+
+              <ShareMenu videoId={video.id} title={video.title} onToast={showToast} />
+
+              <button
+                className="mf-sub-btn"
+                style={{ background: '#f2f2f2', color: '#0f0f0f' }}
+                onClick={() => me ? setShowPlaylistModal(true) : onSignIn()}
+              >
+                📁 Save to playlist
+              </button>
+
+              <button
+                className="mf-sub-btn"
+                style={{
+                  background: saved ? '#e8f0fe' : '#f2f2f2',
+                  color: saved ? '#065fd4' : '#0f0f0f',
+                }}
+                onClick={handleSave}
+              >
+                {saved ? '🔖 Saved' : '🔖 Save'}
+              </button>
+
+              <div
+                style={{
+                  background: '#f2f2f2',
+                  borderRadius: 20,
+                  padding: '8px 14px',
+                  fontSize: 14,
+                  fontWeight: 500,
+                }}
+              >
+                {formatViews(viewCount)}
+              </div>
+            </div>
+          </div>
+
+          {video.description && (
+            <div className="mf-watch-desc">{video.description}</div>
+          )}
+
+          <CommentSection videoId={video.id} onSignIn={onSignIn} />
+        </div>
+
+        <div>
+          <h3 style={{ fontSize: 16, marginBottom: 14 }}>Up next</h3>
+          <div className="mf-sidebar-list">
+            {related.map((v) => (
+              <div key={v.id} className="mf-sidebar-item" onClick={() => navigate(`/watch/${v.id}`)}>
+                <div className="mf-sidebar-thumb">
+                  {v.status === 'ready' ? (
+                    <img src={`/api/v1/videos/${v.id}/thumbnail.jpg`} alt={v.title} loading="lazy" />
+                  ) : (
+                    <div style={{ width: '100%', height: '100%', background: '#e5e5e5' }} />
+                  )}
+                </div>
+                <div className="mf-sidebar-info">
+                  <div className="mf-sidebar-title">{v.title}</div>
+                  <div className="mf-sidebar-meta">{formatViews(v.view_count)}</div>
+                  <div className="mf-sidebar-meta">{timeAgo(v.created_at)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {showPlaylistModal && video && (
+        <SaveToPlaylistModal
+          videoId={video.id}
+          onClose={() => setShowPlaylistModal(false)}
+          onToast={showToast}
+        />
+      )}
+
+      {toast && <div className="mf-toast">{toast}</div>}
+    </>
+  );
+}

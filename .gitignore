@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Databases (local dev data - NOT for Git)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data/
+services/*/data/
+
+# User content (videos, avatars, banners)
+apps/*/uploads/
+uploads/
+processed/
+thumbnails/
+
+# Secrets
+secrets/
+*.pem
+*.key
+
+# Temp
+tmp/
+temp/
+*.tmp

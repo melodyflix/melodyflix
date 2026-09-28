@@ -1,0 +1,20 @@
+{
+  "name": "@melodyflix/notifications",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "fastify": "^4.28.0",
+    "zod": "^3.23.8",
+    "@melodyflix/shared-config": "workspace:*",
+    "@melodyflix/shared-logger": "workspace:*",
+    "@melodyflix/shared-types": "workspace:*",
+    "@melodyflix/shared-db": "workspace:*",
+    "@melodyflix/shared-events": "workspace:*",
+    "@melodyflix/shared-auth": "workspace:*"
+  }
+}

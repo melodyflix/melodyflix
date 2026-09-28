@@ -1,0 +1,16 @@
+{
+  "name": "@melodyflix/health",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "fastify": "^4.28.0",
+    "@melodyflix/shared-config": "workspace:*",
+    "@melodyflix/shared-logger": "workspace:*",
+    "@melodyflix/shared-types": "workspace:*"
+  }
+}
