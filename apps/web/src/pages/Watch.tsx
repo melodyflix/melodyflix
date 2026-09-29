@@ -5,8 +5,9 @@ import {
   likeVideo, recordView, followChannel, unfollowChannel, isFollowing,
   toggleSaveVideo, isVideoSaved,
   recordHistory, getResumePosition,
+  getEpisodeInfo,
   getCachedUser,
-  type Video, type Channel,
+  type Video, type Channel, type Episode, type Series,
 } from '../lib/api';
 import HlsPlayer from '../components/HlsPlayer';
 import CommentSection from '../components/CommentSection';
@@ -49,6 +50,7 @@ export default function Watch({ onSignIn }: Props) {
   const [busyReaction, setBusyReaction] = useState(false);
   const [busySub, setBusySub] = useState(false);
   const [toast, setToast] = useState('');
+  const [episodeInfo, setEpisodeInfo] = useState<{ episode: Episode | null; series: Series | null; next_episode: Episode | null; next_video: Video | null } | null>(null);
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [resumeAt, setResumeAt] = useState<number>(0);
   const [resumedFrom, setResumedFrom] = useState<number>(0);
@@ -100,6 +102,11 @@ export default function Watch({ onSignIn }: Props) {
 
         recordView(v.id)
           .then((res) => setViewCount(res.view_count))
+          .catch(() => {});
+
+        // Fetch episode info (for series navigation)
+        getEpisodeInfo(v.id)
+          .then((info) => setEpisodeInfo(info))
           .catch(() => {});
 
         // Fetch resume position (logged-in user)
@@ -246,6 +253,32 @@ export default function Watch({ onSignIn }: Props) {
             )}
           </div>
 
+          {episodeInfo?.episode && episodeInfo.series && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                marginTop: 14,
+                marginBottom: -4,
+                fontSize: 13,
+                color: '#7c3aed',
+                fontWeight: 600,
+              }}
+            >
+              <span
+                onClick={() => navigate(`/series/${episodeInfo.series!.id}`)}
+                style={{ cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                {episodeInfo.series.title}
+              </span>
+              <span style={{ color: '#909090' }}>·</span>
+              <span>
+                S{episodeInfo.series.total_seasons > 0 ? '?' : '1'} E{episodeInfo.episode.episode_number}
+              </span>
+            </div>
+          )}
+
           <h1 className="mf-watch-title">{video.title}</h1>
 
           <div className="mf-watch-row">
@@ -337,6 +370,26 @@ export default function Watch({ onSignIn }: Props) {
               </div>
 
               <ShareMenu videoId={video.id} title={video.title} onToast={showToast} />
+
+              {episodeInfo?.next_video && (
+                <button
+                  className="mf-sub-btn"
+                  style={{
+                    background: '#7c3aed',
+                    color: '#fff',
+                    border: 'none',
+                    fontWeight: 600,
+                  }}
+                  onClick={() => {
+                    if (episodeInfo.next_video) {
+                      navigate(`/watch/${episodeInfo.next_video.id}`);
+                    }
+                  }}
+                  title="Play next episode"
+                >
+                  ⏭ Next episode
+                </button>
+              )}
 
               <button
                 className="mf-sub-btn"

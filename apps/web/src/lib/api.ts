@@ -821,3 +821,131 @@ export function podcastRssUrl(channelId: string): string {
 export interface VideoWithType extends Video {
   content_type?: string;
 }
+
+// ============ Series / Seasons / Episodes ============
+export interface Series {
+  id: string;
+  channel_id: string;
+  title: string;
+  description: string | null;
+  cover_url: string | null;
+  category: string;
+  total_seasons: number;
+  total_episodes: number;
+  status: 'ongoing' | 'completed' | 'cancelled';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Season {
+  id: string;
+  series_id: string;
+  season_number: number;
+  title: string | null;
+  description: string | null;
+  episode_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Episode {
+  id: string;
+  series_id: string;
+  season_id: string;
+  video_id: string;
+  episode_number: number;
+  title: string;
+  description: string | null;
+  skip_intro_seconds: number;
+  skip_recap_seconds: number;
+  skip_credits_seconds: number;
+  air_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SeriesWithSeasons {
+  series: Series;
+  seasons: (Season & { episodes: Episode[] })[];
+  is_owner?: boolean;
+}
+
+export interface EpisodeInfo {
+  episode: Episode | null;
+  series: Series | null;
+  next_episode?: Episode | null;
+  next_video?: Video | null;
+}
+
+export async function listAllSeries(limit = 50, offset = 0): Promise<{ series: Series[]; total: number }> {
+  return request<{ series: Series[]; total: number }>(`/api/v1/videos/series?limit=${limit}&offset=${offset}`);
+}
+
+export async function listSeriesByChannel(channelId: string): Promise<{ series: Series[]; total: number }> {
+  return request<{ series: Series[]; total: number }>(`/api/v1/videos/series?channel=${channelId}`);
+}
+
+export async function getSeries(id: string): Promise<SeriesWithSeasons> {
+  return request<SeriesWithSeasons>(`/api/v1/videos/series/${id}`);
+}
+
+export async function createSeries(input: { title: string; description?: string; cover_url?: string; category?: string }): Promise<Series> {
+  return request<Series>('/api/v1/videos/series', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateSeries(id: string, updates: Partial<Series>): Promise<Series> {
+  return request<Series>(`/api/v1/videos/series/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function deleteSeries(id: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/videos/series/${id}`, { method: 'DELETE' });
+}
+
+export async function createSeason(seriesId: string, seasonNumber: number, title?: string, description?: string): Promise<Season> {
+  return request<Season>(`/api/v1/videos/series/${seriesId}/seasons`, {
+    method: 'POST',
+    body: JSON.stringify({ season_number: seasonNumber, title, description }),
+  });
+}
+
+export async function deleteSeason(seasonId: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/videos/seasons/${seasonId}`, { method: 'DELETE' });
+}
+
+export async function createEpisode(seriesId: string, input: {
+  season_id: string;
+  video_id: string;
+  episode_number: number;
+  title: string;
+  description?: string;
+  skip_intro_seconds?: number;
+  skip_recap_seconds?: number;
+  skip_credits_seconds?: number;
+  air_date?: string;
+}): Promise<Episode> {
+  return request<Episode>(`/api/v1/videos/series/${seriesId}/episodes`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateEpisode(episodeId: string, updates: Partial<Episode>): Promise<Episode> {
+  return request<Episode>(`/api/v1/videos/episodes/${episodeId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function deleteEpisode(episodeId: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/videos/episodes/${episodeId}`, { method: 'DELETE' });
+}
+
+export async function getEpisodeInfo(videoId: string): Promise<EpisodeInfo> {
+  return request<EpisodeInfo>(`/api/v1/videos/${videoId}/episode-info`);
+}

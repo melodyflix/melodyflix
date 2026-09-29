@@ -5,6 +5,7 @@ import { loadConfig } from '@melodyflix/shared-config';
 import { createLogger } from '@melodyflix/shared-logger';
 import { searchRoutes } from './routes/search.route.js';
 import { podcastRoutes } from './routes/podcast.route.js';
+import { seriesRoutes } from './routes/series.route.js';
 import { trendingRoutes } from './routes/trending.route.js';
 import { watchLaterRoutes } from './routes/watchlater.route.js';
 import { historyRoutes } from './routes/history.route.js';
@@ -14,6 +15,7 @@ import { commentRoutes } from './routes/comment.route.js';
 import { adminReportRoutes } from './routes/admin.route.js';
 import { ensureSchema } from './services/video.service.js';
 import { ensureCommentSchema, ensureHistorySchema, ensurePlaylistSchema } from './services/comment.service.js';
+import { ensureSeriesSchema } from './services/series.service.js';
 import { ensureStorage } from './services/storage.service.js';
 
 const config = loadConfig();
@@ -38,6 +40,7 @@ ensureSchema();
 ensureCommentSchema();
 ensureHistorySchema();
 ensurePlaylistSchema();
+ensureSeriesSchema();
 logger.info('videos storage and schema ensured');
 
 // Specific routes first (before wildcards)
