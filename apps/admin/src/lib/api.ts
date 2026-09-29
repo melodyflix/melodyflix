@@ -231,3 +231,100 @@ export async function verifyChannel(channelId: string): Promise<Channel> {
 export async function unverifyChannel(channelId: string): Promise<Channel> {
   return request<Channel>(`/api/channels/admin/${channelId}/unverify`, { method: 'POST' });
 }
+
+// ============ Ad Networks (external — Adsterra, Monetag, AdSense) ============
+export interface AdNetwork {
+  id: string;
+  name: string;
+  vast_tag_url: string;
+  type: 'pre-roll' | 'mid-roll' | 'post-roll';
+  weight: number;
+  active: number;
+  priority: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function listAdNetworks(): Promise<{ networks: AdNetwork[] }> {
+  return request<{ networks: AdNetwork[] }>('/api/v1/videos/admin/ad-networks');
+}
+
+export async function createAdNetwork(input: {
+  name: string;
+  vast_tag_url: string;
+  type?: 'pre-roll' | 'mid-roll' | 'post-roll';
+  weight?: number;
+  priority?: number;
+}): Promise<AdNetwork> {
+  return request<AdNetwork>('/api/v1/videos/admin/ad-networks', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateAdNetwork(id: string, updates: Partial<{
+  name: string;
+  vast_tag_url: string;
+  type: 'pre-roll' | 'mid-roll' | 'post-roll';
+  weight: number;
+  priority: number;
+  active: number;
+}>): Promise<AdNetwork> {
+  return request<AdNetwork>(`/api/v1/videos/admin/ad-networks/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function deleteAdNetwork(id: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/videos/admin/ad-networks/${id}`, { method: 'DELETE' });
+}
+
+// ============ Internal Ads ============
+export interface Ad {
+  id: string;
+  title: string;
+  description: string | null;
+  video_url: string;
+  click_url: string | null;
+  type: 'pre-roll' | 'mid-roll' | 'post-roll';
+  duration_seconds: number;
+  skip_after_seconds: number;
+  active: number;
+  weight: number;
+  impression_count: number;
+  click_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function listAds(): Promise<{ ads: Ad[] }> {
+  return request<{ ads: Ad[] }>('/api/v1/videos/admin/ads');
+}
+
+export async function createAd(input: {
+  title: string;
+  description?: string;
+  video_url: string;
+  click_url?: string;
+  type?: 'pre-roll' | 'mid-roll' | 'post-roll';
+  duration_seconds?: number;
+  skip_after_seconds?: number;
+  weight?: number;
+}): Promise<Ad> {
+  return request<Ad>('/api/v1/videos/admin/ads', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateAd(id: string, updates: Partial<Ad>): Promise<Ad> {
+  return request<Ad>(`/api/v1/videos/admin/ads/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function deleteAd(id: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/videos/admin/ads/${id}`, { method: 'DELETE' });
+}

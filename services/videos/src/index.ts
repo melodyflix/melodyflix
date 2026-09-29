@@ -44,6 +44,8 @@ ensureHistorySchema();
 ensurePlaylistSchema();
 ensureSeriesSchema();
 ensureStorySchema();
+ensureAdsSchema();
+ensureAdNetworksSchema();
 logger.info('videos storage and schema ensured');
 
 // Specific routes first (before wildcards)
