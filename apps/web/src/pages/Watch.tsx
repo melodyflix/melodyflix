@@ -11,6 +11,7 @@ import {
 import HlsPlayer from '../components/HlsPlayer';
 import CommentSection from '../components/CommentSection';
 import ShareMenu from '../components/ShareMenu';
+import GuestBanner from '../components/GuestBanner';
 import VerifiedBadge from '../components/VerifiedBadge';
 import SaveToPlaylistModal from '../components/SaveToPlaylistModal';
 import { usePlayer } from '../components/PlayerContext';
@@ -373,6 +374,8 @@ export default function Watch({ onSignIn }: Props) {
           {video.description && (
             <div className="mf-watch-desc">{video.description}</div>
           )}
+
+          <GuestBanner onSignIn={onSignIn} />
 
           <CommentSection videoId={video.id} onSignIn={onSignIn} />
         </div>

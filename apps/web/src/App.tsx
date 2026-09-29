@@ -42,6 +42,13 @@ function AppInner() {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
+  function handleOpenLogin() {
+    try {
+      sessionStorage.setItem('mf_return_to', location.pathname + location.search);
+    } catch {}
+    setShowLogin(true);
+  }
+
   function handleSignOut() {
     clearAuth();
     setUser(null);
@@ -54,6 +61,9 @@ function AppInner() {
   }
 
   function requireSignIn() {
+    try {
+      sessionStorage.setItem('mf_return_to', location.pathname + location.search);
+    } catch {}
     setShowLogin(true);
   }
 

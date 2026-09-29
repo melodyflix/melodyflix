@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api, setAuth, type User } from '../lib/api';
 
 interface Props {
@@ -9,6 +10,8 @@ interface Props {
 type Mode = 'signin' | 'signup';
 
 export default function LoginModal({ onClose, onSuccess }: Props) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -25,11 +28,26 @@ export default function LoginModal({ onClose, onSuccess }: Props) {
         const res = await api.login(email, password);
         setAuth(res.token, res.user);
         onSuccess(res.user);
+        // Return path — if user came from a specific page, go back there
+        const returnTo = sessionStorage.getItem('mf_return_to');
+        if (returnTo) {
+          sessionStorage.removeItem('mf_return_to');
+          if (returnTo !== location.pathname + location.search) {
+            navigate(returnTo);
+          }
+        }
       } else {
         await api.signup(email, username, password, username);
         const res = await api.login(email, password);
         setAuth(res.token, res.user);
         onSuccess(res.user);
+        const returnTo = sessionStorage.getItem('mf_return_to');
+        if (returnTo) {
+          sessionStorage.removeItem('mf_return_to');
+          if (returnTo !== location.pathname + location.search) {
+            navigate(returnTo);
+          }
+        }
       }
     } catch (err) {
       setError((err as Error).message);
