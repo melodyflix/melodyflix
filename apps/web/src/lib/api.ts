@@ -963,3 +963,79 @@ export async function listShorts(limit = 50, offset = 0): Promise<ShortsListResp
 export async function listShortsByChannel(channelId: string, limit = 50, offset = 0): Promise<ShortsListResponse> {
   return request<ShortsListResponse>(`/api/v1/videos/shorts?channel=${channelId}&limit=${limit}&offset=${offset}`);
 }
+
+// ============ Stories (24h ephemeral) ============
+export interface Story {
+  id: string;
+  user_id: string;
+  media_type: 'image' | 'video';
+  media_url: string;
+  caption: string | null;
+  duration_seconds: number;
+  view_count: number;
+  expires_at: string;
+  created_at: string;
+}
+
+export interface StoryGroup {
+  user_id: string;
+  stories: Story[];
+  has_unseen: boolean;
+  latest_at: string;
+}
+
+export async function listStoryGroups(): Promise<{ groups: StoryGroup[] }> {
+  return request<{ groups: StoryGroup[] }>('/api/v1/videos/stories/groups');
+}
+
+export async function listStoriesByUser(userId: string): Promise<{ stories: Story[] }> {
+  return request<{ stories: Story[] }>(`/api/v1/videos/stories/user/${userId}`);
+}
+
+export async function markStoryViewed(storyId: string): Promise<{ viewed: boolean }> {
+  return request<{ viewed: boolean }>(`/api/v1/videos/stories/${storyId}/view`, { method: 'POST' });
+}
+
+export async function deleteStory(storyId: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/videos/stories/${storyId}`, { method: 'DELETE' });
+}
+
+export function uploadStory(
+  file: File,
+  caption: string | undefined,
+  onProgress?: (pct: number) => void,
+): Promise<Story> {
+  return new Promise((resolve, reject) => {
+    const form = new FormData();
+    if (caption) form.append('caption', caption);
+    form.append('file', file);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/v1/videos/stories/upload');
+    const token = getToken();
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300 && data.success) resolve(data.data);
+        else reject(new Error(data.error || `HTTP ${xhr.status}`));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    xhr.onerror = () => reject(new Error('Upload failed'));
+    xhr.send(form);
+  });
+}
+
+// Story media URL helper (used in <img> or <video>)
+export function storyMediaUrl(mediaUrl: string): string {
+  return mediaUrl; // already absolute path from server
+}

@@ -17,6 +17,7 @@ import { adminReportRoutes } from './routes/admin.route.js';
 import { ensureSchema } from './services/video.service.js';
 import { ensureCommentSchema, ensureHistorySchema, ensurePlaylistSchema } from './services/comment.service.js';
 import { ensureSeriesSchema } from './services/series.service.js';
+import { ensureStorySchema } from './services/story.service.js';
 import { ensureStorage } from './services/storage.service.js';
 
 const config = loadConfig();
@@ -42,6 +43,7 @@ ensureCommentSchema();
 ensureHistorySchema();
 ensurePlaylistSchema();
 ensureSeriesSchema();
+ensureStorySchema();
 logger.info('videos storage and schema ensured');
 
 // Specific routes first (before wildcards)

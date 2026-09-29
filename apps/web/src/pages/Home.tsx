@@ -5,6 +5,9 @@ import {
   type Video, type CategoryStat,
 } from '../lib/api';
 import VideoCard from '../components/VideoCard';
+import StoryBar from '../components/StoryBar';
+import LoginModal from '../components/LoginModal';
+import { getCachedUser } from '../lib/api';
 
 const CATEGORY_LABELS: Record<string, string> = {
   all: 'All',
@@ -33,6 +36,7 @@ export default function Home() {
   const [categories, setCategories] = useState<CategoryStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   // Load categories once
   useEffect(() => {
@@ -80,6 +84,8 @@ export default function Home() {
 
   return (
     <div>
+      <StoryBar onSignIn={() => setShowLoginModal(true)} />
+
       {/* Category tabs (sticky) */}
       <div
         style={{
