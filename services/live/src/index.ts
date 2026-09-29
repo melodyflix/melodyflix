@@ -7,6 +7,7 @@ import { liveRoutes } from './routes/live.route.js';
 import { ensureSchema, cleanupStaleStreams } from './services/live.service.js';
 import { ensureHlsStorage, stopAllPipelines } from './services/pipeline.service.js';
 import { handleBroadcaster, handleViewer, registerViewer, unregisterViewer } from './services/ws.service.js';
+import { startRtmpServer, stopRtmpServer } from './services/rtmp.service.js';
 
 const config = loadConfig();
 const logger = createLogger('live');
@@ -58,6 +59,13 @@ const start = async () => {
   try {
     await app.listen({ port: PORT, host: '0.0.0.0' });
     logger.info(`live service listening on port ${PORT}`);
+
+    // Start RTMP ingest server
+    try {
+      startRtmpServer();
+    } catch (err) {
+      logger.error({ err }, 'failed to start RTMP server');
+    }
     logger.info('WebSocket endpoints:');
     logger.info('  - Broadcaster: ws://127.0.0.1:4005/ws/broadcast?key=STREAM_KEY&token=JWT');
     logger.info('  - Viewer:      ws://127.0.0.1:4005/ws/viewer?streamId=ID&token=JWT');
@@ -71,6 +79,7 @@ const start = async () => {
 function shutdown() {
   logger.info('shutting down...');
   stopAllPipelines();
+  try { stopRtmpServer(); } catch {}
   process.exit(0);
 }
 process.on('SIGTERM', shutdown);

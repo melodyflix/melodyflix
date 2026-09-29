@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  api, createLiveStream, updateLiveStream, deleteLiveStream,
+  api, createLiveStream, updateLiveStream, deleteLiveStream, getLiveStream,
   liveBroadcastWsUrl,
   getCachedUser, getToken,
   type User, type LiveStream, type Channel,
@@ -14,12 +14,14 @@ interface Props {
 
 type Phase = 'setup' | 'preview' | 'live' | 'ended';
 type FacingMode = 'user' | 'environment';
+type BroadcastMode = 'camera' | 'obs';
 
 export default function GoLive({ user, onSignIn }: Props) {
   const navigate = useNavigate();
   const [channel, setChannel] = useState<Channel | null>(null);
   const [loading, setLoading] = useState(true);
   const [phase, setPhase] = useState<Phase>('setup');
+  const [broadcastMode, setBroadcastMode] = useState<BroadcastMode>('camera');
   const [error, setError] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -30,6 +32,7 @@ export default function GoLive({ user, onSignIn }: Props) {
   const [switching, setSwitching] = useState(false);
   const [hasCam, setHasCam] = useState(false);
   const [availableCameras, setAvailableCameras] = useState<number>(0);
+  const [obsConnected, setObsConnected] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -59,6 +62,26 @@ export default function GoLive({ user, onSignIn }: Props) {
     return () => clearInterval(t);
   }, [phase]);
 
+  // Poll live status in OBS mode
+  useEffect(() => {
+    if (broadcastMode !== 'obs' || !stream) return;
+    const t = setInterval(async () => {
+      try {
+        const s = await getLiveStream(stream.id);
+        setObsConnected(s.status === 'live');
+        if (s.status === 'live' && phase === 'setup') {
+          setPhase('live');
+          startedAtRef.current = Date.now();
+        }
+        if (s.status === 'ended' && phase === 'live') {
+          setPhase('ended');
+        }
+      } catch {}
+    }, 4000);
+    return () => clearInterval(t);
+  }, [broadcastMode, stream?.id, phase]);
+
+  // ============ Camera functions ============
   async function getCameraStream(facing: FacingMode): Promise<MediaStream> {
     return navigator.mediaDevices.getUserMedia({
       video: {
@@ -67,29 +90,22 @@ export default function GoLive({ user, onSignIn }: Props) {
         frameRate: { ideal: 30, max: 30 },
         facingMode: { ideal: facing },
       },
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        sampleRate: 44100,
-      },
+      audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 44100 },
     });
   }
 
   async function enableCamera() {
     setError('');
     try {
-      const stream = await getCameraStream(facingMode);
-      mediaStreamRef.current = stream;
-
-      // Check how many cameras are available
+      const s = await getCameraStream(facingMode);
+      mediaStreamRef.current = s;
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const cams = devices.filter((d) => d.kind === 'videoinput');
         setAvailableCameras(cams.length);
       } catch {}
-
       if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+        videoRef.current.srcObject = s;
         videoRef.current.muted = true;
         videoRef.current.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'none';
         videoRef.current.play().catch(() => {});
@@ -106,9 +122,7 @@ export default function GoLive({ user, onSignIn }: Props) {
     const newFacing: FacingMode = facingMode === 'user' ? 'environment' : 'user';
     setSwitching(true);
     setError('');
-
     try {
-      // Request new camera stream
       const fresh = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 1280, max: 1280 },
@@ -118,28 +132,19 @@ export default function GoLive({ user, onSignIn }: Props) {
         },
         audio: false,
       });
-
-      const newVideoTrack = fresh.getVideoTracks()[0];
-      const currentStream = mediaStreamRef.current;
-
-      // Remove and stop old video track
-      const oldTracks = currentStream.getVideoTracks();
-      for (const t of oldTracks) {
-        currentStream.removeTrack(t);
+      const newTrack = fresh.getVideoTracks()[0];
+      const cur = mediaStreamRef.current;
+      for (const t of cur.getVideoTracks()) {
+        cur.removeTrack(t);
         t.stop();
       }
-
-      // Add new video track to the SAME MediaStream (so MediaRecorder keeps working)
-      currentStream.addTrack(newVideoTrack);
-
-      // Refresh video element
+      cur.addTrack(newTrack);
       if (videoRef.current) {
         videoRef.current.srcObject = null;
-        videoRef.current.srcObject = currentStream;
+        videoRef.current.srcObject = cur;
         videoRef.current.style.transform = newFacing === 'user' ? 'scaleX(-1)' : 'none';
         videoRef.current.play().catch(() => {});
       }
-
       setFacingMode(newFacing);
     } catch (err) {
       setError(`Could not switch camera: ${(err as Error).message}`);
@@ -151,7 +156,6 @@ export default function GoLive({ user, onSignIn }: Props) {
   async function startBroadcast() {
     if (!channel || !mediaStreamRef.current) return;
     setError('');
-
     try {
       const newStream = await createLiveStream(
         channel.id,
@@ -178,11 +182,8 @@ export default function GoLive({ user, onSignIn }: Props) {
           }
         } catch {}
       };
-
       ws.onerror = () => setError('WebSocket connection error');
-      ws.onclose = () => {
-        if (phase === 'live') setPhase('ended');
-      };
+      ws.onclose = () => { if (phase === 'live') setPhase('ended'); };
 
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error('Connection timeout')), 10000);
@@ -192,8 +193,6 @@ export default function GoLive({ user, onSignIn }: Props) {
 
       const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
         ? 'video/webm;codecs=vp8,opus'
-        : MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-        ? 'video/webm;codecs=vp9,opus'
         : 'video/webm';
 
       const recorder = new MediaRecorder(mediaStreamRef.current, {
@@ -202,15 +201,11 @@ export default function GoLive({ user, onSignIn }: Props) {
         audioBitsPerSecond: 96_000,
       });
       recorderRef.current = recorder;
-
       recorder.ondataavailable = (ev) => {
         if (ev.data && ev.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-          ev.data.arrayBuffer().then((buf) => {
-            try { ws.send(buf); } catch {}
-          });
+          ev.data.arrayBuffer().then((buf) => { try { ws.send(buf); } catch {} });
         }
       };
-
       recorder.start(1000);
     } catch (err) {
       setError((err as Error).message);
@@ -223,7 +218,6 @@ export default function GoLive({ user, onSignIn }: Props) {
       try { recorderRef.current.stop(); } catch {}
     }
     recorderRef.current = null;
-
     if (wsRef.current) {
       try {
         if (wsRef.current.readyState === WebSocket.OPEN) {
@@ -233,20 +227,37 @@ export default function GoLive({ user, onSignIn }: Props) {
       } catch {}
     }
     wsRef.current = null;
-
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach((t) => t.stop());
       mediaStreamRef.current = null;
     }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
+    if (videoRef.current) videoRef.current.srcObject = null;
     setHasCam(false);
   }
 
+  // ============ OBS functions ============
+  async function createObsStream() {
+    if (!channel) return;
+    setError('');
+    try {
+      const newStream = await createLiveStream(
+        channel.id,
+        title.trim() || 'Live stream (OBS)',
+        description.trim() || undefined,
+        category
+      );
+      setStream(newStream);
+      setPhase('preview');
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  // ============ End / Reset ============
   async function endStream() {
     stopBroadcast();
     setPhase('ended');
+    setObsConnected(false);
     if (stream) {
       try { await updateLiveStream(stream.id, {}); } catch {}
     }
@@ -261,6 +272,7 @@ export default function GoLive({ user, onSignIn }: Props) {
     setDescription('');
     setDuration(0);
     setFacingMode('user');
+    setObsConnected(false);
     setPhase('setup');
   }
 
@@ -272,6 +284,11 @@ export default function GoLive({ user, onSignIn }: Props) {
     return `${m}:${String(sec).padStart(2, '0')}`;
   }
 
+  function copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text).then(() => alert('Copied!')).catch(() => alert('Failed to copy'));
+  }
+
+  // ============ Render ============
   if (!user) {
     return (
       <div className="mf-container">
@@ -294,11 +311,7 @@ export default function GoLive({ user, onSignIn }: Props) {
         <div className="mf-empty">
           <div className="mf-empty-icon">📺</div>
           <div style={{ fontSize: 18, marginBottom: 8 }}>You need a channel to go live</div>
-          <button
-            className="mf-btn-primary"
-            style={{ width: 'auto', padding: '10px 24px' }}
-            onClick={() => navigate('/channel/new')}
-          >
+          <button className="mf-btn-primary" style={{ width: 'auto', padding: '10px 24px' }} onClick={() => navigate('/channel/new')}>
             Create channel
           </button>
         </div>
@@ -306,143 +319,175 @@ export default function GoLive({ user, onSignIn }: Props) {
     );
   }
 
+  const rtmpUrl = `rtmp://${window.location.hostname}:1935/live`;
+
   return (
     <div className="mf-container" style={{ maxWidth: 900 }}>
       <h1 style={{ fontSize: 24, marginBottom: 8 }}>
         {phase === 'live' && <span style={{ color: '#dc2626' }}>● </span>}
         {phase === 'setup' && 'Go Live'}
-        {phase === 'preview' && 'Ready to broadcast'}
+        {phase === 'preview' && (broadcastMode === 'camera' ? 'Ready to broadcast' : 'Waiting for OBS...')}
         {phase === 'live' && 'You are LIVE'}
         {phase === 'ended' && 'Stream ended'}
       </h1>
 
       {phase === 'setup' && (
-        <p style={{ color: '#606060', marginBottom: 24 }}>
-          Broadcast using your camera and microphone. Works directly in the browser.
+        <p style={{ color: '#606060', marginBottom: 20 }}>
+          Choose how you want to broadcast.
         </p>
       )}
 
       {error && <div className="mf-error">{error}</div>}
 
-      {/* Camera preview */}
-      <div
-        style={{
-          width: '100%',
-          aspectRatio: '16 / 9',
-          background: '#000',
-          borderRadius: 12,
-          overflow: 'hidden',
-          position: 'relative',
-          marginBottom: 20,
-        }}
-      >
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          playsInline
+      {/* Mode tabs (only in setup) */}
+      {phase === 'setup' && (
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            marginBottom: 20,
+            background: '#f2f2f2',
+            padding: 4,
+            borderRadius: 10,
+          }}
+        >
+          <button
+            onClick={() => setBroadcastMode('camera')}
+            style={{
+              flex: 1,
+              padding: '10px 14px',
+              borderRadius: 8,
+              border: 'none',
+              background: broadcastMode === 'camera' ? '#fff' : 'transparent',
+              color: broadcastMode === 'camera' ? '#0f0f0f' : '#606060',
+              fontWeight: 600,
+              fontSize: 14,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              boxShadow: broadcastMode === 'camera' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              transition: 'all 0.15s',
+            }}
+          >
+            📷 Camera
+          </button>
+          <button
+            onClick={() => setBroadcastMode('obs')}
+            style={{
+              flex: 1,
+              padding: '10px 14px',
+              borderRadius: 8,
+              border: 'none',
+              background: broadcastMode === 'obs' ? '#fff' : 'transparent',
+              color: broadcastMode === 'obs' ? '#0f0f0f' : '#606060',
+              fontWeight: 600,
+              fontSize: 14,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              boxShadow: broadcastMode === 'obs' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              transition: 'all 0.15s',
+            }}
+          >
+            🎬 OBS / RTMP
+          </button>
+        </div>
+      )}
+
+      {/* Camera preview (only in camera mode) */}
+      {broadcastMode === 'camera' && (
+        <div
           style={{
             width: '100%',
-            height: '100%',
-            display: hasCam ? 'block' : 'none',
-            objectFit: 'cover',
-            transition: 'transform 0.2s',
+            aspectRatio: '16 / 9',
+            background: '#000',
+            borderRadius: 12,
+            overflow: 'hidden',
+            position: 'relative',
+            marginBottom: 20,
           }}
-        />
-        {!hasCam && phase !== 'ended' && (
-          <div
+        >
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
             style={{
-              position: 'absolute', inset: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexDirection: 'column', color: '#fff', gap: 12,
+              width: '100%',
+              height: '100%',
+              display: hasCam ? 'block' : 'none',
+              objectFit: 'cover',
+              transition: 'transform 0.2s',
             }}
-          >
-            <div style={{ fontSize: 60, opacity: 0.5 }}>🎥</div>
-            <div style={{ fontSize: 14, color: '#a0a0a0' }}>
-              {phase === 'setup' ? 'Camera preview off' : 'Camera stopped'}
+          />
+          {!hasCam && phase !== 'ended' && (
+            <div
+              style={{
+                position: 'absolute', inset: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexDirection: 'column', color: '#fff', gap: 12,
+              }}
+            >
+              <div style={{ fontSize: 60, opacity: 0.5 }}>🎥</div>
+              <div style={{ fontSize: 14, color: '#a0a0a0' }}>
+                {phase === 'setup' ? 'Camera preview off' : 'Camera stopped'}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+          {hasCam && (
+            <button
+              onClick={switchCamera}
+              disabled={switching}
+              title="Switch camera"
+              style={{
+                position: 'absolute', bottom: 12, right: 12,
+                width: 46, height: 46, borderRadius: '50%',
+                background: 'rgba(0,0,0,0.65)', border: '2px solid rgba(255,255,255,0.5)',
+                color: '#fff', fontSize: 20, cursor: switching ? 'wait' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                zIndex: 10, backdropFilter: 'blur(4px)',
+              }}
+            >
+              {switching ? '⟳' : '🔄'}
+            </button>
+          )}
+          {hasCam && (
+            <div
+              style={{
+                position: 'absolute', bottom: 20, left: 12,
+                background: 'rgba(0,0,0,0.6)', color: '#fff',
+                padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, zIndex: 10,
+              }}
+            >
+              {facingMode === 'user' ? '🤳 Front' : '📷 Back'}
+              {availableCameras > 1 && ' · tap 🔄 to switch'}
+            </div>
+          )}
+          {phase === 'live' && (
+            <div
+              style={{
+                position: 'absolute', top: 12, left: 12,
+                background: '#dc2626', color: '#fff',
+                padding: '4px 10px', borderRadius: 4, fontSize: 12, fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              <span>●</span> LIVE
+            </div>
+          )}
+          {phase === 'live' && (
+            <div
+              style={{
+                position: 'absolute', top: 12, right: 12,
+                background: 'rgba(0,0,0,0.7)', color: '#fff',
+                padding: '4px 10px', borderRadius: 4, fontSize: 12, fontWeight: 500,
+              }}
+            >
+              ⏱ {formatTime(duration)}
+            </div>
+          )}
+        </div>
+      )}
 
-        {/* Camera switch button */}
-        {hasCam && (
-          <button
-            onClick={switchCamera}
-            disabled={switching}
-            title={facingMode === 'user' ? 'Switch to back camera' : 'Switch to front camera'}
-            style={{
-              position: 'absolute',
-              bottom: 12,
-              right: 12,
-              width: 46,
-              height: 46,
-              borderRadius: '50%',
-              background: 'rgba(0,0,0,0.65)',
-              border: '2px solid rgba(255,255,255,0.5)',
-              color: '#fff',
-              fontSize: 20,
-              cursor: switching ? 'wait' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10,
-              backdropFilter: 'blur(4px)',
-              transition: 'transform 0.4s ease',
-              transform: switching ? 'rotate(180deg)' : 'none',
-            }}
-          >
-            {switching ? '⟳' : '🔄'}
-          </button>
-        )}
-
-        {/* Facing label */}
-        {hasCam && (
-          <div
-            style={{
-              position: 'absolute',
-              bottom: 20,
-              left: 12,
-              background: 'rgba(0,0,0,0.6)',
-              color: '#fff',
-              padding: '4px 10px',
-              borderRadius: 6,
-              fontSize: 12,
-              fontWeight: 500,
-              zIndex: 10,
-            }}
-          >
-            {facingMode === 'user' ? '🤳 Front' : '📷 Back'}
-            {availableCameras > 1 && ' · tap 🔄 to switch'}
-          </div>
-        )}
-
-        {phase === 'live' && (
-          <div
-            style={{
-              position: 'absolute', top: 12, left: 12,
-              background: '#dc2626', color: '#fff',
-              padding: '4px 10px', borderRadius: 4,
-              fontSize: 12, fontWeight: 600,
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}
-          >
-            <span style={{ animation: 'mf-blink 1s infinite' }}>●</span> LIVE
-          </div>
-        )}
-        {phase === 'live' && (
-          <div
-            style={{
-              position: 'absolute', top: 12, right: 12,
-              background: 'rgba(0,0,0,0.7)', color: '#fff',
-              padding: '4px 10px', borderRadius: 4,
-              fontSize: 12, fontWeight: 500,
-            }}
-          >
-            ⏱ {formatTime(duration)}
-          </div>
-        )}
-      </div>
-
+      {/* Common: title + desc + category (only in setup) */}
       {phase === 'setup' && (
         <>
           <div className="mf-form-group">
@@ -479,18 +524,118 @@ export default function GoLive({ user, onSignIn }: Props) {
               <option value="other">Other</option>
             </select>
           </div>
-
-          <button
-            className="mf-btn-primary"
-            style={{ width: '100%', padding: 12, fontSize: 15 }}
-            onClick={enableCamera}
-          >
-            🎥 Enable camera & microphone
-          </button>
         </>
       )}
 
-      {phase === 'preview' && (
+      {/* Camera mode: enable camera button */}
+      {phase === 'setup' && broadcastMode === 'camera' && (
+        <button
+          className="mf-btn-primary"
+          style={{ width: '100%', padding: 12, fontSize: 15 }}
+          onClick={enableCamera}
+        >
+          🎥 Enable camera & microphone
+        </button>
+      )}
+
+      {/* OBS mode: setup instructions */}
+      {phase === 'setup' && broadcastMode === 'obs' && (
+        <button
+          className="mf-btn-primary"
+          style={{ width: '100%', padding: 12, fontSize: 15 }}
+          onClick={createObsStream}
+        >
+          🔑 Generate RTMP credentials
+        </button>
+      )}
+
+      {/* OBS mode: preview — show credentials */}
+      {phase === 'preview' && broadcastMode === 'obs' && stream && (
+        <>
+          <div
+            style={{
+              background: '#1e1e1e', color: '#fff',
+              borderRadius: 12, padding: 20, marginBottom: 16,
+            }}
+          >
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              {obsConnected ? <span style={{ color: '#22c55e' }}>●</span> : <span style={{ color: '#dba617' }}>●</span>}
+              {obsConnected ? 'OBS Connected — You are LIVE!' : 'Waiting for OBS...'}
+            </div>
+
+            <div style={{ fontSize: 12, color: '#a0a0a0', marginBottom: 4 }}>Stream URL</div>
+            <div
+              style={{
+                background: '#000', padding: '10px 14px', borderRadius: 6,
+                fontFamily: 'monospace', fontSize: 13,
+                marginBottom: 12, wordBreak: 'break-all',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+              }}
+            >
+              <span>{rtmpUrl}</span>
+              <button
+                onClick={() => copyToClipboard(rtmpUrl)}
+                style={{
+                  background: '#333', border: 'none', color: '#fff',
+                  padding: '4px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 12, flexShrink: 0,
+                }}
+              >
+                Copy
+              </button>
+            </div>
+
+            <div style={{ fontSize: 12, color: '#a0a0a0', marginBottom: 4 }}>Stream Key</div>
+            <div
+              style={{
+                background: '#000', padding: '10px 14px', borderRadius: 6,
+                fontFamily: 'monospace', fontSize: 13,
+                marginBottom: 12, wordBreak: 'break-all',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+              }}
+            >
+              <span>{stream.stream_key}</span>
+              <button
+                onClick={() => copyToClipboard(stream.stream_key)}
+                style={{
+                  background: '#333', border: 'none', color: '#fff',
+                  padding: '4px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 12, flexShrink: 0,
+                }}
+              >
+                Copy
+              </button>
+            </div>
+
+            <div style={{ fontSize: 12, color: '#a0a0a0', lineHeight: 1.7 }}>
+              <strong>OBS Setup:</strong><br />
+              1. Open OBS → Settings → Stream<br />
+              2. Service: <code>Custom...</code><br />
+              3. Server: paste the Stream URL above<br />
+              4. Stream Key: paste the Stream Key above<br />
+              5. Click <strong>Start Streaming</strong>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              className="mf-btn-secondary"
+              style={{ flex: 1, padding: 12 }}
+              onClick={() => { stopBroadcast(); setPhase('setup'); }}
+            >
+              Cancel
+            </button>
+            <button
+              className="mf-btn-primary"
+              style={{ flex: 1, padding: 12, background: '#dc2626' }}
+              onClick={endStream}
+            >
+              ■ End Stream
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Camera mode: preview buttons */}
+      {phase === 'preview' && broadcastMode === 'camera' && (
         <>
           <div style={{ background: '#e8f0fe', padding: 14, borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
             <strong>Ready:</strong> {title || '(no title)'}
@@ -514,6 +659,7 @@ export default function GoLive({ user, onSignIn }: Props) {
         </>
       )}
 
+      {/* Live state */}
       {phase === 'live' && (
         <>
           <div
@@ -544,6 +690,7 @@ export default function GoLive({ user, onSignIn }: Props) {
         </>
       )}
 
+      {/* Ended state */}
       {phase === 'ended' && (
         <>
           <div style={{ background: '#f9f9f9', padding: 20, borderRadius: 8, textAlign: 'center', marginBottom: 16 }}>
