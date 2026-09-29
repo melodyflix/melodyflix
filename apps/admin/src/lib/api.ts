@@ -328,3 +328,94 @@ export async function updateAd(id: string, updates: Partial<Ad>): Promise<Ad> {
 export async function deleteAd(id: string): Promise<{ deleted: boolean }> {
   return request<{ deleted: boolean }>(`/api/v1/videos/admin/ads/${id}`, { method: 'DELETE' });
 }
+
+// ============ Payment Gateways ============
+export interface PaymentGateway {
+  id: string;
+  provider: string;
+  display_name: string;
+  api_key: string | null;
+  api_secret: string | null;
+  merchant_id: string | null;
+  base_url: string | null;
+  sandbox: number;
+  active: number;
+  is_default: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaymentTransaction {
+  id: string;
+  gateway_id: string;
+  user_id: string;
+  purpose: string;
+  reference_id: string | null;
+  amount: number;
+  currency: string;
+  status: string;
+  external_id: string | null;
+  metadata: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaymentStats {
+  total_transactions: number;
+  completed_transactions: number;
+  total_revenue: number;
+  revenue_last_30d: number;
+}
+
+export async function listPaymentGateways(): Promise<{ gateways: PaymentGateway[] }> {
+  return request<{ gateways: PaymentGateway[] }>('/api/v1/videos/admin/payment/gateways');
+}
+
+export async function createPaymentGateway(input: {
+  provider: string;
+  display_name: string;
+  api_key?: string;
+  api_secret?: string;
+  merchant_id?: string;
+  base_url?: string;
+  sandbox?: boolean;
+  active?: boolean;
+  is_default?: boolean;
+}): Promise<PaymentGateway> {
+  return request<PaymentGateway>('/api/v1/videos/admin/payment/gateways', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updatePaymentGateway(id: string, updates: Partial<{
+  display_name: string;
+  api_key: string;
+  api_secret: string;
+  merchant_id: string;
+  base_url: string;
+  sandbox: boolean;
+  active: boolean;
+  is_default: boolean;
+}>): Promise<PaymentGateway> {
+  return request<PaymentGateway>(`/api/v1/videos/admin/payment/gateways/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function deletePaymentGateway(id: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/videos/admin/payment/gateways/${id}`, { method: 'DELETE' });
+}
+
+export async function listPaymentTransactions(limit = 100, offset = 0): Promise<{ transactions: PaymentTransaction[]; stats: PaymentStats | null }> {
+  return request<{ transactions: PaymentTransaction[]; stats: PaymentStats | null }>(
+    `/api/v1/videos/admin/payment/transactions?limit=${limit}&offset=${offset}`
+  );
+}
+
+export async function completeTransaction(id: string): Promise<PaymentTransaction> {
+  return request<PaymentTransaction>(`/api/v1/videos/admin/payment/transactions/${id}/complete`, {
+    method: 'POST',
+  });
+}

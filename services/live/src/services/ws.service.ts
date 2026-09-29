@@ -7,6 +7,7 @@ import {
   addViewer, removeViewer, postChat,
 } from './live.service.js';
 import { startCameraPipeline, streamPlaylistPath } from './pipeline.service.js';
+import { consumeMessageCredit } from './chatlimits.client.js';
 
 const logger = createLogger('ws');
 
@@ -160,12 +161,43 @@ export function handleViewer(ws: WebSocket, url: URL): void {
     viewerCount: (getStreamById(streamId)?.viewer_count) ?? 0,
   }));
 
-  ws.on('message', (data) => {
+  ws.on('message', async (data) => {
     try {
       const msg = JSON.parse(data.toString());
       if (msg.type === 'chat' && typeof msg.content === 'string') {
         const content = msg.content.slice(0, 500).trim();
         if (!content) return;
+
+        // Logged-in users — check message credit
+        if (user && token) {
+          const result = await consumeMessageCredit(token);
+          if (!result.ok) {
+            if (result.error === 'MESSAGE_LIMIT_REACHED') {
+              try {
+                ws.send(JSON.stringify({
+                  type: 'limit_reached',
+                  usage: result.usage,
+                }));
+              } catch {}
+              return;
+            }
+            try {
+              ws.send(JSON.stringify({ type: 'error', message: result.error }));
+            } catch {}
+            return;
+          }
+          // Send updated usage to this viewer
+          try {
+            ws.send(JSON.stringify({ type: 'usage_update', usage: result.usage }));
+          } catch {}
+        } else {
+          // Guest users cannot chat — must sign in
+          try {
+            ws.send(JSON.stringify({ type: 'error', message: 'Sign in to chat' }));
+          } catch {}
+          return;
+        }
+
         const uname = (user ? (msg.username || username) : 'Guest').slice(0, 50);
         const chat = postChat(streamId, user?.sub ?? 'anonymous', uname, content);
         broadcastToViewers(streamId, {
@@ -173,7 +205,9 @@ export function handleViewer(ws: WebSocket, url: URL): void {
           chat: { id: chat.id, username: chat.username, content: chat.content, created_at: chat.created_at },
         });
       }
-    } catch {}
+    } catch (err) {
+      logger.error({ err: (err as Error).message }, 'ws message handler error');
+    }
   });
 
   ws.on('close', () => {

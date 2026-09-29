@@ -7,9 +7,10 @@ import Users from './pages/Users';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import AdNetworks from './pages/AdNetworks';
+import AdminPayments from './pages/AdminPayments';
 import { api, getToken, clearToken, type User } from './lib/api';
 
-type Page = 'dashboard' | 'channels' | 'videos' | 'users' | 'reports' | 'ads' | 'settings';
+type Page = 'dashboard' | 'channels' | 'videos' | 'users' | 'reports' | 'ads' | 'payments' | 'settings';
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState<boolean>(!!getToken());
@@ -38,6 +39,7 @@ export default function App() {
     { key: 'videos', label: 'Videos', icon: '🎬' },
     { key: 'users', label: 'Users', icon: '👥' },
     { key: 'ads', label: 'Ads', icon: '💰' },
+    { key: 'payments', label: 'Payments', icon: '💳' },
     { key: 'reports', label: 'Reports', icon: '🚩' },
     { key: 'settings', label: 'Settings', icon: '⚙️' },
   ];
@@ -91,6 +93,7 @@ export default function App() {
           {page === 'videos' && <Videos />}
           {page === 'users' && <Users />}
           {page === 'ads' && <AdNetworks />}
+          {page === 'payments' && <AdminPayments />}
           {page === 'reports' && <Reports />}
           {page === 'settings' && <Settings />}
         </main>

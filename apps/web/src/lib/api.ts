@@ -1073,3 +1073,90 @@ export async function recordAdClick(adId: string, videoId: string): Promise<{ re
     body: JSON.stringify({ video_id: videoId }),
   });
 }
+
+// ============ Payment Gateways (public) ============
+export interface PublicGateway {
+  id: string;
+  provider: string;
+  display_name: string;
+  sandbox: number;
+  is_default: number;
+}
+
+export async function listAvailableGateways(): Promise<{ gateways: PublicGateway[] }> {
+  return request<{ gateways: PublicGateway[] }>('/api/v1/videos/payment/available');
+}
+
+export interface CheckoutResponse {
+  transaction_id: string;
+  amount: number;
+  currency: string;
+  gateway: {
+    provider: string;
+    display_name: string;
+    sandbox: boolean;
+    merchant_id: string | null;
+    base_url: string | null;
+  };
+}
+
+export async function startCheckout(input: {
+  purpose: 'super_chat' | 'membership' | 'donation' | 'ppv' | 'message_pack';
+  amount: number;
+  currency?: string;
+  reference_id?: string;
+  metadata?: Record<string, any>;
+  gateway_id?: string;
+}): Promise<CheckoutResponse> {
+  return request<CheckoutResponse>('/api/v1/videos/payment/checkout', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function verifyPayment(transactionId: string, status?: string, externalId?: string): Promise<any> {
+  return request<any>('/api/v1/videos/payment/verify', {
+    method: 'POST',
+    body: JSON.stringify({ transaction_id: transactionId, status, external_id: externalId }),
+  });
+}
+
+export interface MyTransaction {
+  id: string;
+  purpose: string;
+  amount: number;
+  currency: string;
+  status: string;
+  created_at: string;
+}
+
+export async function listMyTransactions(): Promise<{ transactions: MyTransaction[] }> {
+  return request<{ transactions: MyTransaction[] }>('/api/v1/videos/payment/my-transactions');
+}
+
+// ============ Chat Limits ============
+export interface ChatUsage {
+  free_used: number;
+  free_remaining: number;
+  free_limit: number;
+  paid_balance: number;
+  total_messages_sent: number;
+  can_send: boolean;
+  requires_payment: boolean;
+  pack_price: number;
+  pack_size: number;
+}
+
+export async function getChatUsage(): Promise<ChatUsage> {
+  return request<ChatUsage>('/api/v1/videos/chat-limits/me');
+}
+
+export async function getChatLimitConstants(): Promise<{ FREE_MESSAGE_LIMIT: number; MESSAGE_PACK_SIZE: number; MESSAGE_PACK_PRICE_BDT: number }> {
+  return request<{ FREE_MESSAGE_LIMIT: number; MESSAGE_PACK_SIZE: number; MESSAGE_PACK_PRICE_BDT: number }>('/api/v1/videos/chat-limits/constants');
+}
+
+export async function consumeMessageCredit(): Promise<{ consumed: 'free' | 'paid'; usage: ChatUsage }> {
+  return request<{ consumed: 'free' | 'paid'; usage: ChatUsage }>('/api/v1/videos/chat-limits/consume', {
+    method: 'POST',
+  });
+}
