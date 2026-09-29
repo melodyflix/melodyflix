@@ -6,6 +6,7 @@ import {
 } from '../lib/api';
 import VideoCard from '../components/VideoCard';
 import VerifiedBadge from '../components/VerifiedBadge';
+import ChannelPosts from '../components/ChannelPosts';
 
 export default function Channel() {
   const { id } = useParams<{ id: string }>();
@@ -17,6 +18,7 @@ export default function Channel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+  const [tab, setTab] = useState<'videos' | 'community'>('videos');
   const [subscriberCount, setSubscriberCount] = useState(0);
   const [busySub, setBusySub] = useState(false);
 
@@ -110,18 +112,70 @@ export default function Channel() {
       </div>
 
       <div className="mf-container">
-        <h2 style={{ fontSize: 18, marginBottom: 16 }}>Videos</h2>
-        {videos.length === 0 ? (
-          <div className="mf-empty">
-            <div className="mf-empty-icon">📭</div>
-            <div>No videos yet</div>
-          </div>
-        ) : (
-          <div className="mf-grid">
-            {videos.map((v) => (
-              <VideoCard key={v.id} video={v} onClick={(id) => navigate(`/watch/${id}`)} />
-            ))}
-          </div>
+        {/* Tab bar */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 4,
+            borderBottom: '1px solid #e5e5e5',
+            marginBottom: 20,
+          }}
+        >
+          <button
+            onClick={() => setTab('videos')}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '10px 20px',
+              fontSize: 14,
+              fontWeight: 600,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+              color: tab === 'videos' ? '#0f0f0f' : '#606060',
+              borderBottom: tab === 'videos' ? '3px solid #0f0f0f' : '3px solid transparent',
+              marginBottom: -1,
+              transition: 'all 0.15s',
+            }}
+          >
+            Videos
+          </button>
+          <button
+            onClick={() => setTab('community')}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '10px 20px',
+              fontSize: 14,
+              fontWeight: 600,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+              color: tab === 'community' ? '#0f0f0f' : '#606060',
+              borderBottom: tab === 'community' ? '3px solid #0f0f0f' : '3px solid transparent',
+              marginBottom: -1,
+              transition: 'all 0.15s',
+            }}
+          >
+            Community
+          </button>
+        </div>
+
+        {tab === 'videos' && (
+          videos.length === 0 ? (
+            <div className="mf-empty">
+              <div className="mf-empty-icon">📭</div>
+              <div>No videos yet</div>
+            </div>
+          ) : (
+            <div className="mf-grid">
+              {videos.map((v) => (
+                <VideoCard key={v.id} video={v} onClick={(id) => navigate(`/watch/${id}`)} />
+              ))}
+            </div>
+          )
+        )}
+
+        {tab === 'community' && channel && (
+          <ChannelPosts channel={channel} onSignIn={() => {}} />
         )}
       </div>
     </>

@@ -6,7 +6,9 @@ import { createLogger } from '@melodyflix/shared-logger';
 import { channelRoutes, channelUploadRoutes } from './routes/channel.route.js';
 import { subscriptionsRoutes } from './routes/subscriptions.route.js';
 import { channelAdminRoutes } from './routes/admin.route.js';
+import { communityRoutes } from './routes/community.route.js';
 import { ensureSchema } from './services/channel.service.js';
+import { ensureCommunitySchema } from './services/community.service.js';
 import { ensureChannelStorage } from './services/storage.service.js';
 
 const config = loadConfig();
@@ -27,12 +29,14 @@ app.addHook('onRequest', async (req, reply) => {
 app.get('/health', async () => ({ service: 'channel', status: 'ok' }));
 
 ensureSchema();
+ensureCommunitySchema();
 ensureChannelStorage();
-logger.info('channel schema and storage ensured');
+logger.info('channel + community schema and storage ensured');
 
-// Order matters: specific routes BEFORE wildcards
+// Register specific routes BEFORE wildcards
 await app.register(subscriptionsRoutes, { prefix: '/api/v1/channels' });
 await app.register(channelAdminRoutes, { prefix: '/api/v1/channels' });
+await app.register(communityRoutes, { prefix: '/api/v1/channels' });
 await app.register(channelUploadRoutes, { prefix: '/api/v1/channels' });
 await app.register(channelRoutes, { prefix: '/api/v1/channels' });
 

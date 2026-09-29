@@ -695,3 +695,52 @@ export function liveViewerWsUrl(streamId: string, token?: string): string {
   const t = token ? `&token=${encodeURIComponent(token)}` : '';
   return `${proto}://${window.location.host}/ws-live/viewer?streamId=${encodeURIComponent(streamId)}${t}`;
 }
+
+// ============ Community Posts ============
+export interface CommunityPost {
+  id: string;
+  channel_id: string;
+  content: string;
+  like_count: number;
+  comment_count: number;
+  created_at: string;
+  updated_at: string;
+  user_reaction?: boolean;
+}
+
+export interface CommunityPostsResponse {
+  posts: CommunityPost[];
+  total: number;
+}
+
+export async function listChannelPosts(channelId: string, limit = 20, offset = 0): Promise<CommunityPostsResponse> {
+  return request<CommunityPostsResponse>(`/api/channels/${channelId}/posts?limit=${limit}&offset=${offset}`);
+}
+
+export async function createCommunityPost(channelId: string, content: string): Promise<CommunityPost> {
+  return request<CommunityPost>(`/api/channels/${channelId}/posts`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
+}
+
+export async function updateCommunityPost(postId: string, content: string): Promise<CommunityPost> {
+  return request<CommunityPost>(`/api/channels/posts/${postId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ content }),
+  });
+}
+
+export async function deleteCommunityPost(postId: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/channels/posts/${postId}`, { method: 'DELETE' });
+}
+
+export async function toggleCommunityPostLike(postId: string): Promise<{ liked: boolean; likeCount: number }> {
+  return request<{ liked: boolean; likeCount: number }>(`/api/channels/posts/${postId}/like`, {
+    method: 'POST',
+  });
+}
+
+export async function getMyChannelPosts(): Promise<{ posts: CommunityPost[]; total: number; channel: Channel | null }> {
+  return request<{ posts: CommunityPost[]; total: number; channel: Channel | null }>('/api/channels/me/posts/own');
+}
