@@ -1039,3 +1039,37 @@ export function uploadStory(
 export function storyMediaUrl(mediaUrl: string): string {
   return mediaUrl; // already absolute path from server
 }
+
+// ============ Ad Config ============
+export interface AdConfig {
+  source: 'internal' | 'external';
+  vast_tag_url?: string;
+  network_name?: string;
+  ad?: {
+    id: string;
+    title: string;
+    video_url: string;
+    click_url: string | null;
+    type: string;
+    duration_seconds: number;
+    skip_after_seconds: number;
+  };
+}
+
+export async function getAdConfig(videoId: string): Promise<AdConfig> {
+  return request<AdConfig>(`/api/v1/videos/admin/ad-config/${videoId}`);
+}
+
+export async function recordAdImpression(adId: string, videoId: string): Promise<{ recorded: boolean }> {
+  return request<{ recorded: boolean }>(`/api/v1/videos/admin/ads/${adId}/impression`, {
+    method: 'POST',
+    body: JSON.stringify({ video_id: videoId }),
+  });
+}
+
+export async function recordAdClick(adId: string, videoId: string): Promise<{ recorded: boolean }> {
+  return request<{ recorded: boolean }>(`/api/v1/videos/admin/ads/${adId}/click`, {
+    method: 'POST',
+    body: JSON.stringify({ video_id: videoId }),
+  });
+}

@@ -6,13 +6,17 @@ import {
   toggleSaveVideo, isVideoSaved,
   recordHistory, getResumePosition,
   getEpisodeInfo,
+  getAdConfig,
+  recordAdImpression,
   getCachedUser,
+  type AdConfig,
   type Video, type Channel, type Episode, type Series,
 } from '../lib/api';
 import HlsPlayer from '../components/HlsPlayer';
 import CommentSection from '../components/CommentSection';
 import ShareMenu from '../components/ShareMenu';
 import GuestBanner from '../components/GuestBanner';
+import AdPlayer from '../components/AdPlayer';
 import VerifiedBadge from '../components/VerifiedBadge';
 import SaveToPlaylistModal from '../components/SaveToPlaylistModal';
 import { usePlayer } from '../components/PlayerContext';
@@ -50,6 +54,9 @@ export default function Watch({ onSignIn }: Props) {
   const [busyReaction, setBusyReaction] = useState(false);
   const [busySub, setBusySub] = useState(false);
   const [toast, setToast] = useState('');
+  const [showAd, setShowAd] = useState(true);
+  const [adConfig, setAdConfig] = useState<AdConfig | null>(null);
+  const [adLoading, setAdLoading] = useState(true);
   const [episodeInfo, setEpisodeInfo] = useState<{ episode: Episode | null; series: Series | null; next_episode: Episode | null; next_video: Video | null } | null>(null);
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [resumeAt, setResumeAt] = useState<number>(0);
@@ -103,6 +110,23 @@ export default function Watch({ onSignIn }: Props) {
         recordView(v.id)
           .then((res) => setViewCount(res.view_count))
           .catch(() => {});
+
+        // Fetch ad config (pre-roll)
+        getAdConfig(v.id)
+          .then(async (cfg) => {
+            if (cfg && (cfg.ad || cfg.vast_tag_url)) {
+              setAdConfig(cfg);
+              setShowAd(true);
+              // Record impression for internal ads
+              if (cfg.ad?.id) {
+                recordAdImpression(cfg.ad.id, v.id).catch(() => {});
+              }
+            } else {
+              setShowAd(false);
+            }
+          })
+          .catch(() => setShowAd(false))
+          .finally(() => setAdLoading(false));
 
         // Fetch episode info (for series navigation)
         getEpisodeInfo(v.id)
@@ -235,7 +259,22 @@ export default function Watch({ onSignIn }: Props) {
       <div className="mf-watch">
         <div>
           <div ref={playerWrapRef}>
-            {video.status === 'ready' ? (
+            {video.status === 'ready' && adLoading ? (
+              <div className="mf-player">
+                <div className="mf-player-status">Loading...</div>
+              </div>
+            ) : video.status === 'ready' && showAd && adConfig ? (
+              <div className="mf-player">
+                <AdPlayer
+                  vastTagUrl={adConfig.vast_tag_url}
+                  fallbackVideoUrl={adConfig.ad?.video_url}
+                  fallbackClickUrl={adConfig.ad?.click_url ?? undefined}
+                  skipAfter={adConfig.ad?.skip_after_seconds ?? 5}
+                  onComplete={() => setShowAd(false)}
+                  onError={() => setShowAd(false)}
+                />
+              </div>
+            ) : video.status === 'ready' ? (
               <HlsPlayer
                 src={streamSrc}
                 poster={poster}

@@ -7,6 +7,7 @@ import {
 } from '../services/vast.service.js';
 import {
   createAd, listAds, getAdById, updateAd as updateAdSvc, deleteAd as deleteAdSvc, getAdStats,
+  recordImpression, recordClick,
 } from '../services/ads.service.js';
 
 const CreateNetworkSchema = z.object({
@@ -136,6 +137,44 @@ export async function adNetworkRoutes(app: FastifyInstance) {
       return reply.send({ success: true, data: { deleted: true } });
     } catch (err) {
       return reply.code(403).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // POST /api/v1/videos/admin/ads/:id/impression
+  app.post('/ads/:id/impression', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { video_id } = (req.body ?? {}) as { video_id?: string };
+    const user = extractBearerToken(req.headers.authorization)
+      ? (await import('@melodyflix/shared-auth')).verifyJwt(
+          extractBearerToken(req.headers.authorization)!
+        )
+      : null;
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
+      ?? req.ip ?? null;
+    try {
+      recordImpression(id, user?.sub ?? null, video_id ?? null, ip);
+      return reply.send({ success: true, data: { recorded: true } });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // POST /api/v1/videos/admin/ads/:id/click
+  app.post('/ads/:id/click', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { video_id } = (req.body ?? {}) as { video_id?: string };
+    const user = extractBearerToken(req.headers.authorization)
+      ? (await import('@melodyflix/shared-auth')).verifyJwt(
+          extractBearerToken(req.headers.authorization)!
+        )
+      : null;
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
+      ?? req.ip ?? null;
+    try {
+      recordClick(id, user?.sub ?? null, video_id ?? null, ip);
+      return reply.send({ success: true, data: { recorded: true } });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
     }
   });
 }
