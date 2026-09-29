@@ -1160,3 +1160,40 @@ export async function consumeMessageCredit(): Promise<{ consumed: 'free' | 'paid
     method: 'POST',
   });
 }
+
+// ============ Super Chat ============
+export interface SuperChat {
+  id: string;
+  stream_id: string;
+  user_id: string;
+  username: string;
+  content: string;
+  amount: number;
+  currency: string;
+  color: string;
+  pinned_until: string;
+  transaction_id: string | null;
+  created_at: string;
+}
+
+export interface SuperChatConfig {
+  min_amount: number;
+  presets: { amount: number; color: string; pinSeconds: number; label: string }[];
+}
+
+export async function getSuperChatConfig(): Promise<SuperChatConfig> {
+  return request<SuperChatConfig>('/api/v1/live/superchat-config');
+}
+
+export async function listSuperChats(streamId: string, limit = 50): Promise<{ superchats: SuperChat[]; pinned: SuperChat[] }> {
+  return request<{ superchats: SuperChat[]; pinned: SuperChat[] }>(
+    `/api/v1/live/${streamId}/superchats?limit=${limit}`
+  );
+}
+
+export async function sendSuperChat(streamId: string, content: string, amount: number, transactionId: string): Promise<SuperChat> {
+  return request<SuperChat>(`/api/v1/live/${streamId}/superchats`, {
+    method: 'POST',
+    body: JSON.stringify({ content, amount, transaction_id: transactionId }),
+  });
+}

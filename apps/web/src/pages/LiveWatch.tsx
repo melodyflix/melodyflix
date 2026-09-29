@@ -26,6 +26,8 @@ export default function LiveWatch({ onSignIn }: Props) {
   const [wsConnected, setWsConnected] = useState(false);
   const [chatUsage, setChatUsage] = useState<ChatUsage | null>(null);
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [showSuperChatModal, setShowSuperChatModal] = useState(false);
+  const [pinnedChats, setPinnedChats] = useState<any[]>([]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<any>(null);
@@ -45,6 +47,11 @@ export default function LiveWatch({ onSignIn }: Props) {
 
         const chatRes = await listLiveChat(id, 100);
         setChat(chatRes.chat);
+
+        try {
+          const scRes = await listSuperChats(id, 20);
+          if (scRes.pinned) setPinnedChats(scRes.pinned);
+        } catch {}
       } catch (err) {
         setError((err as Error).message);
       } finally {
@@ -81,6 +88,8 @@ export default function LiveWatch({ onSignIn }: Props) {
         } else if (msg.type === 'limit_reached') {
           if (msg.usage) setChatUsage(msg.usage);
           setShowLimitModal(true);
+        } else if (msg.type === 'superchat' && msg.superchat) {
+          setPinnedChats((prev) => [msg.superchat, ...prev].slice(0, 5));
         } else if (msg.type === 'usage_update') {
           if (msg.usage) setChatUsage(msg.usage);
         }
@@ -284,6 +293,31 @@ export default function LiveWatch({ onSignIn }: Props) {
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+            {pinnedChats.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                {pinnedChats.map((sc: any) => (
+                  <div
+                    key={sc.id}
+                    style={{
+                      background: sc.color,
+                      color: '#fff',
+                      padding: '10px 14px',
+                      borderRadius: 10,
+                      border: '2px solid ' + sc.color,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ fontWeight: 700, fontSize: 13 }}>💎 {sc.username}</span>
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>৳{sc.amount}</span>
+                    </div>
+                    <div style={{ fontSize: 14, lineHeight: 1.4 }}>{sc.content}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {chat.length === 0 ? (
               <div style={{ color: '#606060', fontSize: 13, textAlign: 'center', marginTop: 30 }}>
                 No messages yet — be the first!
@@ -347,10 +381,40 @@ export default function LiveWatch({ onSignIn }: Props) {
               >
                 Send
               </button>
+              <button
+                type="button"
+                onClick={() => me ? setShowSuperChatModal(true) : onSignIn()}
+                title="Send Super Chat"
+                style={{
+                  background: '#7c3aed',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                💎 Super
+              </button>
             </div>
           </form>
         </div>
       </div>
+      {showSuperChatModal && id && (
+        <SuperChatModal
+          streamId={id}
+          onClose={() => setShowSuperChatModal(false)}
+          onSignIn={onSignIn}
+          onSent={(sc) => {
+            setPinnedChats((prev) => [sc, ...prev].slice(0, 5));
+          }}
+        />
+      )}
+
       {showLimitModal && chatUsage && (
         <div
           onClick={() => setShowLimitModal(false)}

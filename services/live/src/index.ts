@@ -4,7 +4,9 @@ import websocket from '@fastify/websocket';
 import { loadConfig } from '@melodyflix/shared-config';
 import { createLogger } from '@melodyflix/shared-logger';
 import { liveRoutes } from './routes/live.route.js';
+import { superChatRoutes } from './routes/superchat.route.js';
 import { ensureSchema, cleanupStaleStreams } from './services/live.service.js';
+import { ensureSuperChatSchema } from './services/superchat.service.js';
 import { ensureHlsStorage, stopAllPipelines } from './services/pipeline.service.js';
 import { handleBroadcaster, handleViewer, registerViewer, unregisterViewer } from './services/ws.service.js';
 import { startRtmpServer, stopRtmpServer } from './services/rtmp.service.js';
@@ -27,6 +29,7 @@ app.addHook('onRequest', async (req, reply) => {
 app.get('/health', async () => ({ service: 'live', status: 'ok' }));
 
 ensureSchema();
+ensureSuperChatSchema();
 ensureHlsStorage();
 logger.info('live schema and HLS storage ensured');
 
