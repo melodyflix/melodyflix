@@ -20,12 +20,14 @@ const CreateMetaSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(5000).optional(),
   visibility: z.enum(['public', 'unlisted', 'private']).optional(),
+  category: z.string().max(30).optional(),
 });
 
 const UpdateVideoSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   description: z.string().max(5000).optional(),
   visibility: z.enum(['public', 'unlisted', 'private']).optional(),
+  category: z.string().max(30).optional(),
 });
 
 const LikeSchema = z.object({
@@ -120,8 +122,9 @@ export async function videoRoutes(app: FastifyInstance) {
     const description = fields.description?.value?.toString();
     const channelId = fields.channelId?.value?.toString() ?? 'unknown';
     const visibility = fields.visibility?.value?.toString() as 'public' | 'unlisted' | 'private' | undefined;
+    const category = fields.category?.value?.toString();
 
-    const parsed = CreateMetaSchema.safeParse({ title, description, visibility });
+    const parsed = CreateMetaSchema.safeParse({ title, description, visibility, category });
     if (!parsed.success) {
       return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
     }

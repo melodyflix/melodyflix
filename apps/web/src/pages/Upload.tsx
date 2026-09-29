@@ -16,6 +16,7 @@ export default function Upload({ user, onSignIn }: Props) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'unlisted' | 'private'>('public');
+  const [category, setCategory] = useState<string>('other');
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -190,6 +191,28 @@ export default function Upload({ user, onSignIn }: Props) {
             <option value="public">Public — everyone can see</option>
             <option value="unlisted">Unlisted — only with link</option>
             <option value="private">Private — only you</option>
+          </select>
+        </div>
+
+        <div className="mf-form-group">
+          <label className="mf-label">Category</label>
+          <select
+            className="mf-input"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            disabled={busy}
+          >
+            <option value="music">Music</option>
+            <option value="gaming">Gaming</option>
+            <option value="education">Education</option>
+            <option value="technology">Technology</option>
+            <option value="entertainment">Entertainment</option>
+            <option value="sports">Sports</option>
+            <option value="news">News</option>
+            <option value="comedy">Comedy</option>
+            <option value="film">Film</option>
+            <option value="vlog">Vlog</option>
+            <option value="other">Other</option>
           </select>
         </div>
 

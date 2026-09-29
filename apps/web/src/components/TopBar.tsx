@@ -16,11 +16,13 @@ interface Props {
   onHistory: () => void;
   onPlaylists: () => void;
   onMyVideos: () => void;
+  onGoLive: () => void;
+  onLive: () => void;
 }
 
 export default function TopBar({
   user, onLogoClick, onSearch, onSignIn, onSignOut, onMyChannel, onUpload,
-  onWatchLater, onSubscriptions, onHistory, onPlaylists, onMyVideos,
+  onWatchLater, onSubscriptions, onHistory, onPlaylists, onMyVideos, onGoLive, onLive,
 }: Props) {
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -50,6 +52,43 @@ export default function TopBar({
       </form>
 
       <div className="mf-topbar-right">
+        {/* Live button */}
+        <button
+          onClick={onLive}
+          title="Live streams"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            fontSize: 22,
+            cursor: 'pointer',
+            padding: '4px 8px',
+            color: '#0f0f0f',
+            lineHeight: 1,
+            position: 'relative',
+          }}
+        >
+          📡
+        </button>
+
+        {/* Go Live button */}
+        {user && (
+          <button
+            onClick={onGoLive}
+            title="Go Live"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              fontSize: 22,
+              cursor: 'pointer',
+              padding: '4px 8px',
+              color: '#dc2626',
+              lineHeight: 1,
+            }}
+          >
+            🔴
+          </button>
+        )}
+
         {user && (
           <button
             onClick={onUpload}
@@ -93,6 +132,12 @@ export default function TopBar({
                 <div style={{ padding: '8px 16px', borderBottom: '1px solid #f0f0f0' }}>
                   <div style={{ fontWeight: 500 }}>{user.username}</div>
                   <div style={{ fontSize: 12, color: '#606060' }}>{user.email}</div>
+                </div>
+                <div
+                  onClick={() => { setMenuOpen(false); onGoLive(); }}
+                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14, color: '#dc2626', fontWeight: 500 }}
+                >
+                  🔴 Go Live
                 </div>
                 <div
                   onClick={() => { setMenuOpen(false); onMyChannel(); }}

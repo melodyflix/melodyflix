@@ -4,6 +4,7 @@ import multipart from '@fastify/multipart';
 import { loadConfig } from '@melodyflix/shared-config';
 import { createLogger } from '@melodyflix/shared-logger';
 import { searchRoutes } from './routes/search.route.js';
+import { trendingRoutes } from './routes/trending.route.js';
 import { watchLaterRoutes } from './routes/watchlater.route.js';
 import { historyRoutes } from './routes/history.route.js';
 import { playlistRoutes } from './routes/playlist.route.js';
@@ -38,8 +39,9 @@ ensureHistorySchema();
 ensurePlaylistSchema();
 logger.info('videos storage and schema ensured');
 
-// Routes — specific paths BEFORE wildcards
+// Specific routes first (before wildcards)
 await app.register(searchRoutes, { prefix: '/api/v1/videos' });
+await app.register(trendingRoutes, { prefix: '/api/v1/videos' });
 await app.register(watchLaterRoutes, { prefix: '/api/v1/videos' });
 await app.register(historyRoutes, { prefix: '/api/v1/videos' });
 await app.register(playlistRoutes, { prefix: '/api/v1/videos' });

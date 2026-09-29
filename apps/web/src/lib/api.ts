@@ -574,3 +574,124 @@ export function uploadChannelBanner(channelId: string, file: File): Promise<{ ur
     xhr.send(form);
   });
 }
+
+// ============ Trending & Categories ============
+export interface CategoryStat {
+  category: string;
+  video_count: number;
+  total_views: number;
+}
+
+export async function listTrending(limit = 50, offset = 0, days = 7): Promise<{ videos: Video[]; total: number; days: number }> {
+  return request<{ videos: Video[]; total: number; days: number }>(
+    `/api/v1/videos/trending?limit=${limit}&offset=${offset}&days=${days}`
+  );
+}
+
+export async function listCategories(): Promise<{ categories: CategoryStat[] }> {
+  return request<{ categories: CategoryStat[] }>('/api/v1/videos/categories');
+}
+
+export async function listVideosByCategory(category: string, limit = 50, offset = 0): Promise<{ videos: Video[]; total: number; category: string }> {
+  return request<{ videos: Video[]; total: number; category: string }>(
+    `/api/v1/videos/category/${category}?limit=${limit}&offset=${offset}`
+  );
+}
+
+export const VIDEO_CATEGORIES = [
+  'music', 'gaming', 'education', 'technology', 'entertainment',
+  'sports', 'news', 'comedy', 'film', 'vlog', 'other',
+] as const;
+
+export type VideoCategory = typeof VIDEO_CATEGORIES[number];
+
+// ============ Live Streaming ============
+export interface LiveStream {
+  id: string;
+  user_id: string;
+  channel_id: string;
+  title: string;
+  description: string | null;
+  stream_key: string;
+  category: string;
+  status: 'idle' | 'connecting' | 'live' | 'ended';
+  source: 'camera' | 'rtmp';
+  hls_url: string | null;
+  viewer_count: number;
+  peak_viewers: number;
+  total_views: number;
+  started_at: string | null;
+  ended_at: string | null;
+  created_at: string;
+  updated_at: string;
+  is_live?: boolean;
+}
+
+export interface LiveChat {
+  id: string;
+  stream_id: string;
+  user_id: string;
+  username: string;
+  content: string;
+  created_at: string;
+}
+
+export async function listLiveStreams(limit = 50, offset = 0): Promise<{ streams: LiveStream[]; total: number }> {
+  return request<{ streams: LiveStream[]; total: number }>(`/api/v1/live/streams?limit=${limit}&offset=${offset}`);
+}
+
+export async function getLiveStream(id: string): Promise<LiveStream> {
+  return request<LiveStream>(`/api/v1/live/${id}`);
+}
+
+export async function getMyActiveStream(): Promise<LiveStream> {
+  return request<LiveStream>('/api/v1/live/me/active');
+}
+
+export async function listMyStreams(): Promise<{ streams: LiveStream[] }> {
+  return request<{ streams: LiveStream[] }>('/api/v1/live/me');
+}
+
+export async function createLiveStream(channelId: string, title: string, description?: string, category?: string): Promise<LiveStream> {
+  return request<LiveStream>('/api/v1/live/streams', {
+    method: 'POST',
+    body: JSON.stringify({ channel_id: channelId, title, description, category }),
+  });
+}
+
+export async function updateLiveStream(id: string, updates: { title?: string; description?: string; category?: string }): Promise<LiveStream> {
+  return request<LiveStream>(`/api/v1/live/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function deleteLiveStream(id: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/live/${id}`, { method: 'DELETE' });
+}
+
+export async function listLiveChat(streamId: string, limit = 100, since?: string): Promise<{ chat: LiveChat[] }> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (since) params.set('since', since);
+  return request<{ chat: LiveChat[] }>(`/api/v1/live/${streamId}/chat?${params}`);
+}
+
+export async function postLiveChat(streamId: string, content: string): Promise<LiveChat> {
+  return request<LiveChat>(`/api/v1/live/${streamId}/chat`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
+}
+
+// WebSocket URLs — uses current host
+export function liveBroadcastWsUrl(streamKey: string, token: string): string {
+  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  // When served via nginx on 5174, proxy needs /ws → live service
+  return `${proto}://${window.location.host}/ws-live/broadcast?key=${encodeURIComponent(streamKey)}&token=${encodeURIComponent(token)}`;
+}
+
+export function liveViewerWsUrl(streamId: string, token?: string): string {
+  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const t = token ? `&token=${encodeURIComponent(token)}` : '';
+  return `${proto}://${window.location.host}/ws-live/viewer?streamId=${encodeURIComponent(streamId)}${t}`;
+}

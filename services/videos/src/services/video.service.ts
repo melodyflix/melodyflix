@@ -68,6 +68,7 @@ export function createVideo(
     description: input.description ?? null,
     visibility: input.visibility ?? 'public',
     status: 'uploading',
+    category: input.category ?? 'other',
     duration_seconds: 0,
     file_size_bytes: fileSize,
     original_filename: originalFilename,
@@ -80,14 +81,14 @@ export function createVideo(
     updated_at: now,
   };
   db.prepare(`
-    INSERT INTO videos (id, channel_id, owner_id, title, description, visibility, status,
+    INSERT INTO videos (id, channel_id, owner_id, title, description, visibility, status, category,
                         duration_seconds, file_size_bytes, original_filename,
                         hls_master_url, thumbnail_url, view_count, like_count, dislike_count,
                         created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     video.id, video.channel_id, video.owner_id, video.title, video.description,
-    video.visibility, video.status, video.duration_seconds, video.file_size_bytes,
+    video.visibility, video.status, video.category, video.duration_seconds, video.file_size_bytes,
     video.original_filename, video.hls_master_url, video.thumbnail_url,
     video.view_count, video.like_count, video.dislike_count,
     video.created_at, video.updated_at
@@ -342,4 +343,82 @@ export function countSearchResults(opts: Omit<SearchOptions, 'limit' | 'offset' 
   const where = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
   const row = db.prepare(`SELECT COUNT(*) as n FROM videos ${where}`).get(...params) as { n: number };
   return row.n;
+}
+
+// ---------- Trending ----------
+export function listTrending(limit = 50, offset = 0, windowDays = 7): Video[] {
+  const db = getDb();
+  const cutoff = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString();
+  return db.prepare(`
+    SELECT * FROM videos
+    WHERE status = 'ready'
+      AND visibility = 'public'
+      AND created_at >= ?
+    ORDER BY (view_count * 2 + like_count * 5 - dislike_count * 2) DESC, created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(cutoff, limit, offset) as Video[];
+}
+
+export function countTrending(windowDays = 7): number {
+  const db = getDb();
+  const cutoff = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString();
+  const row = db.prepare(`
+    SELECT COUNT(*) as n FROM videos
+    WHERE status = 'ready' AND visibility = 'public' AND created_at >= ?
+  `).get(cutoff) as { n: number };
+  return row.n;
+}
+
+// ---------- Categories ----------
+export interface CategoryStats {
+  category: string;
+  video_count: number;
+  total_views: number;
+}
+
+export function listCategories(): CategoryStats[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      COALESCE(category, 'other') as category,
+      COUNT(*) as video_count,
+      COALESCE(SUM(view_count), 0) as total_views
+    FROM videos
+    WHERE status = 'ready' AND visibility = 'public'
+    GROUP BY category
+    ORDER BY video_count DESC
+  `).all() as CategoryStats[];
+}
+
+export function listVideosByCategory(category: string, limit = 50, offset = 0): Video[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT * FROM videos
+    WHERE status = 'ready'
+      AND visibility = 'public'
+      AND COALESCE(category, 'other') = ?
+    ORDER BY created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(category, limit, offset) as Video[];
+}
+
+export function countVideosByCategory(category: string): number {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT COUNT(*) as n FROM videos
+    WHERE status = 'ready' AND visibility = 'public' AND COALESCE(category, 'other') = ?
+  `).get(category) as { n: number };
+  return row.n;
+}
+
+// ---------- Update category ----------
+export function updateVideoCategory(id: string, ownerId: string, category: string): Video {
+  const db = getDb();
+  const existing = getVideoById(id);
+  if (!existing) throw new Error('Video not found');
+  if (existing.owner_id !== ownerId) throw new Error('Not authorized');
+  const now = new Date().toISOString();
+  db.prepare('UPDATE videos SET category = ?, updated_at = ? WHERE id = ?')
+    .run(category, now, id);
+  return getVideoById(id)!;
 }

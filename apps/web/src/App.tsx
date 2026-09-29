@@ -19,6 +19,9 @@ import History from './pages/History';
 import Playlists from './pages/Playlists';
 import PlaylistDetail from './pages/PlaylistDetail';
 import MyVideos from './pages/MyVideos';
+import GoLive from './pages/GoLive';
+import LiveList from './pages/LiveList';
+import LiveWatch from './pages/LiveWatch';
 import { api, getCachedUser, getToken, clearAuth, type User } from './lib/api';
 
 function AppInner() {
@@ -70,6 +73,8 @@ function AppInner() {
         onHistory={() => navigate('/history')}
         onPlaylists={() => navigate('/playlists')}
         onMyVideos={() => navigate('/my-videos')}
+        onGoLive={() => navigate('/go-live')}
+        onLive={() => navigate('/live')}
       />
 
       <Routes>
@@ -83,6 +88,9 @@ function AppInner() {
         <Route path="/playlists" element={<Playlists onSignIn={requireSignIn} />} />
         <Route path="/playlist/:id" element={<PlaylistDetail onSignIn={requireSignIn} />} />
         <Route path="/my-videos" element={<MyVideos onSignIn={requireSignIn} />} />
+        <Route path="/live" element={<LiveList />} />
+        <Route path="/live/:id" element={<LiveWatch onSignIn={requireSignIn} />} />
+        <Route path="/go-live" element={<GoLive user={user} onSignIn={() => setShowLogin(true)} />} />
         <Route path="/upload" element={<Upload user={user} onSignIn={() => setShowLogin(true)} />} />
         <Route path="/channel/new" element={<CreateChannel user={user} onSignIn={() => setShowLogin(true)} />} />
         <Route path="/channel/me" element={<MyChannel user={user} onSignIn={() => setShowLogin(true)} />} />
