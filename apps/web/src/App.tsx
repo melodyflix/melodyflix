@@ -22,6 +22,7 @@ import MyVideos from './pages/MyVideos';
 import GoLive from './pages/GoLive';
 import LiveList from './pages/LiveList';
 import LiveWatch from './pages/LiveWatch';
+import TwoFASettings from './pages/TwoFASettings';
 import { api, getCachedUser, getToken, clearAuth, type User } from './lib/api';
 
 function AppInner() {
@@ -85,6 +86,7 @@ function AppInner() {
         onMyVideos={() => navigate('/my-videos')}
         onGoLive={() => navigate('/go-live')}
         onLive={() => navigate('/live')}
+        onSettings={() => navigate('/settings/security')}
       />
 
       <Routes>
@@ -100,6 +102,7 @@ function AppInner() {
         <Route path="/my-videos" element={<MyVideos onSignIn={requireSignIn} />} />
         <Route path="/live" element={<LiveList />} />
         <Route path="/live/:id" element={<LiveWatch onSignIn={requireSignIn} />} />
+        <Route path="/settings/security" element={<TwoFASettings user={user} onSignIn={requireSignIn} />} />
         <Route path="/go-live" element={<GoLive user={user} onSignIn={() => setShowLogin(true)} />} />
         <Route path="/upload" element={<Upload user={user} onSignIn={() => setShowLogin(true)} />} />
         <Route path="/channel/new" element={<CreateChannel user={user} onSignIn={() => setShowLogin(true)} />} />

@@ -5,7 +5,9 @@ import { createLogger } from '@melodyflix/shared-logger';
 import { authRoutes } from './routes/auth.route.js';
 import { adminRoutes } from './routes/admin.route.js';
 import { publicUserRoutes } from './routes/public.route.js';
+import { twofaRoutes } from './routes/twofa.route.js';
 import { ensureSchema } from './services/auth.service.js';
+import { ensureTwoFASchema } from './services/twofa.service.js';
 
 const config = loadConfig();
 const logger = createLogger('auth');
@@ -21,9 +23,11 @@ app.addHook('onRequest', async (req, reply) => {
 app.get('/health', async () => ({ service: 'auth', status: 'ok' }));
 
 ensureSchema();
-logger.info('auth schema ensured');
+ensureTwoFASchema();
+logger.info('auth + 2FA schema ensured');
 
 await app.register(authRoutes, { prefix: '/api/v1/auth' });
+await app.register(twofaRoutes, { prefix: '/api/v1/auth' });
 await app.register(adminRoutes, { prefix: '/api/v1/admin' });
 await app.register(publicUserRoutes, { prefix: '/api/v1/auth' });
 

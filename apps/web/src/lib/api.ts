@@ -744,3 +744,56 @@ export async function toggleCommunityPostLike(postId: string): Promise<{ liked: 
 export async function getMyChannelPosts(): Promise<{ posts: CommunityPost[]; total: number; channel: Channel | null }> {
   return request<{ posts: CommunityPost[]; total: number; channel: Channel | null }>('/api/channels/me/posts/own');
 }
+
+// ============ Two-Factor Authentication (2FA) ============
+export interface TwoFAStatus {
+  enabled: boolean;
+  has_backup_codes: number;
+}
+
+export interface TwoFASetupResult {
+  secret: string;
+  qr_data_url: string;
+  manual_entry: string;
+}
+
+export interface TwoFAConfirmResult {
+  enabled: boolean;
+  backup_codes: string[];
+}
+
+export async function getTwoFAStatus(): Promise<TwoFAStatus> {
+  return request<TwoFAStatus>('/api/auth/2fa/status');
+}
+
+export async function beginTwoFASetup(): Promise<TwoFASetupResult> {
+  return request<TwoFASetupResult>('/api/auth/2fa/setup', { method: 'POST' });
+}
+
+export async function confirmTwoFA(code: string): Promise<TwoFAConfirmResult> {
+  return request<TwoFAConfirmResult>('/api/auth/2fa/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+}
+
+export async function disableTwoFA(code: string): Promise<{ disabled: boolean }> {
+  return request<{ disabled: boolean }>('/api/auth/2fa/disable', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+}
+
+export async function regenerateBackupCodes(code: string): Promise<{ backup_codes: string[] }> {
+  return request<{ backup_codes: string[] }>('/api/auth/2fa/regenerate-backup-codes', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+}
+
+export async function completeTwoFALogin(tempToken: string, code: string): Promise<{ user: User; token: string }> {
+  return request<{ user: User; token: string }>('/api/auth/2fa/login', {
+    method: 'POST',
+    body: JSON.stringify({ temp_token: tempToken, code }),
+  });
+}

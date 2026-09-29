@@ -4,6 +4,7 @@ import { getDb } from '@melodyflix/shared-db';
 import { hashPassword, verifyPassword, signJwt } from './crypto.service.js';
 import { toSafeUser, type User, type SafeUser } from '../models/user.model.js';
 import { loadConfig } from '@melodyflix/shared-config';
+import { isTwoFAEnabled } from './twofa.service.js';
 import { publish, CHANNELS } from '@melodyflix/shared-events';
 
 export interface SignupInput {
@@ -73,7 +74,11 @@ export function signup(input: SignupInput): SafeUser {
   return toSafeUser(user);
 }
 
-export function login(input: LoginInput): { user: SafeUser; token: string } {
+export type LoginResult =
+  | { user: SafeUser; token: string; requires_2fa?: false }
+  | { requires_2fa: true; temp_token: string; user_id: string };
+
+export function login(input: LoginInput): LoginResult {
   const db = getDb();
   const row = db.prepare('SELECT * FROM users WHERE email = ? LIMIT 1').get(input.email) as User | undefined;
   if (!row) throw new Error('Invalid credentials');
@@ -83,6 +88,42 @@ export function login(input: LoginInput): { user: SafeUser; token: string } {
   }
 
   const config = loadConfig();
+
+  // Check if 2FA is enabled
+  if (isTwoFAEnabled(row.id)) {
+    // Return a short-lived temp token (5 min) to complete 2FA
+    const tempToken = signJwt(
+      { sub: row.id, role: row.role, purpose: '2fa_verify' },
+      config.JWT_SECRET,
+      5 * 60
+    );
+    return { requires_2fa: true, temp_token: tempToken, user_id: row.id };
+  }
+
+  const expiresInSec = 7 * 24 * 60 * 60;
+  const token = signJwt({ sub: row.id, role: row.role }, config.JWT_SECRET, expiresInSec);
+
+  return { user: toSafeUser(row), token, requires_2fa: false };
+}
+
+// Complete 2FA login — verify code and return full token
+export function completeTwoFALogin(tempToken: string, code: string): { user: SafeUser; token: string } {
+  const config = loadConfig();
+  const payload = require('./crypto.service.js').verifyJwt(tempToken, config.JWT_SECRET) as
+    | { sub: string; purpose: string; role: string }
+    | null;
+  if (!payload || payload.purpose !== '2fa_verify') {
+    throw new Error('Invalid or expired session');
+  }
+
+  const twofa = require('./twofa.service.js');
+  const valid = twofa.consumeTwoFACode(payload.sub, code);
+  if (!valid) throw new Error('Invalid 2FA code');
+
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM users WHERE id = ? LIMIT 1').get(payload.sub) as User | undefined;
+  if (!row) throw new Error('User not found');
+
   const expiresInSec = 7 * 24 * 60 * 60;
   const token = signJwt({ sub: row.id, role: row.role }, config.JWT_SECRET, expiresInSec);
 

@@ -1,7 +1,7 @@
 // melodyflix auth - HTTP routes
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { signup, login, getUserById } from '../services/auth.service.js';
+import { signup, login, completeTwoFALogin, getUserById } from '../services/auth.service.js';
 import { verifyJwt } from '../services/crypto.service.js';
 import { loadConfig } from '@melodyflix/shared-config';
 
@@ -38,6 +38,35 @@ export async function authRoutes(app: FastifyInstance) {
     }
     try {
       const result = login(parsed.data);
+      // If 2FA is required, tell frontend
+      if ('requires_2fa' in result && result.requires_2fa) {
+        return reply.send({
+          success: true,
+          data: {
+            requires_2fa: true,
+            temp_token: result.temp_token,
+            user_id: result.user_id,
+          },
+        });
+      }
+      return reply.send({ success: true, data: result });
+    } catch (err) {
+      return reply.code(401).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // POST /api/v1/auth/2fa/login — complete login with 2FA code
+  app.post('/2fa/login', async (req, reply) => {
+    const TwoFALoginSchema = z.object({
+      temp_token: z.string().min(10),
+      code: z.string().min(4).max(20),
+    });
+    const parsed = TwoFALoginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+    }
+    try {
+      const result = completeTwoFALogin(parsed.data.temp_token, parsed.data.code);
       return reply.send({ success: true, data: result });
     } catch (err) {
       return reply.code(401).send({ success: false, error: (err as Error).message });
