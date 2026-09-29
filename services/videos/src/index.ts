@@ -5,6 +5,7 @@ import { loadConfig } from '@melodyflix/shared-config';
 import { createLogger } from '@melodyflix/shared-logger';
 import { searchRoutes } from './routes/search.route.js';
 import { podcastRoutes } from './routes/podcast.route.js';
+import { shortRoutes } from './routes/shorts.route.js';
 import { seriesRoutes } from './routes/series.route.js';
 import { trendingRoutes } from './routes/trending.route.js';
 import { watchLaterRoutes } from './routes/watchlater.route.js';

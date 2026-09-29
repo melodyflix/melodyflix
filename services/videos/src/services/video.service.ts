@@ -453,3 +453,35 @@ export function listPodcastsByChannel(channelId: string, limit = 50, offset = 0)
     LIMIT ? OFFSET ?
   `).all(channelId, limit, offset) as Video[];
 }
+
+
+// ---------- Shorts ----------
+export function listShorts(limit = 50, offset = 0): Video[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT * FROM videos
+    WHERE status = 'ready' AND visibility = 'public'
+      AND COALESCE(content_type, 'video') = 'short'
+    ORDER BY created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(limit, offset) as Video[];
+}
+
+export function countShorts(): number {
+  const db = getDb();
+  const row = db.prepare(
+    "SELECT COUNT(*) as n FROM videos WHERE status = 'ready' AND visibility = 'public' AND COALESCE(content_type, 'video') = 'short'"
+  ).get() as { n: number };
+  return row.n;
+}
+
+export function listShortsByChannel(channelId: string, limit = 50, offset = 0): Video[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT * FROM videos
+    WHERE channel_id = ? AND status = 'ready' AND visibility = 'public'
+      AND COALESCE(content_type, 'video') = 'short'
+    ORDER BY created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(channelId, limit, offset) as Video[];
+}

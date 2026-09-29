@@ -949,3 +949,17 @@ export async function deleteEpisode(episodeId: string): Promise<{ deleted: boole
 export async function getEpisodeInfo(videoId: string): Promise<EpisodeInfo> {
   return request<EpisodeInfo>(`/api/v1/videos/${videoId}/episode-info`);
 }
+
+// ============ Shorts ============
+export interface ShortsListResponse {
+  shorts: Video[];
+  total: number;
+}
+
+export async function listShorts(limit = 50, offset = 0): Promise<ShortsListResponse> {
+  return request<ShortsListResponse>(`/api/v1/videos/shorts?limit=${limit}&offset=${offset}`);
+}
+
+export async function listShortsByChannel(channelId: string, limit = 50, offset = 0): Promise<ShortsListResponse> {
+  return request<ShortsListResponse>(`/api/v1/videos/shorts?channel=${channelId}&limit=${limit}&offset=${offset}`);
+}

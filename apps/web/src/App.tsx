@@ -26,6 +26,7 @@ import TwoFASettings from './pages/TwoFASettings';
 import Podcasts from './pages/Podcasts';
 import SeriesList from './pages/SeriesList';
 import SeriesDetail from './pages/SeriesDetail';
+import ShortsFeed from './pages/ShortsFeed';
 import { api, getCachedUser, getToken, clearAuth, type User } from './lib/api';
 
 function AppInner() {
@@ -92,6 +93,7 @@ function AppInner() {
         onSettings={() => navigate('/settings/security')}
         onPodcasts={() => navigate('/podcasts')}
         onSeries={() => navigate('/series')}
+        onShorts={() => navigate('/shorts')}
       />
 
       <Routes>
@@ -107,6 +109,8 @@ function AppInner() {
         <Route path="/my-videos" element={<MyVideos onSignIn={requireSignIn} />} />
         <Route path="/live" element={<LiveList />} />
         <Route path="/podcasts" element={<Podcasts />} />
+        <Route path="/shorts" element={<ShortsFeed onSignIn={requireSignIn} />} />
+        <Route path="/shorts/:id" element={<ShortsFeed onSignIn={requireSignIn} />} />
         <Route path="/series" element={<SeriesList onSignIn={requireSignIn} />} />
         <Route path="/series/:id" element={<SeriesDetail onSignIn={requireSignIn} />} />
         <Route path="/live/:id" element={<LiveWatch onSignIn={requireSignIn} />} />

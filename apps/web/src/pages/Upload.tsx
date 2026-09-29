@@ -17,7 +17,7 @@ export default function Upload({ user, onSignIn }: Props) {
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'unlisted' | 'private'>('public');
   const [category, setCategory] = useState<string>('other');
-  const [contentType, setContentType] = useState<'video' | 'podcast'>('video');
+  const [contentType, setContentType] = useState<'video' | 'podcast' | 'short'>('video');
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -200,16 +200,17 @@ export default function Upload({ user, onSignIn }: Props) {
           <select
             className="mf-input"
             value={contentType}
-            onChange={(e) => setContentType(e.target.value as 'video' | 'podcast')}
+            onChange={(e) => setContentType(e.target.value as 'video' | 'podcast' | 'short')}
             disabled={busy}
           >
             <option value="video">🎬 Video — visual content</option>
+            <option value="short">📱 Short — vertical, max 60s</option>
             <option value="podcast">🎙️ Podcast — audio-first episode</option>
           </select>
           <div style={{ fontSize: 12, color: '#606060', marginTop: 4 }}>
-            {contentType === 'podcast'
-              ? 'Podcast episodes appear in the Podcasts section with audio-first UI'
-              : 'Standard video with player'}
+            {contentType === 'podcast' && 'Podcast episodes appear in the Podcasts section with audio-first UI'}
+            {contentType === 'short' && 'Shorts appear in the vertical Shorts feed. Keep under 60 seconds.'}
+            {contentType === 'video' && 'Standard video with player'}
           </div>
         </div>
 
