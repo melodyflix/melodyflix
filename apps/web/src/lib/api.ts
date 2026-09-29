@@ -1197,3 +1197,59 @@ export async function sendSuperChat(streamId: string, content: string, amount: n
     body: JSON.stringify({ content, amount, transaction_id: transactionId }),
   });
 }
+
+// ============ Channel Membership ============
+export interface MembershipTier {
+  id: string;
+  channel_id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  currency: string;
+  color: string;
+  badge_emoji: string;
+  active: number;
+  subscriber_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Membership {
+  id: string;
+  user_id: string;
+  channel_id: string;
+  tier_id: string;
+  status: 'active' | 'expired' | 'cancelled';
+  started_at: string;
+  expires_at: string;
+  auto_renew: number;
+  last_payment_at: string | null;
+  total_paid: number;
+  transaction_id: string | null;
+  created_at: string;
+  updated_at: string;
+  tier?: MembershipTier;
+}
+
+export async function listChannelTiers(channelId: string): Promise<{ tiers: MembershipTier[] }> {
+  return request<{ tiers: MembershipTier[] }>(`/api/v1/videos/memberships/tiers/${channelId}`);
+}
+
+export async function getMyMembershipForChannel(channelId: string): Promise<{ membership: Membership | null }> {
+  return request<{ membership: Membership | null }>(`/api/v1/videos/memberships/check/${channelId}`);
+}
+
+export async function listMyMemberships(): Promise<{ memberships: Membership[] }> {
+  return request<{ memberships: Membership[] }>('/api/v1/videos/memberships/me');
+}
+
+export async function joinMembership(tierId: string, transactionId: string): Promise<{ membership: Membership; tier: MembershipTier }> {
+  return request<{ membership: Membership; tier: MembershipTier }>('/api/v1/videos/memberships/join', {
+    method: 'POST',
+    body: JSON.stringify({ tier_id: tierId, transaction_id: transactionId }),
+  });
+}
+
+export async function cancelMembership(channelId: string): Promise<{ cancelled: boolean }> {
+  return request<{ cancelled: boolean }>(`/api/v1/videos/memberships/cancel/${channelId}`, { method: 'DELETE' });
+}

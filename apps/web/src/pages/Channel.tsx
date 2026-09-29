@@ -7,6 +7,8 @@ import {
 import VideoCard from '../components/VideoCard';
 import VerifiedBadge from '../components/VerifiedBadge';
 import ChannelPosts from '../components/ChannelPosts';
+import MembershipModal from '../components/MembershipModal';
+import { listChannelTiers, getMyMembershipForChannel, type MembershipTier, type Membership } from '../lib/api';
 
 export default function Channel() {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +21,9 @@ export default function Channel() {
   const [error, setError] = useState('');
   const [subscribed, setSubscribed] = useState(false);
   const [tab, setTab] = useState<'videos' | 'community'>('videos');
+  const [tiers, setTiers] = useState<MembershipTier[]>([]);
+  const [myMembership, setMyMembership] = useState<Membership | null>(null);
+  const [showMembershipModal, setShowMembershipModal] = useState(false);
   const [subscriberCount, setSubscriberCount] = useState(0);
   const [busySub, setBusySub] = useState(false);
 
@@ -90,23 +95,87 @@ export default function Channel() {
             <div className="mf-channel-desc">{channel.description}</div>
           )}
           {!isOwnChannel && (
-            <button
-              className={`mf-sub-btn ${subscribed ? 'subscribed' : ''}`}
-              style={{ marginTop: 14 }}
-              onClick={handleSubscribe}
-              disabled={busySub}
-            >
-              {subscribed ? 'Subscribed' : 'Subscribe'}
-            </button>
+            <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                className={`mf-sub-btn ${subscribed ? 'subscribed' : ''}`}
+                onClick={handleSubscribe}
+                disabled={busySub}
+              >
+                {subscribed ? 'Subscribed' : 'Subscribe'}
+              </button>
+              {tiers.length > 0 && (
+                myMembership ? (
+                  <button
+                    className="mf-sub-btn"
+                    style={{
+                      background: myMembership.tier?.color ?? '#7c3aed',
+                      color: '#fff',
+                      border: 'none',
+                    }}
+                    title={`Expires ${new Date(myMembership.expires_at).toLocaleDateString()}`}
+                  >
+                    {myMembership.tier?.badge_emoji ?? '🏅'} Member
+                  </button>
+                ) : (
+                  <button
+                    className="mf-sub-btn"
+                    style={{
+                      background: 'linear-gradient(135deg, #7c3aed, #ec4899)',
+                      color: '#fff',
+                      border: 'none',
+                      fontWeight: 700,
+                    }}
+                    onClick={() => setShowMembershipModal(true)}
+                  >
+                    🏅 Join
+                  </button>
+                )
+              )}
+            </div>
           )}
           {isOwnChannel && (
-            <button
-              className="mf-sub-btn"
-              style={{ marginTop: 14, background: '#fff', color: '#0f0f0f', border: '1px solid #e5e5e5' }}
-              onClick={() => navigate('/channel/me/edit')}
-            >
-              Edit channel
-            </button>
+            <>
+              <button
+                className="mf-sub-btn"
+                style={{ marginTop: 14, background: '#fff', color: '#0f0f0f', border: '1px solid #e5e5e5' }}
+                onClick={() => navigate('/channel/me/edit')}
+              >
+                Edit channel
+              </button>
+
+              {tiers.length > 0 && (
+                myMembership ? (
+                  <button
+                    className="mf-sub-btn"
+                    style={{
+                      marginTop: 14,
+                      marginLeft: 8,
+                      background: myMembership.tier?.color ?? '#7c3aed',
+                      color: '#fff',
+                      border: 'none',
+                    }}
+                    title={`Expires ${new Date(myMembership.expires_at).toLocaleDateString()}`}
+                  >
+                    {myMembership.tier?.badge_emoji ?? '🏅'} Member
+                  </button>
+                ) : (
+                  <button
+                    className="mf-sub-btn"
+                    style={{
+                      marginTop: 14,
+                      marginLeft: 8,
+                      background: 'linear-gradient(135deg, #7c3aed, #ec4899)',
+                      color: '#fff',
+                      border: 'none',
+                      fontWeight: 700,
+                    }}
+                    onClick={() => setShowMembershipModal(true)}
+                  >
+                    🏅 Join
+                  </button>
+                )
+              )}
+            </>
           )}
         </div>
       </div>
@@ -178,6 +247,18 @@ export default function Channel() {
           <ChannelPosts channel={channel} onSignIn={() => {}} />
         )}
       </div>
+
+      {showMembershipModal && channel && (
+        <MembershipModal
+          channelId={channel.id}
+          channelName={channel.name}
+          onClose={() => setShowMembershipModal(false)}
+          onSignIn={() => {}}
+          onJoined={(m, t) => {
+            setMyMembership(m);
+          }}
+        />
+      )}
     </>
   );
 }

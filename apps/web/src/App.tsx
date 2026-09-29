@@ -28,6 +28,7 @@ import SeriesList from './pages/SeriesList';
 import SeriesDetail from './pages/SeriesDetail';
 import ShortsFeed from './pages/ShortsFeed';
 import BuyMessages from './pages/BuyMessages';
+import MyMemberships from './pages/MyMemberships';
 import { api, getCachedUser, getToken, clearAuth, type User } from './lib/api';
 
 function AppInner() {
@@ -95,6 +96,7 @@ function AppInner() {
         onPodcasts={() => navigate('/podcasts')}
         onSeries={() => navigate('/series')}
         onShorts={() => navigate('/shorts')}
+        onMemberships={() => navigate('/my-memberships')}
       />
 
       <Routes>
@@ -112,6 +114,7 @@ function AppInner() {
         <Route path="/podcasts" element={<Podcasts />} />
         <Route path="/shorts" element={<ShortsFeed onSignIn={requireSignIn} />} />
         <Route path="/buy-messages" element={<BuyMessages onSignIn={requireSignIn} />} />
+        <Route path="/my-memberships" element={<MyMemberships onSignIn={requireSignIn} />} />
         <Route path="/shorts/:id" element={<ShortsFeed onSignIn={requireSignIn} />} />
         <Route path="/series" element={<SeriesList onSignIn={requireSignIn} />} />
         <Route path="/series/:id" element={<SeriesDetail onSignIn={requireSignIn} />} />
