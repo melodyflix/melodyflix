@@ -43,7 +43,20 @@ export default function App() {
   return (
     <div className="mf-layout">
       <aside className="mf-sidebar">
-        <div className="mf-sidebar-logo">melody<span>flix</span></div>
+        <div className="mf-sidebar-logo" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <svg width="24" height="24" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+            <defs>
+              <linearGradient id="admin-mf-grad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#7c3aed" />
+                <stop offset="55%" stopColor="#a855f7" />
+                <stop offset="100%" stopColor="#ec4899" />
+              </linearGradient>
+            </defs>
+            <rect width="64" height="64" rx="18" fill="url(#admin-mf-grad)" />
+            <path d="M25 20 L47 32 L25 44 Z" fill="#fff" />
+          </svg>
+          <span>melody<span style={{ color: '#a855f7' }}>flix</span></span>
+        </div>
         <ul className="mf-menu">
           {menu.map((m) => (
             <li

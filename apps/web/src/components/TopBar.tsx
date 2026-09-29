@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { User } from '../lib/api';
 import NotificationBell from './NotificationBell';
+import Logo from './Logo';
 
 interface Props {
   user: User | null;
@@ -36,9 +37,8 @@ export default function TopBar({
 
   return (
     <header className="mf-topbar">
-      <div className="mf-logo" onClick={onLogoClick}>
-        <span className="mf-logo-mark">▶</span>
-        <span className="mf-logo-text">melodyflix</span>
+      <div onClick={onLogoClick} style={{ cursor: 'pointer' }}>
+        <Logo size={36} />
       </div>
 
       <form className="mf-search" onSubmit={submit}>
