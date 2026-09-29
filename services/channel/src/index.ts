@@ -5,6 +5,7 @@ import { loadConfig } from '@melodyflix/shared-config';
 import { createLogger } from '@melodyflix/shared-logger';
 import { channelRoutes, channelUploadRoutes } from './routes/channel.route.js';
 import { subscriptionsRoutes } from './routes/subscriptions.route.js';
+import { channelAdminRoutes } from './routes/admin.route.js';
 import { ensureSchema } from './services/channel.service.js';
 import { ensureChannelStorage } from './services/storage.service.js';
 
@@ -29,7 +30,9 @@ ensureSchema();
 ensureChannelStorage();
 logger.info('channel schema and storage ensured');
 
+// Order matters: specific routes BEFORE wildcards
 await app.register(subscriptionsRoutes, { prefix: '/api/v1/channels' });
+await app.register(channelAdminRoutes, { prefix: '/api/v1/channels' });
 await app.register(channelUploadRoutes, { prefix: '/api/v1/channels' });
 await app.register(channelRoutes, { prefix: '/api/v1/channels' });
 

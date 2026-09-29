@@ -5,6 +5,7 @@ import {
   type Channel as ChannelType, type Video,
 } from '../lib/api';
 import VideoCard from '../components/VideoCard';
+import VerifiedBadge from '../components/VerifiedBadge';
 
 export default function Channel() {
   const { id } = useParams<{ id: string }>();
@@ -76,7 +77,10 @@ export default function Channel() {
       <div className="mf-channel-header">
         <div className="mf-channel-avatar-lg">{initial}</div>
         <div className="mf-channel-info-lg">
-          <div className="mf-channel-name-lg">{channel.name}</div>
+          <div className="mf-channel-name-lg" style={{ display: "flex", alignItems: "center" }}>
+            {channel.name}
+            <VerifiedBadge verified={channel.is_verified} size={22} />
+          </div>
           <div className="mf-channel-stats">
             @{channel.handle} · {subscriberCount} subscribers · {videos.length} videos
           </div>

@@ -11,6 +11,7 @@ import {
 import HlsPlayer from '../components/HlsPlayer';
 import CommentSection from '../components/CommentSection';
 import ShareMenu from '../components/ShareMenu';
+import VerifiedBadge from '../components/VerifiedBadge';
 import SaveToPlaylistModal from '../components/SaveToPlaylistModal';
 import { usePlayer } from '../components/PlayerContext';
 
@@ -259,7 +260,10 @@ export default function Watch({ onSignIn }: Props) {
                 style={{ cursor: 'pointer' }}
                 onClick={() => navigate(`/channel/${video.channel_id}`)}
               >
-                <div style={{ fontWeight: 500 }}>{channelName}</div>
+                <div style={{ fontWeight: 500, display: "flex", alignItems: "center" }}>
+                {channelName}
+                <VerifiedBadge verified={channel?.is_verified} size={14} />
+              </div>
                 <div style={{ fontSize: 12, color: '#606060' }}>
                   {subscriberCount} subscribers
                 </div>

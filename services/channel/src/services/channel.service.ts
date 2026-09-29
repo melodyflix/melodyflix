@@ -179,3 +179,23 @@ export function getFollowingCount(userId: string): number {
   const row = db.prepare('SELECT COUNT(*) as n FROM follows WHERE user_id = ?').get(userId) as { n: number };
   return row.n;
 }
+
+
+// ---------- Admin: Verification ----------
+export function verifyChannel(channelId: string): Channel | null {
+  const db = getDb();
+  const existing = getChannelById(channelId);
+  if (!existing) return null;
+  const now = new Date().toISOString();
+  db.prepare('UPDATE channels SET is_verified = 1, updated_at = ? WHERE id = ?').run(now, channelId);
+  return getChannelById(channelId);
+}
+
+export function unverifyChannel(channelId: string): Channel | null {
+  const db = getDb();
+  const existing = getChannelById(channelId);
+  if (!existing) return null;
+  const now = new Date().toISOString();
+  db.prepare('UPDATE channels SET is_verified = 0, updated_at = ? WHERE id = ?').run(now, channelId);
+  return getChannelById(channelId);
+}

@@ -222,3 +222,12 @@ export async function deleteReportedComment(id: string): Promise<{ status: strin
     { method: 'POST' }
   );
 }
+
+// ============ Channel Verification ============
+export async function verifyChannel(channelId: string): Promise<Channel> {
+  return request<Channel>(`/api/channels/admin/${channelId}/verify`, { method: 'POST' });
+}
+
+export async function unverifyChannel(channelId: string): Promise<Channel> {
+  return request<Channel>(`/api/channels/admin/${channelId}/unverify`, { method: 'POST' });
+}

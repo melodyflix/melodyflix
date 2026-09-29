@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listMySubscriptions, getCachedUser, type Channel } from '../lib/api';
+import VerifiedBadge from '../components/VerifiedBadge';
 
 interface Props {
   onSignIn: () => void;
@@ -91,8 +92,9 @@ export default function Subscriptions({ onSignIn }: Props) {
               >
                 {ch.name[0].toUpperCase()}
               </div>
-              <div style={{ fontWeight: 500, fontSize: 15, marginBottom: 4 }}>
+              <div style={{ fontWeight: 500, fontSize: 15, marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {ch.name}
+                <VerifiedBadge verified={ch.is_verified} size={14} />
               </div>
               <div style={{ fontSize: 12, color: '#606060' }}>
                 @{ch.handle}
