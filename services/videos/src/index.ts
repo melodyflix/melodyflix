@@ -4,6 +4,7 @@ import multipart from '@fastify/multipart';
 import { loadConfig } from '@melodyflix/shared-config';
 import { createLogger } from '@melodyflix/shared-logger';
 import { searchRoutes } from './routes/search.route.js';
+import { podcastRoutes } from './routes/podcast.route.js';
 import { trendingRoutes } from './routes/trending.route.js';
 import { watchLaterRoutes } from './routes/watchlater.route.js';
 import { historyRoutes } from './routes/history.route.js';

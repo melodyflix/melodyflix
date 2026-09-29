@@ -203,7 +203,7 @@ export async function isFollowing(channelId: string): Promise<{ following: boole
 // upload video (multipart with progress)
 export function uploadVideo(
   file: File,
-  meta: { title: string; description?: string; channelId: string; visibility?: string },
+  meta: { title: string; description?: string; channelId: string; visibility?: string; contentType?: string },
   onProgress?: (pct: number) => void
 ): Promise<Video> {
   return new Promise((resolve, reject) => {
@@ -212,6 +212,7 @@ export function uploadVideo(
     if (meta.description) form.append('description', meta.description);
     form.append('channelId', meta.channelId);
     form.append('visibility', meta.visibility ?? 'public');
+    if (meta.contentType) form.append('contentType', meta.contentType);
     form.append('file', file);
 
     const xhr = new XMLHttpRequest();
@@ -796,4 +797,27 @@ export async function completeTwoFALogin(tempToken: string, code: string): Promi
     method: 'POST',
     body: JSON.stringify({ temp_token: tempToken, code }),
   });
+}
+
+// ============ Podcasts ============
+export interface PodcastsListResponse {
+  podcasts: Video[];
+  total: number;
+}
+
+export async function listPodcasts(limit = 50, offset = 0): Promise<PodcastsListResponse> {
+  return request<PodcastsListResponse>(`/api/v1/videos/podcasts?limit=${limit}&offset=${offset}`);
+}
+
+export async function listPodcastsByChannel(channelId: string, limit = 50, offset = 0): Promise<PodcastsListResponse> {
+  return request<PodcastsListResponse>(`/api/v1/videos/podcasts?channel=${channelId}&limit=${limit}&offset=${offset}`);
+}
+
+export function podcastRssUrl(channelId: string): string {
+  return `/api/v1/videos/podcasts/rss/${channelId}`;
+}
+
+// Extend Video type with content_type
+export interface VideoWithType extends Video {
+  content_type?: string;
 }

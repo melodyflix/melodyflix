@@ -27,6 +27,7 @@ export interface Video {
   visibility: VideoVisibility;
   status: VideoStatus;
   category: string;
+  content_type: string;
   duration_seconds: number;
   file_size_bytes: number;
   original_filename: string | null;
@@ -44,4 +45,5 @@ export interface CreateVideoInput {
   description?: string;
   visibility?: VideoVisibility;
   category?: string;
+  content_type?: string;
 }

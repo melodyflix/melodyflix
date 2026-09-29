@@ -69,6 +69,7 @@ export function createVideo(
     visibility: input.visibility ?? 'public',
     status: 'uploading',
     category: input.category ?? 'other',
+    content_type: input.content_type ?? 'video',
     duration_seconds: 0,
     file_size_bytes: fileSize,
     original_filename: originalFilename,
@@ -81,14 +82,14 @@ export function createVideo(
     updated_at: now,
   };
   db.prepare(`
-    INSERT INTO videos (id, channel_id, owner_id, title, description, visibility, status, category,
+    INSERT INTO videos (id, channel_id, owner_id, title, description, visibility, status, category, content_type,
                         duration_seconds, file_size_bytes, original_filename,
                         hls_master_url, thumbnail_url, view_count, like_count, dislike_count,
                         created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     video.id, video.channel_id, video.owner_id, video.title, video.description,
-    video.visibility, video.status, video.category, video.duration_seconds, video.file_size_bytes,
+    video.visibility, video.status, video.category, video.content_type, video.duration_seconds, video.file_size_bytes,
     video.original_filename, video.hls_master_url, video.thumbnail_url,
     video.view_count, video.like_count, video.dislike_count,
     video.created_at, video.updated_at
@@ -421,4 +422,34 @@ export function updateVideoCategory(id: string, ownerId: string, category: strin
   db.prepare('UPDATE videos SET category = ?, updated_at = ? WHERE id = ?')
     .run(category, now, id);
   return getVideoById(id)!;
+}
+
+
+// ---------- Podcasts ----------
+export function listPodcasts(limit = 50, offset = 0): Video[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT * FROM videos
+    WHERE status = 'ready' AND visibility = 'public' AND COALESCE(content_type, 'video') = 'podcast'
+    ORDER BY created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(limit, offset) as Video[];
+}
+
+export function countPodcasts(): number {
+  const db = getDb();
+  const row = db.prepare(
+    "SELECT COUNT(*) as n FROM videos WHERE status = 'ready' AND visibility = 'public' AND COALESCE(content_type, 'video') = 'podcast'"
+  ).get() as { n: number };
+  return row.n;
+}
+
+export function listPodcastsByChannel(channelId: string, limit = 50, offset = 0): Video[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT * FROM videos
+    WHERE channel_id = ? AND status = 'ready' AND visibility = 'public' AND COALESCE(content_type, 'video') = 'podcast'
+    ORDER BY created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(channelId, limit, offset) as Video[];
 }

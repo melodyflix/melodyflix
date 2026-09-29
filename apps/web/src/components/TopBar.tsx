@@ -20,11 +20,12 @@ interface Props {
   onGoLive: () => void;
   onLive: () => void;
   onSettings: () => void;
+  onPodcasts: () => void;
 }
 
 export default function TopBar({
   user, onLogoClick, onSearch, onSignIn, onSignOut, onMyChannel, onUpload,
-  onWatchLater, onSubscriptions, onHistory, onPlaylists, onMyVideos, onGoLive, onLive, onSettings,
+  onWatchLater, onSubscriptions, onHistory, onPlaylists, onMyVideos, onGoLive, onLive, onSettings, onPodcasts,
 }: Props) {
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -181,6 +182,12 @@ export default function TopBar({
                   style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
                 >
                   📤 Upload video
+                </div>
+                <div
+                  onClick={() => { setMenuOpen(false); onPodcasts(); }}
+                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
+                >
+                  🎙️ Podcasts
                 </div>
                 <div
                   onClick={() => { setMenuOpen(false); onSettings(); }}

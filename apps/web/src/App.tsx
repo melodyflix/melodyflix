@@ -23,6 +23,7 @@ import GoLive from './pages/GoLive';
 import LiveList from './pages/LiveList';
 import LiveWatch from './pages/LiveWatch';
 import TwoFASettings from './pages/TwoFASettings';
+import Podcasts from './pages/Podcasts';
 import { api, getCachedUser, getToken, clearAuth, type User } from './lib/api';
 
 function AppInner() {
@@ -87,6 +88,7 @@ function AppInner() {
         onGoLive={() => navigate('/go-live')}
         onLive={() => navigate('/live')}
         onSettings={() => navigate('/settings/security')}
+        onPodcasts={() => navigate('/podcasts')}
       />
 
       <Routes>
@@ -101,6 +103,7 @@ function AppInner() {
         <Route path="/playlist/:id" element={<PlaylistDetail onSignIn={requireSignIn} />} />
         <Route path="/my-videos" element={<MyVideos onSignIn={requireSignIn} />} />
         <Route path="/live" element={<LiveList />} />
+        <Route path="/podcasts" element={<Podcasts />} />
         <Route path="/live/:id" element={<LiveWatch onSignIn={requireSignIn} />} />
         <Route path="/settings/security" element={<TwoFASettings user={user} onSignIn={requireSignIn} />} />
         <Route path="/go-live" element={<GoLive user={user} onSignIn={() => setShowLogin(true)} />} />
