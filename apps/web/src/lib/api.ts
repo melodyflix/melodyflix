@@ -1253,3 +1253,63 @@ export async function joinMembership(tierId: string, transactionId: string): Pro
 export async function cancelMembership(channelId: string): Promise<{ cancelled: boolean }> {
   return request<{ cancelled: boolean }>(`/api/v1/videos/memberships/cancel/${channelId}`, { method: 'DELETE' });
 }
+
+// ============ Creator Analytics ============
+export interface AnalyticsOverview {
+  total_videos: number;
+  total_views: number;
+  total_likes: number;
+  total_comments: number;
+  total_subscribers: number;
+  total_watch_time_seconds: number;
+  avg_views_per_video: number;
+  avg_completion_rate: number;
+}
+
+export interface DailyPoint {
+  date: string;
+  views: number;
+  likes: number;
+  comments: number;
+}
+
+export interface TopVideo {
+  id: string;
+  title: string;
+  thumbnail_url: string | null;
+  view_count: number;
+  like_count: number;
+  comment_count: number;
+  duration_seconds: number;
+  created_at: string;
+}
+
+export interface RevenueBreakdown {
+  super_chat: number;
+  membership: number;
+  ads: number;
+  total: number;
+}
+
+export interface SubscriberPoint {
+  date: string;
+  total: number;
+}
+
+export interface AnalyticsData {
+  overview: AnalyticsOverview;
+  series: DailyPoint[];
+  top: TopVideo[];
+  revenue: RevenueBreakdown;
+  growth: SubscriberPoint[];
+  days: number;
+  channel_id?: string;
+}
+
+export async function getMyAnalytics(days = 30): Promise<AnalyticsData> {
+  return request<AnalyticsData>(`/api/v1/videos/analytics/me?days=${days}`);
+}
+
+export async function getChannelAnalytics(channelId: string, days = 30): Promise<AnalyticsData> {
+  return request<AnalyticsData>(`/api/v1/videos/analytics/channel/${channelId}?days=${days}`);
+}

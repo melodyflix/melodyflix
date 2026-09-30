@@ -24,11 +24,12 @@ interface Props {
   onSeries: () => void;
   onShorts: () => void;
   onMemberships: () => void;
+  onAnalytics: () => void;
 }
 
 export default function TopBar({
   user, onLogoClick, onSearch, onSignIn, onSignOut, onMyChannel, onUpload,
-  onWatchLater, onSubscriptions, onHistory, onPlaylists, onMyVideos, onGoLive, onLive, onSettings, onPodcasts, onSeries, onShorts, onMemberships,
+  onWatchLater, onSubscriptions, onHistory, onPlaylists, onMyVideos, onGoLive, onLive, onSettings, onPodcasts, onSeries, onShorts, onMemberships, onAnalytics,
 }: Props) {
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -149,6 +150,12 @@ export default function TopBar({
                   style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
                 >
                   📺 My Channel
+                </div>
+                <div
+                  onClick={() => { setMenuOpen(false); onAnalytics(); }}
+                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
+                >
+                  📊 Analytics
                 </div>
                 <div
                   onClick={() => { setMenuOpen(false); onMyVideos(); }}
