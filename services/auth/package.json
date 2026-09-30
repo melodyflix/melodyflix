@@ -17,6 +17,7 @@
     "@melodyflix/shared-events": "workspace:*",
     "@melodyflix/shared-auth": "workspace:*",
     "otplib": "^12.0.1",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "nodemailer": "^6.9.15"
   }
 }

@@ -4,6 +4,7 @@ import TopBar from './components/TopBar';
 import LoginModal from './components/LoginModal';
 import MiniPlayer from './components/MiniPlayer';
 import InstallPrompt from './components/InstallPrompt';
+import VerifyEmailBanner from './components/VerifyEmailBanner';
 import { PlayerProvider } from './components/PlayerContext';
 import Home from './pages/Home';
 import Search from './pages/Search';
@@ -32,6 +33,7 @@ import BuyMessages from './pages/BuyMessages';
 import MyMemberships from './pages/MyMemberships';
 import Analytics from './pages/Analytics';
 import HelpCenter from './pages/HelpCenter';
+import VerifyEmail from './pages/VerifyEmail';
 import { api, getCachedUser, getToken, clearAuth, type User } from './lib/api';
 
 function AppInner() {
@@ -104,6 +106,8 @@ function AppInner() {
         onHelp={() => navigate('/help')}
       />
 
+      <VerifyEmailBanner />
+
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/search" element={<Search />} />
@@ -122,6 +126,7 @@ function AppInner() {
         <Route path="/my-memberships" element={<MyMemberships onSignIn={requireSignIn} />} />
         <Route path="/analytics" element={<Analytics user={user} onSignIn={requireSignIn} />} />
         <Route path="/help" element={<HelpCenter onSignIn={requireSignIn} />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/shorts/:id" element={<ShortsFeed onSignIn={requireSignIn} />} />
         <Route path="/series" element={<SeriesList onSignIn={requireSignIn} />} />
         <Route path="/series/:id" element={<SeriesDetail onSignIn={requireSignIn} />} />

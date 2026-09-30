@@ -5,6 +5,7 @@ import { hashPassword, verifyPassword, signJwt } from './crypto.service.js';
 import { toSafeUser, type User, type SafeUser } from '../models/user.model.js';
 import { loadConfig } from '@melodyflix/shared-config';
 import { isTwoFAEnabled } from './twofa.service.js';
+import { createVerificationToken, sendEmail, getVerificationTemplate } from './email.service.js';
 import { publish, CHANNELS } from '@melodyflix/shared-events';
 
 export interface SignupInput {
@@ -134,4 +135,25 @@ export function getUserById(id: string): SafeUser | null {
   const db = getDb();
   const row = db.prepare('SELECT * FROM users WHERE id = ? LIMIT 1').get(id) as User | undefined;
   return row ? toSafeUser(row) : null;
+}
+
+
+// ---------- Send verification email ----------
+export async function sendVerificationEmailFor(userId: string, email: string, displayName: string): Promise<void> {
+  try {
+    const token = createVerificationToken(userId, email);
+    const baseUrl = process.env.PUBLIC_BASE_URL ?? 'http://127.0.0.1:5174';
+    const verifyUrl = `${baseUrl}/verify-email?token=${token}`;
+    const html = getVerificationTemplate(displayName, verifyUrl);
+    await sendEmail({
+      to: email,
+      subject: 'Verify your melodyflix email',
+      html,
+      user_id: userId,
+    });
+  } catch (err) {
+    // Log but don't fail signup
+    const { createLogger } = await import('@melodyflix/shared-logger');
+    createLogger('signup').warn({ err: (err as Error).message }, 'verification email failed');
+  }
 }

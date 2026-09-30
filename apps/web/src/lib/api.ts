@@ -1419,3 +1419,11 @@ export async function sendTestPush(): Promise<{ sent: number; failed: number; re
     method: 'POST',
   });
 }
+
+// ============ Email Verification ============
+export async function verifyEmailToken(token: string): Promise<{ verified: boolean; user_id: string; email: string }> {
+  return request<{ verified: boolean; user_id: string; email: string }>('/api/auth/email/verify', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+}

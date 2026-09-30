@@ -9,9 +9,10 @@ import Settings from './pages/Settings';
 import AdNetworks from './pages/AdNetworks';
 import AdminPayments from './pages/AdminPayments';
 import AdminSupport from './pages/AdminSupport';
+import AdminEmail from './pages/AdminEmail';
 import { api, getToken, clearToken, type User } from './lib/api';
 
-type Page = 'dashboard' | 'channels' | 'videos' | 'users' | 'reports' | 'ads' | 'payments' | 'support' | 'settings';
+type Page = 'dashboard' | 'channels' | 'videos' | 'users' | 'reports' | 'ads' | 'payments' | 'support' | 'email' | 'settings';
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState<boolean>(!!getToken());
@@ -43,6 +44,7 @@ export default function App() {
     { key: 'payments', label: 'Payments', icon: '💳' },
     { key: 'reports', label: 'Reports', icon: '🚩' },
     { key: 'support', label: 'Support', icon: '🎫' },
+    { key: 'email', label: 'Email', icon: '📧' },
     { key: 'settings', label: 'Settings', icon: '⚙️' },
   ];
 
@@ -98,6 +100,7 @@ export default function App() {
           {page === 'payments' && <AdminPayments />}
           {page === 'reports' && <Reports />}
           {page === 'support' && <AdminSupport />}
+          {page === 'email' && <AdminEmail />}
           {page === 'settings' && <Settings />}
         </main>
       </div>

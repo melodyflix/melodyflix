@@ -1,7 +1,7 @@
 // melodyflix auth - HTTP routes
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { signup, login, completeTwoFALogin, getUserById } from '../services/auth.service.js';
+import { signup, login, completeTwoFALogin, getUserById, sendVerificationEmailFor } from '../services/auth.service.js';
 import { verifyJwt } from '../services/crypto.service.js';
 import { loadConfig } from '@melodyflix/shared-config';
 
@@ -25,6 +25,8 @@ export async function authRoutes(app: FastifyInstance) {
     }
     try {
       const user = signup(parsed.data);
+      // Fire-and-forget verification email
+      sendVerificationEmailFor(user.id, user.email, user.display_name ?? user.username).catch(() => {});
       return reply.code(201).send({ success: true, data: user });
     } catch (err) {
       return reply.code(409).send({ success: false, error: (err as Error).message });

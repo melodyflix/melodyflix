@@ -475,3 +475,58 @@ export async function updateTicketStatus(id: string, status: string): Promise<Su
     body: JSON.stringify({ status }),
   });
 }
+
+// ============ SMTP / Email ============
+export interface SmtpSettings {
+  id: number;
+  host: string;
+  port: number;
+  secure: number;
+  username: string;
+  password: string;
+  from_name: string;
+  from_email: string;
+  enabled: number;
+  updated_at: string;
+}
+
+export interface EmailLog {
+  id: string;
+  user_id: string | null;
+  to_email: string;
+  subject: string;
+  status: string;
+  error: string | null;
+  created_at: string;
+}
+
+export async function getSmtpSettings(): Promise<SmtpSettings | null> {
+  return request<SmtpSettings | null>('/api/admin/email/smtp');
+}
+
+export async function saveSmtpSettings(input: {
+  host: string;
+  port?: number;
+  secure?: boolean;
+  username?: string;
+  password?: string;
+  from_name?: string;
+  from_email: string;
+  enabled?: boolean;
+}): Promise<SmtpSettings> {
+  return request<SmtpSettings>('/api/admin/email/smtp', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function sendTestEmail(to: string): Promise<{ sent: boolean }> {
+  return request<{ sent: boolean }>('/api/admin/email/test', {
+    method: 'POST',
+    body: JSON.stringify({ to }),
+  });
+}
+
+export async function getEmailLogs(limit = 100): Promise<{ logs: EmailLog[] }> {
+  return request<{ logs: EmailLog[] }>(`/api/admin/email/logs?limit=${limit}`);
+}
