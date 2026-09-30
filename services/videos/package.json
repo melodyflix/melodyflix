@@ -17,6 +17,7 @@
     "@melodyflix/shared-types": "workspace:*",
     "@melodyflix/shared-db": "workspace:*",
     "@melodyflix/shared-auth": "workspace:*",
-    "@melodyflix/shared-events": "workspace:*"
+    "@melodyflix/shared-events": "workspace:*",
+    "web-push": "^3.6.7"
   }
 }

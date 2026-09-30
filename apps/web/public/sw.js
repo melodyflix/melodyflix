@@ -89,3 +89,67 @@ self.addEventListener('fetch', (event) => {
     fetch(request).catch(() => caches.match(request).then((r) => r ?? new Response('Offline', { status: 503 })))
   );
 });
+
+
+// ==================== PUSH NOTIFICATIONS ====================
+
+// Receive push notification
+self.addEventListener('push', (event) => {
+  let data = {
+    title: 'melodyflix',
+    body: 'You have a new notification',
+    icon: '/icons/icon-192.png',
+    url: '/',
+    tag: 'melodyflix',
+  };
+
+  try {
+    if (event.data) {
+      const parsed = event.data.json();
+      data = { ...data, ...parsed };
+    }
+  } catch (err) {
+    // Fallback to text if not JSON
+    try {
+      data.body = event.data?.text() ?? data.body;
+    } catch {}
+  }
+
+  const options = {
+    body: data.body,
+    icon: data.icon || '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    tag: data.tag || 'melodyflix',
+    data: { url: data.url || '/' },
+    vibrate: [100, 50, 100],
+    requireInteraction: false,
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+// Handle notification click — focus or open the URL
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const url = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // Try to focus an existing tab
+        for (const client of clientList) {
+          if (client.url.includes(self.location.origin) && 'focus' in client) {
+            client.navigate(url);
+            return client.focus();
+          }
+        }
+        // Otherwise open a new tab
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(url);
+        }
+      })
+  );
+});

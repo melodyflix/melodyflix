@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import PushNotificationSettings from '../components/PushNotificationSettings';
 import {
   getTwoFAStatus, beginTwoFASetup, confirmTwoFA, disableTwoFA, regenerateBackupCodes,
   getCachedUser,
@@ -135,6 +136,9 @@ export default function TwoFASettings({ user, onSignIn }: Props) {
       </div>
 
       {error && <div className="mf-error">{error}</div>}
+
+      {/* Push notifications */}
+      <PushNotificationSettings onSignIn={onSignIn} />
 
       {/* Status */}
       {step === 'status' && status && (

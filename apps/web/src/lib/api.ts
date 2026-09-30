@@ -1385,3 +1385,37 @@ export async function replySupportTicket(id: string, content: string): Promise<S
     body: JSON.stringify({ content }),
   });
 }
+
+// ============ Web Push Notifications ============
+export async function getPushPublicKey(): Promise<{ publicKey: string }> {
+  return request<{ publicKey: string }>('/api/v1/videos/push/public-key');
+}
+
+export async function subscribePush(input: {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent?: string;
+}): Promise<any> {
+  return request<any>('/api/v1/videos/push/subscribe', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function unsubscribePush(endpoint: string): Promise<{ unsubscribed: boolean }> {
+  return request<{ unsubscribed: boolean }>('/api/v1/videos/push/unsubscribe', {
+    method: 'POST',
+    body: JSON.stringify({ endpoint }),
+  });
+}
+
+export async function listMyPushSubscriptions(): Promise<{ subscriptions: any[] }> {
+  return request<{ subscriptions: any[] }>('/api/v1/videos/push/my-subscriptions');
+}
+
+export async function sendTestPush(): Promise<{ sent: number; failed: number; removed: number }> {
+  return request<{ sent: number; failed: number; removed: number }>('/api/v1/videos/push/test', {
+    method: 'POST',
+  });
+}
