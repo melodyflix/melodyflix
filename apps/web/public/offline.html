@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>melodyflix — Offline</title>
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 20px;
+        background: #0f0f0f;
+        color: #fff;
+        padding: 20px;
+        text-align: center;
+      }
+      .icon { font-size: 80px; opacity: 0.7; }
+      h1 { font-size: 24px; font-weight: 700; }
+      p { color: #a0a0a0; font-size: 14px; max-width: 300px; line-height: 1.6; }
+      button {
+        margin-top: 10px;
+        padding: 12px 28px;
+        background: linear-gradient(135deg, #7c3aed, #ec4899);
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: inherit;
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 10px;
+      }
+      .logo svg { width: 32px; height: 32px; }
+    </style>
+  </head>
+  <body>
+    <div class="logo">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="mf" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#7c3aed"/>
+            <stop offset="55%" stop-color="#a855f7"/>
+            <stop offset="100%" stop-color="#ec4899"/>
+          </linearGradient>
+        </defs>
+        <rect width="64" height="64" rx="18" fill="url(#mf)"/>
+        <path d="M25 20 L47 32 L25 44 Z" fill="#fff"/>
+      </svg>
+      melody<span style="color: #a855f7">flix</span>
+    </div>
+    <div class="icon">📡</div>
+    <h1>You're offline</h1>
+    <p>Check your internet connection and try again. Your downloaded content is still available.</p>
+    <button onclick="location.reload()">Retry</button>
+  </body>
+</html>

@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import TopBar from './components/TopBar';
 import LoginModal from './components/LoginModal';
 import MiniPlayer from './components/MiniPlayer';
+import InstallPrompt from './components/InstallPrompt';
 import { PlayerProvider } from './components/PlayerContext';
 import Home from './pages/Home';
 import Search from './pages/Search';
@@ -135,6 +136,7 @@ function AppInner() {
       </Routes>
 
       <MiniPlayer />
+      <InstallPrompt />
 
       {showLogin && (
         <LoginModal

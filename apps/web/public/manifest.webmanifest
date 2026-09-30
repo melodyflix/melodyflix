@@ -1,0 +1,47 @@
+{
+  "name": "melodyflix",
+  "short_name": "melodyflix",
+  "description": "Video streaming platform with live broadcasting, shorts, stories, and podcasts.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#7c3aed",
+  "background_color": "#0f0f0f",
+  "categories": ["entertainment", "video", "music"],
+  "lang": "en",
+  "dir": "ltr",
+  "icons": [
+    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-192-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Live streams",
+      "short_name": "Live",
+      "url": "/live",
+      "icons": [{ "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Shorts",
+      "short_name": "Shorts",
+      "url": "/shorts",
+      "icons": [{ "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Upload video",
+      "short_name": "Upload",
+      "url": "/upload",
+      "icons": [{ "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Buy messages",
+      "short_name": "Messages",
+      "url": "/buy-messages",
+      "icons": [{ "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}
