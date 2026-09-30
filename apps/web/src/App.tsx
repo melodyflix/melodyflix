@@ -30,6 +30,7 @@ import ShortsFeed from './pages/ShortsFeed';
 import BuyMessages from './pages/BuyMessages';
 import MyMemberships from './pages/MyMemberships';
 import Analytics from './pages/Analytics';
+import HelpCenter from './pages/HelpCenter';
 import { api, getCachedUser, getToken, clearAuth, type User } from './lib/api';
 
 function AppInner() {
@@ -99,6 +100,7 @@ function AppInner() {
         onShorts={() => navigate('/shorts')}
         onMemberships={() => navigate('/my-memberships')}
         onAnalytics={() => navigate('/analytics')}
+        onHelp={() => navigate('/help')}
       />
 
       <Routes>
@@ -118,6 +120,7 @@ function AppInner() {
         <Route path="/buy-messages" element={<BuyMessages onSignIn={requireSignIn} />} />
         <Route path="/my-memberships" element={<MyMemberships onSignIn={requireSignIn} />} />
         <Route path="/analytics" element={<Analytics user={user} onSignIn={requireSignIn} />} />
+        <Route path="/help" element={<HelpCenter onSignIn={requireSignIn} />} />
         <Route path="/shorts/:id" element={<ShortsFeed onSignIn={requireSignIn} />} />
         <Route path="/series" element={<SeriesList onSignIn={requireSignIn} />} />
         <Route path="/series/:id" element={<SeriesDetail onSignIn={requireSignIn} />} />

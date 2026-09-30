@@ -49,6 +49,7 @@ ensureAdNetworksSchema();
 ensurePaymentSchema();
 ensureChatLimitsSchema();
 ensureMembershipSchema();
+ensureSupportSchema();
 logger.info('videos storage and schema ensured');
 
 // Specific routes first (before wildcards)

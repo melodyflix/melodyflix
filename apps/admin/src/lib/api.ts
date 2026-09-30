@@ -419,3 +419,59 @@ export async function completeTransaction(id: string): Promise<PaymentTransactio
     method: 'POST',
   });
 }
+
+// ============ Support Tickets (Admin) ============
+export interface SupportTicket {
+  id: string;
+  user_id: string;
+  subject: string;
+  category: string;
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  priority: string;
+  last_message_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SupportMessage {
+  id: string;
+  ticket_id: string;
+  sender_type: 'user' | 'admin';
+  sender_id: string | null;
+  sender_name: string;
+  content: string;
+  created_at: string;
+}
+
+export interface SupportStats {
+  total_tickets: number;
+  open_tickets: number;
+  in_progress_tickets: number;
+  resolved_tickets: number;
+  today_tickets: number;
+}
+
+export async function listAdminSupportTickets(status?: string): Promise<{ tickets: SupportTicket[]; stats: SupportStats }> {
+  const url = status
+    ? `/api/v1/videos/admin/support/admin/tickets?status=${status}`
+    : '/api/v1/videos/admin/support/admin/tickets';
+  return request<{ tickets: SupportTicket[]; stats: SupportStats }>(url);
+}
+
+export async function getSupportTicketDetail(id: string): Promise<{ ticket: SupportTicket; messages: SupportMessage[] }> {
+  return request<{ ticket: SupportTicket; messages: SupportMessage[] }>(`/api/v1/videos/support/tickets/${id}`);
+}
+
+export async function adminReplyTicket(id: string, content: string): Promise<SupportMessage> {
+  return request<SupportMessage>(`/api/v1/videos/admin/support/admin/tickets/${id}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
+}
+
+export async function updateTicketStatus(id: string, status: string): Promise<SupportTicket> {
+  return request<SupportTicket>(`/api/v1/videos/admin/support/admin/tickets/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}

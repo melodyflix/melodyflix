@@ -1313,3 +1313,75 @@ export async function getMyAnalytics(days = 30): Promise<AnalyticsData> {
 export async function getChannelAnalytics(channelId: string, days = 30): Promise<AnalyticsData> {
   return request<AnalyticsData>(`/api/v1/videos/analytics/channel/${channelId}?days=${days}`);
 }
+
+// ============ Customer Support ============
+export interface FaqItem {
+  id: string;
+  category: string;
+  question: string;
+  answer: string;
+  order_index: number;
+}
+
+export async function listFaq(category?: string): Promise<{ faq: FaqItem[]; categories: string[] }> {
+  const url = category
+    ? `/api/v1/videos/support/faq?category=${encodeURIComponent(category)}`
+    : '/api/v1/videos/support/faq';
+  return request<{ faq: FaqItem[]; categories: string[] }>(url);
+}
+
+export async function askChatbot(message: string, conversationId?: string): Promise<{ reply: string; conversation_id: string }> {
+  return request<{ reply: string; conversation_id: string }>('/api/v1/videos/support/chatbot', {
+    method: 'POST',
+    body: JSON.stringify({ message, conversation_id: conversationId }),
+  });
+}
+
+export interface SupportTicket {
+  id: string;
+  user_id: string;
+  subject: string;
+  category: string;
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  priority: string;
+  last_message_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SupportMessage {
+  id: string;
+  ticket_id: string;
+  sender_type: 'user' | 'admin';
+  sender_id: string | null;
+  sender_name: string;
+  content: string;
+  created_at: string;
+}
+
+export async function createSupportTicket(input: {
+  subject: string;
+  message: string;
+  category?: string;
+  priority?: string;
+}): Promise<SupportTicket> {
+  return request<SupportTicket>('/api/v1/videos/support/tickets', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function listMySupportTickets(): Promise<{ tickets: SupportTicket[] }> {
+  return request<{ tickets: SupportTicket[] }>('/api/v1/videos/support/tickets/me');
+}
+
+export async function getSupportTicket(id: string): Promise<{ ticket: SupportTicket; messages: SupportMessage[] }> {
+  return request<{ ticket: SupportTicket; messages: SupportMessage[] }>(`/api/v1/videos/support/tickets/${id}`);
+}
+
+export async function replySupportTicket(id: string, content: string): Promise<SupportMessage> {
+  return request<SupportMessage>(`/api/v1/videos/support/tickets/${id}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
+}

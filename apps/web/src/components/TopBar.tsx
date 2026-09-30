@@ -25,11 +25,12 @@ interface Props {
   onShorts: () => void;
   onMemberships: () => void;
   onAnalytics: () => void;
+  onHelp: () => void;
 }
 
 export default function TopBar({
   user, onLogoClick, onSearch, onSignIn, onSignOut, onMyChannel, onUpload,
-  onWatchLater, onSubscriptions, onHistory, onPlaylists, onMyVideos, onGoLive, onLive, onSettings, onPodcasts, onSeries, onShorts, onMemberships, onAnalytics,
+  onWatchLater, onSubscriptions, onHistory, onPlaylists, onMyVideos, onGoLive, onLive, onSettings, onPodcasts, onSeries, onShorts, onMemberships, onAnalytics, onHelp,
 }: Props) {
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -222,6 +223,12 @@ export default function TopBar({
                   style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14, borderTop: '1px solid #f0f0f0' }}
                 >
                   🔐 Security settings
+                </div>
+                <div
+                  onClick={() => { setMenuOpen(false); onHelp(); }}
+                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14, borderTop: '1px solid #f0f0f0' }}
+                >
+                  🆘 Help Center
                 </div>
                 <div
                   onClick={() => { setMenuOpen(false); onSignOut(); }}
