@@ -12,6 +12,7 @@ interface Props {
   startTime?: number;
   seekTo?: { time: number; nonce: number } | null;
   onStateChange?: (state: PlayerState) => void;
+  onEnded?: () => void;
 }
 
 type QualityLevel = { index: number; height: number; bitrate: number };
@@ -19,7 +20,7 @@ type QualityLevel = { index: number; height: number; bitrate: number };
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 const SLEEP_OPTIONS = [10, 20, 30, 60, 120];
 
-export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateChange }: Props) {
+export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateChange, onEnded }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<any>(null);
   const [error, setError] = useState('');
@@ -162,6 +163,8 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
       if (loop) {
         video.currentTime = 0;
         video.play().catch(() => {});
+      } else {
+        onEnded?.();
       }
     }
 
@@ -171,7 +174,7 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
       video.removeEventListener('timeupdate', onTimeUpdate);
       video.removeEventListener('ended', onEnded);
     };
-  }, [loop, aPoint, bPoint]);
+  }, [loop, aPoint, bPoint, onEnded]);
 
   // Sleep timer ticker
   useEffect(() => {

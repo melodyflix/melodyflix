@@ -10,6 +10,7 @@ import {
   recordAdImpression,
   getCachedUser,
   addToQueue as addToQueueApi,
+  getPreferences,
   type AdConfig,
   type Video, type Channel, type Episode, type Series,
 } from '../lib/api';
@@ -63,6 +64,7 @@ export default function Watch({ onSignIn }: Props) {
   const [episodeInfo, setEpisodeInfo] = useState<{ episode: Episode | null; series: Series | null; next_episode: Episode | null; next_video: Video | null } | null>(null);
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
+  const [autoplayNext, setAutoplayNext] = useState(true);
   const [resumeAt, setResumeAt] = useState<number>(0);
   const [resumedFrom, setResumedFrom] = useState<number>(0);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -172,7 +174,26 @@ export default function Watch({ onSignIn }: Props) {
       historySavedAtRef.current = now;
       recordHistory(video.id, st.currentTime).catch(() => {});
     }, 5000);
-    async function handleAddToQueue() {
+    useEffect(() => {
+    if (!me) return;
+    getPreferences()
+      .then((p) => setAutoplayNext(p.autoplay_next === 1))
+      .catch(() => {});
+  }, [me?.id]);
+
+  function handleVideoEnded() {
+    // Priority 1: Series next episode
+    if (episodeInfo?.next_video) {
+      navigate(`/watch/${episodeInfo.next_video.id}`);
+      return;
+    }
+    // Priority 2: Autoplay next related video
+    if (autoplayNext && related.length > 0) {
+      navigate(`/watch/${related[0].id}`);
+    }
+  }
+
+  async function handleAddToQueue() {
     if (!me) { onSignIn(); return; }
     if (!video) return;
     try {
@@ -299,6 +320,7 @@ export default function Watch({ onSignIn }: Props) {
                 poster={poster}
                 startTime={resumeAt}
                 seekTo={seekTarget}
+            onEnded={handleVideoEnded}
                 onStateChange={(s) => { lastPlayerStateRef.current = s; setCurrentTime(s.currentTime); }}
               />
             ) : (
