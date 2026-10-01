@@ -1427,3 +1427,45 @@ export async function verifyEmailToken(token: string): Promise<{ verified: boole
     body: JSON.stringify({ token }),
   });
 }
+
+
+// ========== Video Chapters ==========
+export interface Chapter {
+  id: string;
+  video_id: string;
+  start_seconds: number;
+  title: string;
+  order_index: number;
+  created_at: string;
+}
+
+export interface ChaptersResult {
+  chapters: Chapter[];
+  source: 'manual' | 'auto' | 'none';
+}
+
+export async function getChapters(videoId: string): Promise<ChaptersResult> {
+  return request<ChaptersResult>(`/api/v1/videos/${videoId}/chapters`);
+}
+
+export async function setChapters(videoId: string, chapters: { start_seconds: number; title: string }[]): Promise<ChaptersResult> {
+  return request<ChaptersResult>(`/api/v1/videos/${videoId}/chapters`, {
+    method: 'PUT',
+    body: JSON.stringify({ chapters }),
+  });
+}
+
+export async function clearChapters(videoId: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/api/v1/videos/${videoId}/chapters`, {
+    method: 'DELETE',
+  });
+}
+
+export function formatTime(seconds: number): string {
+  const s = Math.floor(seconds);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}

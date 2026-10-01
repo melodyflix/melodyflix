@@ -19,6 +19,7 @@ import GuestBanner from '../components/GuestBanner';
 import AdPlayer from '../components/AdPlayer';
 import VerifiedBadge from '../components/VerifiedBadge';
 import SaveToPlaylistModal from '../components/SaveToPlaylistModal';
+import Chapters from '../components/Chapters';
 import { usePlayer } from '../components/PlayerContext';
 
 type Reaction = 'like' | 'dislike' | null;
@@ -61,6 +62,9 @@ export default function Watch({ onSignIn }: Props) {
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [resumeAt, setResumeAt] = useState<number>(0);
   const [resumedFrom, setResumedFrom] = useState<number>(0);
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [seekTarget, setSeekTarget] = useState<{ time: number; nonce: number } | null>(null);
+  const seekNonceRef = useRef(0);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -279,7 +283,8 @@ export default function Watch({ onSignIn }: Props) {
                 src={streamSrc}
                 poster={poster}
                 startTime={resumeAt}
-                onStateChange={(s) => { lastPlayerStateRef.current = s; }}
+                seekTo={seekTarget}
+                onStateChange={(s) => { lastPlayerStateRef.current = s; setCurrentTime(s.currentTime); }}
               />
             ) : (
               <div className="mf-player">
@@ -466,6 +471,12 @@ export default function Watch({ onSignIn }: Props) {
           {video.description && (
             <div className="mf-watch-desc">{video.description}</div>
           )}
+
+          <Chapters
+            videoId={video.id}
+            currentTime={currentTime}
+            onSeek={(s) => { seekNonceRef.current += 1; setSeekTarget({ time: s, nonce: seekNonceRef.current }); }}
+          />
 
           <GuestBanner onSignIn={onSignIn} />
 

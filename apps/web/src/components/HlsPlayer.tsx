@@ -10,6 +10,7 @@ interface Props {
   src: string;
   poster?: string;
   startTime?: number;
+  seekTo?: { time: number; nonce: number } | null;
   onStateChange?: (state: PlayerState) => void;
 }
 
@@ -18,7 +19,7 @@ type QualityLevel = { index: number; height: number; bitrate: number };
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 const SLEEP_OPTIONS = [10, 20, 30, 60, 120];
 
-export default function HlsPlayer({ src, poster, startTime = 0, onStateChange }: Props) {
+export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateChange }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<any>(null);
   const [error, setError] = useState('');
@@ -29,6 +30,16 @@ export default function HlsPlayer({ src, poster, startTime = 0, onStateChange }:
   const [showSpeed, setShowSpeed] = useState(false);
   const [showSleep, setShowSleep] = useState(false);
   const didSeekRef = useRef(false);
+
+  // External seek (e.g. from chapters)
+  useEffect(() => {
+    if (seekTo == null) return;
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = seekTo.time;
+    video.play().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seekTo?.nonce]);
 
   // Loop
   const [loop, setLoop] = useState(false);
