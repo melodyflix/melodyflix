@@ -1,6 +1,6 @@
 # MelodyFlix — HANDOFF.md
 
-**Last updated:** 2026-09-30
+**Last updated:** 2026-10-01
 **Purpose:** Context handoff for new chat sessions. Share this file to continue work.
 
 ---
@@ -298,3 +298,55 @@ If push asks for credentials:
 ---
 
 **End of HANDOFF.md**
+
+
+---
+
+## 11. Session Notes — 2026-10-01 (Critical Fixes)
+
+### Bugs Fixed
+1. **videos service crash (index.ts)** — 6 missing imports + 1 undefined function call
+   - Missing imports: ensureAdNetworksSchema, ensurePaymentSchema, ensureChatLimitsSchema, ensureMembershipSchema, ensureSupportSchema, ensurePushSchema
+   - Removed bad call: ensureAdsSchema() (never existed)
+   - Fixed in commit: 1538ddb
+
+2. **nginx error.log ballooned to 105 GB**
+   - Cause: proot Ubuntu epoll_wait() syscall fails → nginx logs [alert] every millisecond
+   - Fix: nginx.conf error_log level = "emerg" (only emergency logged)
+   - Location: /etc/nginx/nginx.conf line 5
+
+3. **Admin panel showed services offline**
+   - Cause: nginx proxied /api/auth/health → /api/v1/auth/health (wrong path)
+   - Fix: added exact-match locations in /etc/nginx/sites-enabled/melodyflix
+   - Also: moved nginx backup files out of sites-enabled/ (duplicate upstream error)
+
+4. **OOM kills (Signal 9) on Android**
+   - Cause: tsx watch mode uses 300-500MB per service × 5 = 2.5GB+
+   - Fix: use plain "tsx" instead of "tsx watch" (70% less RAM)
+   - Script: scripts/start-all-lite.sh (starts services one-by-one with delays)
+
+### New Files
+- scripts/start-all-lite.sh — RAM-friendly start (uses tsx, not tsx watch)
+
+### Nginx Fixes Applied (NOT in git — system files)
+If deploying to VPS, apply same fixes:
+- /etc/nginx/nginx.conf: error_log level = emerg
+- /etc/nginx/sites-enabled/melodyflix: add exact-match /api/auth/health and /api/channels/health locations
+
+### How to Start (Updated)
+```bash
+# From Termux:
+proot-distro login ubuntu
+
+# From Ubuntu:
+~/melodyflix/scripts/start-all-lite.sh
+```
+
+### Known Remaining Issues
+- Nginx worker_count is high (auto = many workers on Android), could reduce
+- videos/data/ has old test uploads that may need cleanup later
+- web-push package missing (notifications service warning, non-blocking)
+
+---
+
+**End of Session Notes**
