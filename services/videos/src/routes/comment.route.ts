@@ -6,6 +6,8 @@ import { publish, CHANNELS } from '@melodyflix/shared-events';
 import {
   createComment, getComments, getCommentCount, updateComment, deleteComment,
   likeComment, reportComment, toggleSaveVideo, isVideoSaved, listSavedVideos,
+  getCommentsPaginated, pinComment, unpinComment, toggleCreatorHeart,
+  type CommentSort,
 } from '../services/comment.service.js';
 import { batchLookupUsers, getFallbackUser, type PublicUser } from '../services/userlookup.service.js';
 
@@ -213,5 +215,75 @@ export async function commentRoutes(app: FastifyInstance) {
     try { user = requireAuth(req.headers.authorization); }
     catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
     return reply.send({ success: true, data: { videoIds: listSavedVideos(user.sub) } });
+  });
+
+  // ============ Better Comments ============
+
+  // GET /:videoId/comments/paginated?sort=top|newest|oldest&limit=20&offset=0
+  app.get('/:videoId/comments/paginated', async (req, reply) => {
+    const { videoId } = req.params as { videoId: string };
+    const q = req.query as { sort?: string; limit?: string; offset?: string };
+    const sort = (q.sort === 'newest' || q.sort === 'oldest' || q.sort === 'top') ? q.sort as CommentSort : 'top';
+    const limit = Math.min(Math.max(parseInt(q.limit ?? '20') || 20, 1), 50);
+    const offset = Math.max(parseInt(q.offset ?? '0') || 0, 0);
+
+    const u = optionalUser(req.headers.authorization);
+    const currentUserId = (u?.sub as string) ?? null;
+    const page = getCommentsPaginated(videoId, currentUserId, sort, limit, offset);
+    return reply.send(page);
+  });
+
+  // POST /comments/:commentId/pin
+  app.post('/comments/:commentId/pin', async (req, reply) => {
+    let userId: string;
+    let isAdmin = false;
+    try {
+      const payload = requireAuth(req.headers.authorization);
+      userId = payload.sub as string;
+      isAdmin = payload.role === 'admin';
+    } catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { commentId } = req.params as { commentId: string };
+    try {
+      pinComment(commentId, userId, isAdmin);
+      return reply.send({ ok: true, pinned: true });
+    } catch (err) {
+      return reply.code(403).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // POST /comments/:commentId/unpin
+  app.post('/comments/:commentId/unpin', async (req, reply) => {
+    let userId: string;
+    let isAdmin = false;
+    try {
+      const payload = requireAuth(req.headers.authorization);
+      userId = payload.sub as string;
+      isAdmin = payload.role === 'admin';
+    } catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { commentId } = req.params as { commentId: string };
+    try {
+      unpinComment(commentId, userId, isAdmin);
+      return reply.send({ ok: true, pinned: false });
+    } catch (err) {
+      return reply.code(403).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // POST /comments/:commentId/heart
+  app.post('/comments/:commentId/heart', async (req, reply) => {
+    let userId: string;
+    let isAdmin = false;
+    try {
+      const payload = requireAuth(req.headers.authorization);
+      userId = payload.sub as string;
+      isAdmin = payload.role === 'admin';
+    } catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { commentId } = req.params as { commentId: string };
+    try {
+      const result = toggleCreatorHeart(commentId, userId, isAdmin);
+      return reply.send({ ok: true, heart: result.heart });
+    } catch (err) {
+      return reply.code(403).send({ success: false, error: (err as Error).message });
+    }
   });
 }

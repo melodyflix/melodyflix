@@ -12,6 +12,8 @@ export interface Comment {
   reply_count: number;
   is_edited: number;
   is_deleted: number;
+  is_pinned: number;
+  creator_heart: number;
   created_at: string;
   updated_at: string;
   // joined fields
@@ -68,6 +70,11 @@ export function ensureCommentSchema(): void {
       UNIQUE (user_id, video_id)
     );
   `);
+
+  // Migration: add new columns to existing DBs (ignore errors if already present)
+  try { db.exec('ALTER TABLE comments ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0'); } catch {}
+  try { db.exec('ALTER TABLE comments ADD COLUMN creator_heart INTEGER NOT NULL DEFAULT 0'); } catch {}
+  try { db.exec('CREATE INDEX IF NOT EXISTS idx_comments_pinned ON comments(video_id, is_pinned DESC)'); } catch {}
 }
 
 // ---------- Comments ----------
@@ -592,4 +599,124 @@ export function listPlaylistsContainingVideo(userId: string, videoId: string): P
     INNER JOIN playlist_items pi ON pi.playlist_id = p.id
     WHERE p.user_id = ? AND pi.video_id = ?
   `).all(userId, videoId) as Playlist[];
+}
+
+
+// ---------- Better comments: pagination, sorting, pin, heart ----------
+
+export type CommentSort = 'top' | 'newest' | 'oldest';
+
+export interface CommentsPage {
+  comments: CommentWithReplies[];
+  total: number;
+  has_more: boolean;
+  next_offset: number;
+}
+
+export function getCommentsPaginated(
+  videoId: string,
+  currentUserId: string | null,
+  sort: CommentSort = 'top',
+  limit = 20,
+  offset = 0
+): CommentsPage {
+  const db = getDb();
+
+  // Determine ORDER BY
+  let orderClause = 'is_pinned DESC, ';
+  if (sort === 'newest') orderClause += 'created_at DESC';
+  else if (sort === 'oldest') orderClause += 'created_at ASC';
+  else orderClause += 'like_count DESC, created_at DESC'; // top
+
+  // Note: LIMIT/OFFSET inlined because node:sqlite (Node 22) doesn't bind
+  // placeholders in LIMIT/OFFSET clauses reliably. Values are clamped ints — safe.
+  const safeLimit = Math.max(1, Math.min(50, Math.floor(limit)));
+  const safeOffset = Math.max(0, Math.floor(offset));
+  const tops = db.prepare(
+    'SELECT * FROM comments WHERE video_id = ? AND parent_id IS NULL AND is_deleted = 0 ORDER BY ' + orderClause + ' LIMIT ' + safeLimit + ' OFFSET ' + safeOffset
+  ).all(videoId) as Comment[];
+
+  const totalRow = db.prepare(
+    'SELECT COUNT(*) as n FROM comments WHERE video_id = ? AND parent_id IS NULL AND is_deleted = 0'
+  ).get(videoId) as { n: number };
+
+  const result: CommentWithReplies[] = [];
+  for (const top of tops) {
+    const replies = db.prepare(
+      'SELECT * FROM comments WHERE parent_id = ? AND is_deleted = 0 ORDER BY created_at ASC LIMIT 50'
+    ).all(top.id) as Comment[];
+
+    const enrichedReplies = replies.map((r) => ({
+      ...r,
+      user_reaction: currentUserId ? isCommentLiked(r.id, currentUserId) : false,
+    }));
+
+    result.push({
+      ...top,
+      user_reaction: currentUserId ? isCommentLiked(top.id, currentUserId) : false,
+      replies: enrichedReplies,
+    });
+  }
+
+  const total = totalRow.n;
+  const hasMore = offset + limit < total;
+
+  return {
+    comments: result,
+    total,
+    has_more: hasMore,
+    next_offset: offset + limit,
+  };
+}
+
+// Pin a comment (creator only — check ownership of the video)
+export function pinComment(commentId: string, userId: string, isAdmin = false): void {
+  const db = getDb();
+  const comment = db.prepare('SELECT * FROM comments WHERE id = ?').get(commentId) as Comment | undefined;
+  if (!comment) throw new Error('Comment not found');
+
+  // Check ownership: either comment author OR video owner OR admin
+  if (!isAdmin && comment.user_id !== userId) {
+    const video = db.prepare('SELECT owner_id FROM videos WHERE id = ?').get(comment.video_id) as { owner_id: string } | undefined;
+    if (!video || video.owner_id !== userId) {
+      throw new Error('Only the video creator can pin comments');
+    }
+  }
+
+  // Unpin any currently pinned comment in the same video (only one pinned per video)
+  db.prepare('UPDATE comments SET is_pinned = 0 WHERE video_id = ?').run(comment.video_id);
+  db.prepare('UPDATE comments SET is_pinned = 1 WHERE id = ?').run(commentId);
+}
+
+export function unpinComment(commentId: string, userId: string, isAdmin = false): void {
+  const db = getDb();
+  const comment = db.prepare('SELECT * FROM comments WHERE id = ?').get(commentId) as Comment | undefined;
+  if (!comment) throw new Error('Comment not found');
+
+  if (!isAdmin && comment.user_id !== userId) {
+    const video = db.prepare('SELECT owner_id FROM videos WHERE id = ?').get(comment.video_id) as { owner_id: string } | undefined;
+    if (!video || video.owner_id !== userId) {
+      throw new Error('Only the video creator can unpin comments');
+    }
+  }
+
+  db.prepare('UPDATE comments SET is_pinned = 0 WHERE id = ?').run(commentId);
+}
+
+// Creator heart: toggle a heart on a comment (creator only)
+export function toggleCreatorHeart(commentId: string, userId: string, isAdmin = false): { heart: boolean } {
+  const db = getDb();
+  const comment = db.prepare('SELECT * FROM comments WHERE id = ?').get(commentId) as Comment | undefined;
+  if (!comment) throw new Error('Comment not found');
+
+  if (!isAdmin && comment.user_id !== userId) {
+    const video = db.prepare('SELECT owner_id FROM videos WHERE id = ?').get(comment.video_id) as { owner_id: string } | undefined;
+    if (!video || video.owner_id !== userId) {
+      throw new Error('Only the video creator can heart comments');
+    }
+  }
+
+  const newVal = comment.creator_heart ? 0 : 1;
+  db.prepare('UPDATE comments SET creator_heart = ? WHERE id = ?').run(newVal, commentId);
+  return { heart: newVal === 1 };
 }
