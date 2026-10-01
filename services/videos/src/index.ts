@@ -15,12 +15,14 @@ import { videoRoutes } from './routes/video.route.js';
 import { musicRoutes } from './routes/music.route.js';
 import { commentRoutes } from './routes/comment.route.js';
 import { adminReportRoutes } from './routes/admin.route.js';
+import { chapterRoutes } from './routes/chapter.route.js';
 import { ensureSchema } from './services/video.service.js';
 import { ensureCommentSchema, ensureHistorySchema, ensurePlaylistSchema } from './services/comment.service.js';
 import { ensureSeriesSchema } from './services/series.service.js';
 import { ensureStorySchema } from './services/story.service.js';
 import { ensureMusicSchema } from './services/music.service.js';
 import { ensureStorage } from './services/storage.service.js';
+import { ensureChapterSchema } from './services/chapter.service.js';
 import { ensureAdNetworksSchema } from './services/vast.service.js';
 import { ensurePaymentSchema } from './services/payment.service.js';
 import { ensureChatLimitsSchema } from './services/chatlimits.service.js';
@@ -46,6 +48,7 @@ app.addHook('onRequest', async (req, reply) => {
 app.get('/health', async () => ({ service: 'videos', status: 'ok' }));
 
 ensureStorage();
+ensureChapterSchema();
 ensureSchema();
 ensureCommentSchema();
 ensureHistorySchema();
@@ -69,6 +72,7 @@ await app.register(historyRoutes, { prefix: '/api/v1/videos' });
 await app.register(playlistRoutes, { prefix: '/api/v1/videos' });
 await app.register(videoRoutes, { prefix: '/api/v1/videos' });
 await app.register(commentRoutes, { prefix: '/api/v1/videos' });
+await app.register(chapterRoutes, { prefix: '/api/v1/videos' });
 await app.register(musicRoutes, { prefix: '/api/v1/videos/music' });
 await app.register(adminReportRoutes, { prefix: '/api/v1/videos/admin' });
 
