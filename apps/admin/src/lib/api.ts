@@ -83,6 +83,60 @@ export interface VideosListResponse {
   total: number;
 }
 
+
+// ========== Video Chapters (admin) ==========
+export interface Chapter {
+  id: string;
+  video_id: string;
+  start_seconds: number;
+  title: string;
+  order_index: number;
+  created_at: string;
+}
+
+export interface ChaptersResult {
+  chapters: Chapter[];
+  source: 'manual' | 'auto' | 'none';
+}
+
+export async function adminGetChapters(videoId: string): Promise<ChaptersResult> {
+  return request<ChaptersResult>(`/api/v1/videos/admin/chapters/${videoId}`);
+}
+
+export async function adminSetChapters(videoId: string, chapters: { start_seconds: number; title: string }[]): Promise<ChaptersResult> {
+  return request<ChaptersResult>(`/api/v1/videos/admin/chapters/${videoId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ chapters }),
+  });
+}
+
+export async function adminClearChapters(videoId: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/api/v1/videos/admin/chapters/${videoId}`, {
+    method: 'DELETE',
+  });
+}
+
+export function formatChapterTime(seconds: number): string {
+  const s = Math.floor(seconds);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
+
+export function parseTimeInput(input: string): number | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  const parts = trimmed.split(':').map((x) => x.trim());
+  if (parts.some((p) => p === '' || isNaN(Number(p)))) return null;
+  const nums = parts.map(Number);
+  if (nums.length === 2) return nums[0] * 60 + nums[1];
+  if (nums.length === 3) return nums[0] * 3600 + nums[1] * 60 + nums[2];
+  if (nums.length === 1) return nums[0];
+  return null;
+}
+
 export const api = {
   // auth
   login: (email: string, password: string) =>
@@ -529,4 +583,20 @@ export async function sendTestEmail(to: string): Promise<{ sent: boolean }> {
 
 export async function getEmailLogs(limit = 100): Promise<{ logs: EmailLog[] }> {
   return request<{ logs: EmailLog[] }>(`/api/admin/email/logs?limit=${limit}`);
+}
+
+export interface SmtpSettings { id: number; host: string; port: number; secure: number; username: string; password: string; from_name: string; from_email: string; enabled: number; updated_at: string; }
+export interface EmailLog { id: string; user_id: string | null; to_email: string; subject: string; status: string; error: string | null; created_at: string; }
+
+export async function getSmtpSettings(): Promise<SmtpSettings | null> {
+  return request<SmtpSettings | null>('/api/admin/email/smtp');
+}
+export async function saveSmtpSettings(input: any): Promise<SmtpSettings> {
+  return request<SmtpSettings>('/api/admin/email/smtp', { method: 'POST', body: JSON.stringify(input) });
+}
+export async function sendTestEmail(to: string): Promise<{ sent: boolean }> {
+  return request<{ sent: boolean }>('/api/admin/email/test', { method: 'POST', body: JSON.stringify({ to }) });
+}
+export async function getEmailLogs(): Promise<{ logs: EmailLog[] }> {
+  return request<{ logs: EmailLog[] }>('/api/admin/email/logs');
 }

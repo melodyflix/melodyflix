@@ -1,7 +1,7 @@
 // melodyflix videos - chapter routes
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { requireAuth, requireRole } from '@melodyflix/shared-auth';
 import { getDb } from '@melodyflix/shared-db';
 import { getEffectiveChapters, replaceChapters, clearChapters } from '../services/chapter.service.js';
 
@@ -51,6 +51,37 @@ export async function chapterRoutes(app: FastifyInstance) {
     if (!userId) return reply.code(401).send({ message: 'Unauthorized' });
     if (!checkOwner(id, userId)) return reply.code(403).send({ message: 'Not your video' });
 
+    clearChapters(id);
+    return reply.send({ ok: true, source: 'auto' });
+  });
+// ============ ADMIN endpoints (bypass owner check) ============
+
+  // GET /admin/chapters/:id — get chapters for any video
+  app.get('/admin/chapters/:id', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const result = getEffectiveChapters(id);
+    return reply.send(result);
+  });
+
+  // PUT /admin/chapters/:id — set chapters for any video
+  app.put('/admin/chapters/:id', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const parsed = SetChaptersSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ message: 'Invalid chapters', errors: parsed.error.issues });
+    const sorted = [...parsed.data.chapters].sort((a, b) => a.start_seconds - b.start_seconds);
+    const saved = replaceChapters(id, sorted);
+    return reply.send({ chapters: saved, source: 'manual' });
+  });
+
+  // DELETE /admin/chapters/:id — clear manual chapters
+  app.delete('/admin/chapters/:id', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
     clearChapters(id);
     return reply.send({ ok: true, source: 'auto' });
   });

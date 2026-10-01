@@ -9,10 +9,12 @@ import Settings from './pages/Settings';
 import AdNetworks from './pages/AdNetworks';
 import AdminPayments from './pages/AdminPayments';
 import AdminSupport from './pages/AdminSupport';
+import EmailSettings from './pages/EmailSettings';
 import AdminEmail from './pages/AdminEmail';
+import VideoChapters from './pages/VideoChapters';
 import { api, getToken, clearToken, type User } from './lib/api';
 
-type Page = 'dashboard' | 'channels' | 'videos' | 'users' | 'reports' | 'ads' | 'payments' | 'support' | 'email' | 'settings';
+type Page = 'dashboard' | 'channels' | 'videos' | 'chapters' | 'users' | 'reports' | 'ads' | 'payments' | 'support' | 'email' | 'settings';
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState<boolean>(!!getToken());
@@ -39,11 +41,13 @@ export default function App() {
     { key: 'dashboard', label: 'Dashboard', icon: '🏠' },
     { key: 'channels', label: 'Channels', icon: '📺' },
     { key: 'videos', label: 'Videos', icon: '🎬' },
+    { key: 'chapters', label: 'Chapters', icon: '📑' },
     { key: 'users', label: 'Users', icon: '👥' },
     { key: 'ads', label: 'Ads', icon: '💰' },
     { key: 'payments', label: 'Payments', icon: '💳' },
     { key: 'reports', label: 'Reports', icon: '🚩' },
     { key: 'support', label: 'Support', icon: '🎫' },
+    { key: 'email', label: 'Email', icon: '📧' },
     { key: 'email', label: 'Email', icon: '📧' },
     { key: 'settings', label: 'Settings', icon: '⚙️' },
   ];
@@ -95,11 +99,13 @@ export default function App() {
           {page === 'dashboard' && <Dashboard />}
           {page === 'channels' && <Channels />}
           {page === 'videos' && <Videos />}
+        {page === 'chapters' && <VideoChapters />}
           {page === 'users' && <Users />}
           {page === 'ads' && <AdNetworks />}
           {page === 'payments' && <AdminPayments />}
           {page === 'reports' && <Reports />}
           {page === 'support' && <AdminSupport />}
+          {page === 'email' && <EmailSettings />}
           {page === 'email' && <AdminEmail />}
           {page === 'settings' && <Settings />}
         </main>
