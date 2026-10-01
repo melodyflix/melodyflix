@@ -9,6 +9,7 @@ import {
   getAdConfig,
   recordAdImpression,
   getCachedUser,
+  addToQueue as addToQueueApi,
   type AdConfig,
   type Video, type Channel, type Episode, type Series,
 } from '../lib/api';
@@ -20,6 +21,7 @@ import AdPlayer from '../components/AdPlayer';
 import VerifiedBadge from '../components/VerifiedBadge';
 import SaveToPlaylistModal from '../components/SaveToPlaylistModal';
 import Chapters from '../components/Chapters';
+import WatchQueue from '../components/WatchQueue';
 import { usePlayer } from '../components/PlayerContext';
 
 type Reaction = 'like' | 'dislike' | null;
@@ -60,6 +62,7 @@ export default function Watch({ onSignIn }: Props) {
   const [adLoading, setAdLoading] = useState(true);
   const [episodeInfo, setEpisodeInfo] = useState<{ episode: Episode | null; series: Series | null; next_episode: Episode | null; next_video: Video | null } | null>(null);
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+  const [showQueue, setShowQueue] = useState(false);
   const [resumeAt, setResumeAt] = useState<number>(0);
   const [resumedFrom, setResumedFrom] = useState<number>(0);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -169,7 +172,19 @@ export default function Watch({ onSignIn }: Props) {
       historySavedAtRef.current = now;
       recordHistory(video.id, st.currentTime).catch(() => {});
     }, 5000);
-    return () => clearInterval(interval);
+    async function handleAddToQueue() {
+    if (!me) { onSignIn(); return; }
+    if (!video) return;
+    try {
+      await addToQueueApi(video.id);
+      showToast('Added to queue');
+      setShowQueue(true);
+    } catch (err) {
+      showToast((err as Error).message || 'Failed to add to queue');
+    }
+  }
+
+  return () => clearInterval(interval);
   }, [me?.id, video?.id]);
 
   // On unmount: save history + set mini player
@@ -446,6 +461,18 @@ export default function Watch({ onSignIn }: Props) {
               <button
                 className="mf-sub-btn"
                 style={{
+                  background: showQueue ? '#e8f0fe' : '#f2f2f2',
+                  color: showQueue ? '#065fd4' : '#0f0f0f',
+                }}
+                onClick={() => me ? setShowQueue((v) => !v) : onSignIn()}
+                title="Watch Queue"
+              >
+                🕒 Queue
+              </button>
+
+              <button
+                className="mf-sub-btn"
+                style={{
                   background: saved ? '#e8f0fe' : '#f2f2f2',
                   color: saved ? '#065fd4' : '#0f0f0f',
                 }}
@@ -511,6 +538,14 @@ export default function Watch({ onSignIn }: Props) {
           videoId={video.id}
           onClose={() => setShowPlaylistModal(false)}
           onToast={showToast}
+        />
+      )}
+
+      {showQueue && (
+        <WatchQueue
+          onPlay={(id) => { setShowQueue(false); navigate(`/watch/${id}`); }}
+          onSignIn={onSignIn}
+          onClose={() => setShowQueue(false)}
         />
       )}
 

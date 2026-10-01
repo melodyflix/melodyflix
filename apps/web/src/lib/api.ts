@@ -338,6 +338,57 @@ export async function toggleCreatorHeart(commentId: string): Promise<{ ok: boole
   });
 }
 
+
+// ============ Watch Queue ============
+export interface QueueItem {
+  id: string;
+  user_id: string;
+  video_id: string;
+  position: number;
+  added_at: string;
+  title?: string | null;
+  thumbnail_url?: string | null;
+  duration_seconds?: number | null;
+  channel_id?: string | null;
+  owner_id?: string | null;
+}
+
+export interface QueueResponse {
+  items: QueueItem[];
+  count: number;
+}
+
+export async function getWatchQueue(): Promise<QueueResponse> {
+  return request<QueueResponse>('/api/v1/videos/queue');
+}
+
+export async function addToQueue(videoId: string, atTop = false): Promise<QueueResponse> {
+  return request<QueueResponse>('/api/v1/videos/queue', {
+    method: 'POST',
+    body: JSON.stringify({ video_id: videoId, at_top: atTop }),
+  });
+}
+
+export async function removeFromQueue(videoId: string): Promise<QueueResponse> {
+  return request<QueueResponse>(`/api/v1/videos/queue/${videoId}`, { method: 'DELETE' });
+}
+
+export async function reorderQueue(videoIds: string[]): Promise<QueueResponse> {
+  return request<QueueResponse>('/api/v1/videos/queue/reorder', {
+    method: 'PUT',
+    body: JSON.stringify({ video_ids: videoIds }),
+  });
+}
+
+export async function clearQueue(): Promise<{ removed: number }> {
+  return request<{ removed: number }>('/api/v1/videos/queue', { method: 'DELETE' });
+}
+
+export async function getNextInQueue(currentVideoId?: string): Promise<{ next: QueueItem | null }> {
+  const qs = currentVideoId ? `?current=${encodeURIComponent(currentVideoId)}` : '';
+  return request<{ next: QueueItem | null }>(`/api/v1/videos/queue/next${qs}`);
+}
+
 // ============ Save video ============
 export async function toggleSaveVideo(videoId: string): Promise<{ saved: boolean }> {
   return request<{ saved: boolean }>(`/api/v1/videos/${videoId}/save`, { method: 'POST' });

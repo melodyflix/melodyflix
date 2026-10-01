@@ -8,6 +8,12 @@ export interface QueueItem {
   video_id: string;
   position: number;
   added_at: string;
+  // Joined video fields (populated by listQueue)
+  title?: string | null;
+  thumbnail_url?: string | null;
+  duration_seconds?: number | null;
+  channel_id?: string | null;
+  owner_id?: string | null;
 }
 
 export function ensureQueueSchema(): void {
@@ -27,7 +33,13 @@ export function ensureQueueSchema(): void {
 
 export function listQueue(userId: string): QueueItem[] {
   const db = getDb();
-  return db.prepare('SELECT * FROM watch_queue WHERE user_id = ? ORDER BY position ASC, added_at ASC').all(userId) as QueueItem[];
+  return db.prepare(
+    'SELECT q.*, v.title, v.thumbnail_url, v.duration_seconds, v.channel_id, v.owner_id ' +
+    'FROM watch_queue q ' +
+    'LEFT JOIN videos v ON v.id = q.video_id ' +
+    'WHERE q.user_id = ? ' +
+    'ORDER BY q.position ASC, q.added_at ASC'
+  ).all(userId) as QueueItem[];
 }
 
 export function addToQueue(userId: string, videoId: string, atTop = false): QueueItem {
