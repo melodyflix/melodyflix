@@ -239,6 +239,16 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
           e.preventDefault();
           video.volume = Math.max(video.volume - 0.05, 0);
           break;
+        case ',':
+          e.preventDefault();
+          if (!video.paused) video.pause();
+          video.currentTime = Math.max(video.currentTime - (e.shiftKey ? 10 : 1) / 30, 0);
+          break;
+        case '.':
+          e.preventDefault();
+          if (!video.paused) video.pause();
+          video.currentTime = Math.min(video.currentTime + (e.shiftKey ? 10 : 1) / 30, video.duration || 0);
+          break;
       }
     }
     document.addEventListener('keydown', onKey);
