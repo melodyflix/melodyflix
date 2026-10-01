@@ -50,3 +50,6 @@ temp/
 *.tmp
 services/*/src/*.backup-*
 *.backup-*
+
+# Backup files
+*.bak-*

@@ -1,0 +1,43 @@
+# melodyflix — Completed Features (20)
+
+1. Account (Signup/Login/JWT)
+2. Verification Badge
+3. Guest Mode
+4. Community Post
+5. Premium Logo (gradient SVG)
+6. 2FA (TOTP + backup codes)
+7. RTMP/OBS live streaming
+8. Podcast Mode (RSS feed)
+9. Series Management (seasons + episodes)
+10. Shorts/Reels UI
+11. Stories (24h)
+12. Ads System (VAST + IMA + Adsterra/Monetag/AdSense)
+13. Payment System (bKash/Nagad/Rocket/SSLCommerz/Stripe/PayPal/Razorpay)
+14. Chat Limits (৭টি free + ৫০৳/২০ মেসেজ)
+15. Super Chat (৳50-৳1000+)
+16. Channel Membership (monthly tiers)
+17. Creator Analytics (charts + revenue)
+18. Customer Support (FAQ + chatbot + tickets)
+19. PWA (installable + offline)
+20. Push Notifications (VAPID)
+
+## Extra
+- Video Upload (Web + Admin)
+- HLS Player (Quality/Speed/PiP/Mini/Loop/A-B/Sleep)
+- Search backend + Filters
+- Like/Comment/Reply/Share/Save
+- Report + Admin Moderation
+- Watch Later/Subscriptions/History/Resume
+- Playlists
+- Trending + Categories
+- Notifications (Bell + full stack)
+- Admin Panel (Users/Channels/Videos/Reports/Ads/Payments/Support/Email/Settings)
+- Email Verification (SMTP settings)
+- Backup (mf-backup)
+
+## Pending
+- Email Verification admin panel build + push (if unfinished)
+- Advanced Comments (pagination/pinned)
+- Watch Queue
+- Playlist Auto-play
+- Deploy to Oracle Cloud Always Free

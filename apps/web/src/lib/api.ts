@@ -251,6 +251,8 @@ export interface Comment {
   reply_count: number;
   is_edited: number;
   is_deleted: number;
+  is_pinned: number;
+  creator_heart: number;
   created_at: string;
   updated_at: string;
   user_reaction?: boolean;
@@ -295,6 +297,44 @@ export async function reportComment(commentId: string, reason: string, note?: st
   return request<{ reported: boolean }>(`/api/v1/videos/comments/${commentId}/report`, {
     method: 'POST',
     body: JSON.stringify({ reason, note }),
+  });
+}
+
+// ============ Advanced Comments (pagination + pin + heart) ============
+export type CommentSort = 'top' | 'newest' | 'oldest';
+
+export interface CommentsPage {
+  comments: Comment[];
+  total: number;
+  has_more: boolean;
+  next_offset: number;
+}
+
+export async function listCommentsPaginated(
+  videoId: string,
+  sort: CommentSort = 'top',
+  limit = 20,
+  offset = 0,
+): Promise<CommentsPage> {
+  const qs = new URLSearchParams({ sort, limit: String(limit), offset: String(offset) });
+  return request<CommentsPage>(`/api/v1/videos/${videoId}/comments/paginated?${qs.toString()}`);
+}
+
+export async function pinComment(commentId: string): Promise<{ ok: boolean; pinned: boolean }> {
+  return request<{ ok: boolean; pinned: boolean }>(`/api/v1/videos/comments/${commentId}/pin`, {
+    method: 'POST',
+  });
+}
+
+export async function unpinComment(commentId: string): Promise<{ ok: boolean; pinned: boolean }> {
+  return request<{ ok: boolean; pinned: boolean }>(`/api/v1/videos/comments/${commentId}/unpin`, {
+    method: 'POST',
+  });
+}
+
+export async function toggleCreatorHeart(commentId: string): Promise<{ ok: boolean; heart: boolean }> {
+  return request<{ ok: boolean; heart: boolean }>(`/api/v1/videos/comments/${commentId}/heart`, {
+    method: 'POST',
   });
 }
 

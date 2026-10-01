@@ -1,13 +1,16 @@
 import { useEffect, useState, useRef } from 'react';
 import {
-  listComments, createComment, updateComment, deleteComment, likeComment, reportComment,
+  listCommentsPaginated, createComment, updateComment, deleteComment, likeComment, reportComment,
+  pinComment, unpinComment, toggleCreatorHeart,
   getCachedUser,
   timeAgo,
   type Comment,
+  type CommentSort,
 } from '../lib/api';
 
 interface Props {
   videoId: string;
+  videoOwnerId?: string;
   onSignIn: () => void;
 }
 
@@ -18,6 +21,14 @@ const REPORT_REASONS = [
   { key: 'misinformation', label: 'Misinformation' },
   { key: 'other', label: 'Other' },
 ];
+
+const SORT_OPTIONS: { key: CommentSort; label: string }[] = [
+  { key: 'top', label: 'Top' },
+  { key: 'newest', label: 'Newest' },
+  { key: 'oldest', label: 'Oldest' },
+];
+
+const PAGE_SIZE = 20;
 
 function displayName(c: Comment): string {
   if (c.user?.display_name) return c.user.display_name;
@@ -31,10 +42,11 @@ function avatarInitial(c: Comment): string {
 }
 
 function CommentItem({
-  comment, currentUserId, onRefresh, onSignIn, isReply = false,
+  comment, currentUserId, videoOwnerId, onRefresh, onSignIn, isReply = false,
 }: {
   comment: Comment;
   currentUserId: string | null;
+  videoOwnerId?: string;
   onRefresh: () => void;
   onSignIn: () => void;
   isReply?: boolean;
@@ -51,8 +63,11 @@ function CommentItem({
   const [showReplies, setShowReplies] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const isOwner = currentUserId && currentUserId === comment.user_id;
+  const isOwner = !!currentUserId && currentUserId === comment.user_id;
   const isDeleted = comment.is_deleted === 1;
+  const isPinned = comment.is_pinned === 1;
+  const hasHeart = comment.creator_heart === 1;
+  const canModerate = !!currentUserId && !!videoOwnerId && currentUserId === videoOwnerId;
 
   async function handleLike() {
     if (!currentUserId) { onSignIn(); return; }
@@ -120,12 +135,51 @@ function CommentItem({
     }
   }
 
+  async function handlePinToggle() {
+    if (!canModerate) return;
+    setBusy(true);
+    try {
+      if (isPinned) await unpinComment(comment.id);
+      else await pinComment(comment.id);
+      onRefresh();
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleHeartToggle() {
+    if (!canModerate) return;
+    try {
+      await toggleCreatorHeart(comment.id);
+      onRefresh();
+    } catch (err) {
+      alert((err as Error).message);
+    }
+  }
+
   return (
     <div className="mf-comment" style={isReply ? { marginTop: 0 } : undefined}>
-      <div className="mf-comment-avatar">{avatarInitial(comment)}</div>
+      <div
+        className="mf-comment-avatar"
+        style={hasHeart ? { boxShadow: '0 0 0 2px #ff4d6d' } : undefined}
+      >
+        {avatarInitial(comment)}
+      </div>
       <div className="mf-comment-body">
-        <div className="mf-comment-meta">
+        <div className="mf-comment-meta" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span className="mf-comment-author">{displayName(comment)}</span>
+          {canModerate && comment.user_id === videoOwnerId && (
+            <span style={{ fontSize: 11, background: '#606060', color: '#fff', padding: '1px 6px', borderRadius: 10 }}>
+              Creator
+            </span>
+          )}
+          {isPinned && (
+            <span style={{ fontSize: 11, background: '#065fd4', color: '#fff', padding: '1px 6px', borderRadius: 10 }}>
+              📌 Pinned
+            </span>
+          )}
           <span className="mf-comment-time">{timeAgo(comment.created_at)}</span>
           {comment.is_edited === 1 && !isDeleted && (
             <span className="mf-comment-time">(edited)</span>
@@ -154,6 +208,10 @@ function CommentItem({
               {isDeleted ? '[Comment deleted]' : comment.content}
             </div>
 
+            {hasHeart && !isDeleted && (
+              <div style={{ marginTop: 4, fontSize: 13, color: '#ff4d6d' }}>💖 Loved by creator</div>
+            )}
+
             {!isDeleted && (
               <div className="mf-comment-actions">
                 <button
@@ -173,6 +231,27 @@ function CommentItem({
                     }}
                   >
                     💬 Reply
+                  </button>
+                )}
+
+                {!isReply && canModerate && (
+                  <button
+                    className="mf-comment-action"
+                    onClick={handlePinToggle}
+                    disabled={busy}
+                    title={isPinned ? 'Unpin' : 'Pin comment'}
+                  >
+                    📌 {isPinned ? 'Unpin' : 'Pin'}
+                  </button>
+                )}
+
+                {!isReply && canModerate && comment.user_id !== videoOwnerId && (
+                  <button
+                    className="mf-comment-action"
+                    onClick={handleHeartToggle}
+                    title={hasHeart ? 'Remove heart' : 'Heart this comment'}
+                  >
+                    {hasHeart ? '💖' : '🤍'} Heart
                   </button>
                 )}
 
@@ -261,6 +340,7 @@ function CommentItem({
                     key={r.id}
                     comment={r}
                     currentUserId={currentUserId}
+                    videoOwnerId={videoOwnerId}
                     onRefresh={onRefresh}
                     onSignIn={onSignIn}
                     isReply
@@ -298,28 +378,36 @@ function CommentItem({
   );
 }
 
-export default function CommentSection({ videoId, onSignIn }: Props) {
+export default function CommentSection({ videoId, videoOwnerId, onSignIn }: Props) {
   const me = getCachedUser();
   const [comments, setComments] = useState<Comment[]>([]);
   const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [sort, setSort] = useState<CommentSort>('top');
   const [newComment, setNewComment] = useState('');
   const [busy, setBusy] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  async function load() {
+  async function load(reset = true) {
+    if (reset) setLoading(true);
+    else setLoadingMore(true);
     try {
-      const res = await listComments(videoId);
-      setComments(res.comments);
+      const offset = reset ? 0 : comments.length;
+      const res = await listCommentsPaginated(videoId, sort, PAGE_SIZE, offset);
+      setComments(reset ? res.comments : [...comments, ...res.comments]);
       setTotal(res.total);
+      setHasMore(res.has_more);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }
 
-  useEffect(() => { load(); }, [videoId]);
+  useEffect(() => { load(true); /* eslint-disable-next-line */ }, [videoId, sort]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -330,7 +418,7 @@ export default function CommentSection({ videoId, onSignIn }: Props) {
       await createComment(videoId, newComment.trim(), null);
       setNewComment('');
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
-      await load();
+      await load(true);
     } catch (err) {
       alert((err as Error).message);
     } finally {
@@ -348,8 +436,27 @@ export default function CommentSection({ videoId, onSignIn }: Props) {
 
   return (
     <div className="mf-comments-section">
-      <div className="mf-comments-header">
+      <div className="mf-comments-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div className="mf-comments-count">{total} {total === 1 ? 'Comment' : 'Comments'}</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {SORT_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              className="mf-btn-text"
+              onClick={() => setSort(opt.key)}
+              style={{
+                fontSize: 13,
+                padding: '4px 10px',
+                borderRadius: 16,
+                background: sort === opt.key ? '#0f0f0f' : 'transparent',
+                color: sort === opt.key ? '#fff' : '#0f0f0f',
+                border: '1px solid #e5e5e5',
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <form className="mf-comment-form" onSubmit={handleSubmit}>
@@ -390,17 +497,33 @@ export default function CommentSection({ videoId, onSignIn }: Props) {
           No comments yet. Be the first to comment!
         </div>
       ) : (
-        <div className="mf-comment-list">
-          {comments.map((c) => (
-            <CommentItem
-              key={c.id}
-              comment={c}
-              currentUserId={me?.id ?? null}
-              onRefresh={load}
-              onSignIn={onSignIn}
-            />
-          ))}
-        </div>
+        <>
+          <div className="mf-comment-list">
+            {comments.map((c) => (
+              <CommentItem
+                key={c.id}
+                comment={c}
+                currentUserId={me?.id ?? null}
+                videoOwnerId={videoOwnerId}
+                onRefresh={() => load(true)}
+                onSignIn={onSignIn}
+              />
+            ))}
+          </div>
+
+          {hasMore && (
+            <div style={{ textAlign: 'center', marginTop: 16 }}>
+              <button
+                className="mf-btn-secondary"
+                onClick={() => load(false)}
+                disabled={loadingMore}
+                style={{ padding: '8px 20px', borderRadius: 20 }}
+              >
+                {loadingMore ? 'Loading...' : 'Load more comments'}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
