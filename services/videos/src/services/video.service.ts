@@ -40,6 +40,20 @@ export function ensureSchema(): void {
     );
     CREATE INDEX IF NOT EXISTS idx_video_likes_video ON video_likes(video_id);
 
+    CREATE TABLE IF NOT EXISTS video_ratings (
+      id TEXT PRIMARY KEY,
+      video_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      rating INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (video_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_video_ratings_video ON video_ratings(video_id);
+    -- Add rating aggregate columns (idempotent)
+    try { db.exec('ALTER TABLE videos ADD COLUMN rating_avg REAL NOT NULL DEFAULT 0'); } catch {}
+    try { db.exec('ALTER TABLE videos ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0'); } catch {}
+
     CREATE TABLE IF NOT EXISTS video_views (
       id TEXT PRIMARY KEY,
       video_id TEXT NOT NULL,
@@ -257,6 +271,74 @@ export function getUserReaction(videoId: string, userId: string | null): 'like' 
   const row = db.prepare('SELECT type FROM video_likes WHERE video_id = ? AND user_id = ?')
     .get(videoId, userId) as { type: 'like' | 'dislike' } | undefined;
   return row?.type ?? null;
+}
+
+// ---------- Rating (5-star) ----------
+export interface RatingResult {
+  ratingAvg: number;
+  ratingCount: number;
+  userRating: number | null;
+}
+
+export function rateVideo(videoId: string, userId: string, rating: number): RatingResult {
+  const db = getDb();
+  const video = getVideoById(videoId);
+  if (!video) throw new Error('Video not found');
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    throw new Error('Rating must be an integer 1-5');
+  }
+
+  const now = new Date().toISOString();
+  const existing = db.prepare('SELECT id FROM video_ratings WHERE video_id = ? AND user_id = ?')
+    .get(videoId, userId) as { id: string } | undefined;
+
+  if (existing) {
+    db.prepare('UPDATE video_ratings SET rating = ?, updated_at = ? WHERE id = ?')
+      .run(rating, now, existing.id);
+  } else {
+    db.prepare('INSERT INTO video_ratings (id, video_id, user_id, rating, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(randomUUID(), videoId, userId, rating, now, now);
+  }
+
+  // Recompute aggregate
+  const agg = db.prepare('SELECT AVG(rating) as avg, COUNT(*) as n FROM video_ratings WHERE video_id = ?')
+    .get(videoId) as { avg: number | null; n: number };
+  const avg = agg.avg ?? 0;
+  const n = agg.n ?? 0;
+  db.prepare('UPDATE videos SET rating_avg = ?, rating_count = ? WHERE id = ?').run(avg, n, videoId);
+
+  return { ratingAvg: avg, ratingCount: n, userRating: rating };
+}
+
+export function deleteRating(videoId: string, userId: string): RatingResult {
+  const db = getDb();
+  const video = getVideoById(videoId);
+  if (!video) throw new Error('Video not found');
+
+  db.prepare('DELETE FROM video_ratings WHERE video_id = ? AND user_id = ?').run(videoId, userId);
+
+  const agg = db.prepare('SELECT AVG(rating) as avg, COUNT(*) as n FROM video_ratings WHERE video_id = ?')
+    .get(videoId) as { avg: number | null; n: number };
+  const avg = agg.avg ?? 0;
+  const n = agg.n ?? 0;
+  db.prepare('UPDATE videos SET rating_avg = ?, rating_count = ? WHERE id = ?').run(avg, n, videoId);
+
+  return { ratingAvg: avg, ratingCount: n, userRating: null };
+}
+
+export function getUserRating(videoId: string, userId: string | null): number | null {
+  if (!userId) return null;
+  const db = getDb();
+  const row = db.prepare('SELECT rating FROM video_ratings WHERE video_id = ? AND user_id = ?')
+    .get(videoId, userId) as { rating: number } | undefined;
+  return row?.rating ?? null;
+}
+
+export function getRatingStats(videoId: string): { avg: number; count: number } {
+  const db = getDb();
+  const row = db.prepare('SELECT rating_avg as avg, rating_count as count FROM videos WHERE id = ?')
+    .get(videoId) as { avg: number; count: number } | undefined;
+  return { avg: row?.avg ?? 0, count: row?.count ?? 0 };
 }
 
 // ---------- Search ----------

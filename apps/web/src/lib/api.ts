@@ -340,6 +340,35 @@ export async function toggleCreatorHeart(commentId: string): Promise<{ ok: boole
 
 
 
+
+// ============ Video Rating (5-star) ============
+export interface RatingStats {
+  avg: number;
+  count: number;
+  userRating: number | null;
+}
+
+export interface RatingResult {
+  ratingAvg: number;
+  ratingCount: number;
+  userRating: number | null;
+}
+
+export async function getVideoRating(videoId: string): Promise<RatingStats> {
+  return request<RatingStats>(`/api/v1/videos/${videoId}/rating`);
+}
+
+export async function rateVideo(videoId: string, rating: number): Promise<RatingResult> {
+  return request<RatingResult>(`/api/v1/videos/${videoId}/rating`, {
+    method: 'POST',
+    body: JSON.stringify({ rating }),
+  });
+}
+
+export async function deleteVideoRating(videoId: string): Promise<RatingResult> {
+  return request<RatingResult>(`/api/v1/videos/${videoId}/rating`, { method: 'DELETE' });
+}
+
 // ============ User Preferences ============
 export type QualityOption = 'auto' | '144' | '240' | '360' | '480' | '720' | '1080' | '1440' | '2160';
 export type ThemeOption = 'light' | 'dark' | 'system';

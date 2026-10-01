@@ -11,6 +11,7 @@ import {
   createVideo, getVideoById, listVideos, countVideos,
   updateVideo, deleteVideo, updateVideoStatus,
   recordView, likeVideo, getUserReaction,
+  rateVideo, deleteRating, getUserRating, getRatingStats,
 } from '../services/video.service.js';
 import { uploadsDir, processedDir } from '../services/storage.service.js';
 import { transcodeToHls } from '../services/transcode.service.js';
@@ -33,6 +34,10 @@ const UpdateVideoSchema = z.object({
 
 const LikeSchema = z.object({
   type: z.enum(['like', 'dislike', 'none']),
+});
+
+const RatingSchema = z.object({
+  rating: z.number().int().min(1).max(5),
 });
 
 function optionalUser(authorization: string | undefined) {
@@ -100,6 +105,46 @@ export async function videoRoutes(app: FastifyInstance) {
     try {
       const { id } = req.params as { id: string };
       const result = likeVideo(id, user.sub, parsed.data.type);
+      return reply.send({ success: true, data: result });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // GET /:id/rating — current user's rating + aggregate
+  app.get('/:id/rating', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    let userId: string | null = null;
+    try { userId = requireAuth(req.headers.authorization).sub as string; } catch {}
+    const stats = getRatingStats(id);
+    const userRating = getUserRating(id, userId);
+    return reply.send({ success: true, data: { ...stats, userRating } });
+  });
+
+  // POST /:id/rating  { rating: 1-5 }
+  app.post('/:id/rating', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const parsed = RatingSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Rating must be 1-5' });
+    const { id } = req.params as { id: string };
+    try {
+      const result = rateVideo(id, user.sub, parsed.data.rating);
+      return reply.send({ success: true, data: result });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // DELETE /:id/rating — remove own rating
+  app.delete('/:id/rating', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    try {
+      const result = deleteRating(id, user.sub);
       return reply.send({ success: true, data: result });
     } catch (err) {
       return reply.code(400).send({ success: false, error: (err as Error).message });

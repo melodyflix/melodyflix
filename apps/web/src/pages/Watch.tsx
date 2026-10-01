@@ -23,6 +23,7 @@ import VerifiedBadge from '../components/VerifiedBadge';
 import SaveToPlaylistModal from '../components/SaveToPlaylistModal';
 import Chapters from '../components/Chapters';
 import WatchQueue from '../components/WatchQueue';
+import StarRating from '../components/StarRating';
 import { usePlayer } from '../components/PlayerContext';
 
 type Reaction = 'like' | 'dislike' | null;
@@ -491,6 +492,25 @@ export default function Watch({ onSignIn }: Props) {
               >
                 🕒 Queue
               </button>
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: '#f2f2f2',
+                  borderRadius: 20,
+                  padding: '6px 14px',
+                  gap: 8,
+                }}
+              >
+                <span style={{ fontSize: 13, color: '#606060' }}>Rate:</span>
+                <StarRating
+                  videoId={video.id}
+                  onSignIn={onSignIn}
+                  onToast={showToast}
+                  size={18}
+                />
+              </div>
 
               <button
                 className="mf-sub-btn"
