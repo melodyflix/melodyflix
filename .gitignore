@@ -48,3 +48,5 @@ secrets/
 tmp/
 temp/
 *.tmp
+services/*/src/*.backup-*
+*.backup-*
