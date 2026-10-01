@@ -339,6 +339,50 @@ export async function toggleCreatorHeart(commentId: string): Promise<{ ok: boole
 }
 
 
+
+// ============ User Preferences ============
+export type QualityOption = 'auto' | '144' | '240' | '360' | '480' | '720' | '1080' | '1440' | '2160';
+export type ThemeOption = 'light' | 'dark' | 'system';
+
+export interface Preferences {
+  user_id: string;
+  autoplay_next: number;
+  autoplay_playlist: number;
+  default_quality: QualityOption;
+  default_speed: number;
+  theme: ThemeOption;
+  language: string;
+  reduced_motion: number;
+  captions_on: number;
+  updated_at: string;
+}
+
+export interface PreferencesPatch {
+  autoplay_next?: boolean | number;
+  autoplay_playlist?: boolean | number;
+  default_quality?: QualityOption;
+  default_speed?: number;
+  theme?: ThemeOption;
+  language?: string;
+  reduced_motion?: boolean | number;
+  captions_on?: boolean | number;
+}
+
+export async function getPreferences(): Promise<Preferences> {
+  return request<Preferences>('/api/v1/videos/preferences');
+}
+
+export async function updatePreferences(patch: PreferencesPatch): Promise<Preferences> {
+  return request<Preferences>('/api/v1/videos/preferences', {
+    method: 'PUT',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function resetPreferences(): Promise<Preferences> {
+  return request<Preferences>('/api/v1/videos/preferences', { method: 'DELETE' });
+}
+
 // ============ Watch Queue ============
 export interface QueueItem {
   id: string;

@@ -25,6 +25,7 @@ import GoLive from './pages/GoLive';
 import LiveList from './pages/LiveList';
 import LiveWatch from './pages/LiveWatch';
 import TwoFASettings from './pages/TwoFASettings';
+import Preferences from './pages/Preferences';
 import Podcasts from './pages/Podcasts';
 import SeriesList from './pages/SeriesList';
 import SeriesDetail from './pages/SeriesDetail';
@@ -98,6 +99,7 @@ function AppInner() {
         onGoLive={() => navigate('/go-live')}
         onLive={() => navigate('/live')}
         onSettings={() => navigate('/settings/security')}
+        onPreferences={() => navigate('/settings/preferences')}
         onPodcasts={() => navigate('/podcasts')}
         onSeries={() => navigate('/series')}
         onShorts={() => navigate('/shorts')}
@@ -132,6 +134,7 @@ function AppInner() {
         <Route path="/series/:id" element={<SeriesDetail onSignIn={requireSignIn} />} />
         <Route path="/live/:id" element={<LiveWatch onSignIn={requireSignIn} />} />
         <Route path="/settings/security" element={<TwoFASettings user={user} onSignIn={requireSignIn} />} />
+        <Route path="/settings/preferences" element={<Preferences onSignIn={requireSignIn} />} />
         <Route path="/go-live" element={<GoLive user={user} onSignIn={() => setShowLogin(true)} />} />
         <Route path="/upload" element={<Upload user={user} onSignIn={() => setShowLogin(true)} />} />
         <Route path="/channel/new" element={<CreateChannel user={user} onSignIn={() => setShowLogin(true)} />} />
