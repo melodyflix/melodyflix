@@ -27,6 +27,7 @@ import LiveWatch from './pages/LiveWatch';
 import TwoFASettings from './pages/TwoFASettings';
 import Preferences from './pages/Preferences';
 import ClipView from './pages/ClipView';
+import TagView from './pages/TagView';
 import Podcasts from './pages/Podcasts';
 import SeriesList from './pages/SeriesList';
 import SeriesDetail from './pages/SeriesDetail';
@@ -116,6 +117,7 @@ function AppInner() {
         <Route path="/search" element={<Search />} />
         <Route path="/watch/:id" element={<Watch onSignIn={requireSignIn} />} />
         <Route path="/clip/:id" element={<ClipView onSignIn={requireSignIn} />} />
+        <Route path="/tag/:tag" element={<TagView />} />
         <Route path="/watch-later" element={<WatchLater onSignIn={requireSignIn} />} />
         <Route path="/subscriptions" element={<Subscriptions onSignIn={requireSignIn} />} />
         <Route path="/notifications" element={<Notifications onSignIn={requireSignIn} />} />

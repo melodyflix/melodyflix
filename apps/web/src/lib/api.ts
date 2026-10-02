@@ -344,6 +344,67 @@ export async function toggleCreatorHeart(commentId: string): Promise<{ ok: boole
 
 
 
+
+// ============ Video Tags & Hashtags ============
+export interface VideoTag {
+  id: string;
+  video_id: string;
+  tag: string;
+  tag_normalized: string;
+  source: 'manual' | 'hashtag' | 'auto';
+  created_at: string;
+}
+
+export interface TagWithCount {
+  tag: string;
+  tag_normalized: string;
+  video_count: number;
+}
+
+export async function listVideoTags(videoId: string): Promise<{ tags: VideoTag[] }> {
+  return request<{ tags: VideoTag[] }>(`/api/v1/videos/${videoId}/tags`);
+}
+
+export async function addVideoTag(videoId: string, tag: string): Promise<{ tag: VideoTag }> {
+  return request<{ tag: VideoTag }>(`/api/v1/videos/${videoId}/tags`, {
+    method: 'POST',
+    body: JSON.stringify({ tag }),
+  });
+}
+
+export async function replaceVideoTags(videoId: string, tags: string[]): Promise<{ tags: VideoTag[] }> {
+  return request<{ tags: VideoTag[] }>(`/api/v1/videos/${videoId}/tags`, {
+    method: 'PUT',
+    body: JSON.stringify({ tags }),
+  });
+}
+
+export async function removeVideoTag(videoId: string, tag: string): Promise<{ removed: boolean }> {
+  return request<{ removed: boolean }>(`/api/v1/videos/${videoId}/tags/${encodeURIComponent(tag)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function syncHashtags(videoId: string): Promise<{ added: VideoTag[] }> {
+  return request<{ added: VideoTag[] }>(`/api/v1/videos/${videoId}/tags/sync-hashtags`, {
+    method: 'POST',
+  });
+}
+
+export async function getTopTags(limit = 50): Promise<{ tags: TagWithCount[] }> {
+  return request<{ tags: TagWithCount[] }>(`/api/v1/videos/tags/top?limit=${limit}`);
+}
+
+export async function suggestTags(prefix: string, limit = 10): Promise<{ tags: TagWithCount[] }> {
+  return request<{ tags: TagWithCount[] }>(
+    `/api/v1/videos/tags/suggest?q=${encodeURIComponent(prefix)}&limit=${limit}`,
+  );
+}
+
+export async function getVideosByTag(tag: string, limit = 50): Promise<{ videos: any[] }> {
+  return request<{ videos: any[] }>(`/api/v1/videos/tags/${encodeURIComponent(tag)}/videos?limit=${limit}`);
+}
+
 // ============ Video Clips ============
 export interface Clip {
   id: string;

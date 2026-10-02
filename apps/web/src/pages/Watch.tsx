@@ -27,6 +27,7 @@ import StarRating from '../components/StarRating';
 import VideoPoll from '../components/VideoPoll';
 import VideoQuiz from '../components/VideoQuiz';
 import ClipModal from '../components/ClipModal';
+import TagChips from '../components/TagChips';
 import { usePlayer } from '../components/PlayerContext';
 
 type Reaction = 'like' | 'dislike' | null;
@@ -575,6 +576,8 @@ export default function Watch({ onSignIn }: Props) {
           />
 
           <GuestBanner onSignIn={onSignIn} />
+
+          <TagChips videoId={video.id} />
 
           <CommentSection videoId={video.id} videoOwnerId={video.owner_id} onSignIn={onSignIn} onSeek={(sec) => setSeekTarget({ time: sec, nonce: seekNonceRef.current += 1 })} />
         </div>
