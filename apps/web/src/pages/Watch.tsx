@@ -328,6 +328,7 @@ export default function Watch({ onSignIn }: Props) {
                 poster={poster}
                 startTime={resumeAt}
                 seekTo={seekTarget}
+                videoId={video.id}
             onEnded={handleVideoEnded}
                 onStateChange={(s) => { lastPlayerStateRef.current = s; setCurrentTime(s.currentTime); }}
               />

@@ -112,6 +112,7 @@ export default function ClipView({ onSignIn }: Props) {
         <HlsPlayer
           src={streamSrc}
           startTime={clip.start_seconds}
+          videoId={clip.video_id}
           onStateChange={(s) => {
             setCurrentTime(s.currentTime);
             // Enforce clip end boundary — pause when we cross end_seconds

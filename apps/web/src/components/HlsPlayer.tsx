@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { listVideoSubtitles, type SubtitleTrack } from '../lib/api';
 
 export interface PlayerState {
   currentTime: number;
@@ -13,6 +14,8 @@ interface Props {
   seekTo?: { time: number; nonce: number } | null;
   onStateChange?: (state: PlayerState) => void;
   onEnded?: () => void;
+  videoId?: string;
+  subtitlesEnabled?: boolean;
 }
 
 type QualityLevel = { index: number; height: number; bitrate: number };
@@ -20,7 +23,7 @@ type QualityLevel = { index: number; height: number; bitrate: number };
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 const SLEEP_OPTIONS = [10, 20, 30, 60, 120];
 
-export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateChange, onEnded }: Props) {
+export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateChange, onEnded, videoId, subtitlesEnabled = true }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<any>(null);
   const [error, setError] = useState('');
@@ -76,6 +79,7 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
     lastTap: 0, initialTime: 0, moved: false,
   });
   const [brightness, setBrightness] = useState(1);
+  const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -146,6 +150,14 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
       hlsRef.current = null;
     };
   }, [src]);
+
+  // Fetch subtitle tracks for this video
+  useEffect(() => {
+    if (!videoId || !subtitlesEnabled) { setSubtitleTracks([]); return; }
+    listVideoSubtitles(videoId)
+      .then((res) => setSubtitleTracks(res.subtitles))
+      .catch(() => setSubtitleTracks([]));
+  }, [videoId, subtitlesEnabled]);
 
   // Report player state every second
   useEffect(() => {
@@ -473,13 +485,25 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
         poster={poster}
         playsInline
         preload="metadata"
+        crossOrigin="anonymous"
         style={{
           width: '100%',
           height: '100%',
           display: 'block',
           filter: brightness !== 1 ? `brightness(${brightness})` : undefined,
         }}
-      />
+      >
+        {subtitleTracks.map((t) => (
+          <track
+            key={t.id}
+            kind={t.kind === 'captions' ? 'captions' : 'subtitles'}
+            src={`/api/v1/videos/subtitles/${t.id}.vtt`}
+            srcLang={t.language}
+            label={t.label}
+            default={t.is_default === 1}
+          />
+        ))}
+      </video>
 
       {/* Gesture feedback overlay */}
       {gestureFeedback && gestureFeedback.visible && (
