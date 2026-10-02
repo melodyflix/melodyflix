@@ -342,6 +342,70 @@ export async function toggleCreatorHeart(commentId: string): Promise<{ ok: boole
 
 
 
+
+// ============ Video Quiz ============
+export interface QuizOption {
+  id: string;
+  text: string;
+  order_index: number;
+  response_count: number;
+}
+
+export interface Quiz {
+  id: string;
+  video_id: string;
+  question: string;
+  explanation: string | null;
+  is_closed: number;
+  created_at: string;
+  closes_at: string | null;
+  options: QuizOption[];
+  total_responses: number;
+  correct_count: number;
+  user_response_option_id: string | null;
+  user_was_correct: number | null;
+  correct_option_id: string | null;
+}
+
+export async function getVideoQuiz(videoId: string): Promise<{ quiz: Quiz | null }> {
+  return request<{ quiz: Quiz | null }>(`/api/v1/videos/${videoId}/quiz`);
+}
+
+export async function createVideoQuiz(
+  videoId: string,
+  question: string,
+  options: string[],
+  correctIndex: number,
+  explanation?: string | null,
+  closesAt?: string | null,
+): Promise<{ quiz: Quiz }> {
+  return request<{ quiz: Quiz }>(`/api/v1/videos/${videoId}/quiz`, {
+    method: 'POST',
+    body: JSON.stringify({
+      question,
+      options,
+      correct_index: correctIndex,
+      explanation: explanation ?? null,
+      closes_at: closesAt ?? null,
+    }),
+  });
+}
+
+export async function answerQuiz(quizId: string, optionId: string): Promise<{ quiz: Quiz }> {
+  return request<{ quiz: Quiz }>(`/api/v1/videos/quizzes/${quizId}/answer`, {
+    method: 'POST',
+    body: JSON.stringify({ option_id: optionId }),
+  });
+}
+
+export async function closeQuiz(quizId: string): Promise<{ quiz: Quiz }> {
+  return request<{ quiz: Quiz }>(`/api/v1/videos/quizzes/${quizId}/close`, { method: 'POST' });
+}
+
+export async function deleteQuiz(quizId: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/videos/quizzes/${quizId}`, { method: 'DELETE' });
+}
+
 // ============ Video Poll ============
 export interface PollOption {
   id: string;
