@@ -74,7 +74,7 @@ function Toggle({
 export default function AudioSettings({
   settings, onChange, onClose, audioTracks, activeAudioTrack, onSelectAudioTrack,
 }: Props) {
-  const [tab, setTab] = useState<'eq' | 'enhance' | 'tracks'>('eq');
+  const [tab, setTab] = useState<'eq' | 'enhance' | 'spatial' | 'tracks'>('eq');
 
   const hasTracks = audioTracks && audioTracks.length > 1;
 
@@ -94,6 +94,10 @@ export default function AudioSettings({
           className={`mf-audio-tab ${tab === 'enhance' ? 'active' : ''}`}
           onClick={() => setTab('enhance')}
         >✨ Enhance</button>
+        <button
+          className={`mf-audio-tab ${tab === 'spatial' ? 'active' : ''}`}
+          onClick={() => setTab('spatial')}
+        >🎧 Spatial</button>
         {hasTracks && (
           <button
             className={`mf-audio-tab ${tab === 'tracks' ? 'active' : ''}`}
@@ -155,6 +159,63 @@ export default function AudioSettings({
           </>
         )}
 
+        {tab === 'spatial' && (
+          <>
+            <Toggle
+              label="3D spatial audio"
+              hint="Position sound in 3D space (HRTF panner)"
+              checked={!!settings.spatialEnabled}
+              onChange={(v) => onChange({ spatialEnabled: v })}
+            />
+            <Toggle
+              label="Binaural (HRTF preview)"
+              hint="Headphone-optimized spatial rendering"
+              checked={!!settings.binauralEnabled}
+              onChange={(v) => onChange({ binauralEnabled: v })}
+            />
+
+            <div style={{ borderTop: '1px solid #f0f0f0', margin: '12px 0', paddingTop: 12 }}>
+              <div style={{ fontSize: 11, color: '#606060', marginBottom: 8, fontWeight: 500 }}>
+                Position {settings.spatialEnabled ? '' : '(enable 3D to activate)'}
+              </div>
+              <Slider label="Left ← → Right" value={Math.round((settings.spatialX ?? 0) * 100)} min={-100} max={100} step={5} unit="%" onChange={(v) => onChange({ spatialX: v / 100 })} />
+              <Slider label="Front ← → Back" value={Math.round((settings.spatialY ?? 0) * 100)} min={-100} max={100} step={5} unit="%" onChange={(v) => onChange({ spatialY: v / 100 })} />
+              <Slider label="Below ← → Above" value={Math.round((settings.spatialZ ?? 0) * 100)} min={-100} max={100} step={5} unit="%" onChange={(v) => onChange({ spatialZ: v / 100 })} />
+              <Slider label="Distance" value={Math.round((settings.spatialDistance ?? 1) * 100)} min={50} max={500} step={10} unit=" cm" onChange={(v) => onChange({ spatialDistance: v / 100 })} />
+            </div>
+
+            <div style={{ borderTop: '1px solid #f0f0f0', margin: '12px 0', paddingTop: 12 }}>
+              <Slider
+                label="Stereo width"
+                value={Math.round((settings.stereoWidth ?? 1) * 100)}
+                min={0} max={200} step={5} unit="%"
+                onChange={(v) => onChange({ stereoWidth: v / 100 })}
+              />
+              <div style={{ fontSize: 11, color: '#909090', marginTop: -6, marginBottom: 10 }}>
+                0% = mono, 100% = normal, 200% = extra wide
+              </div>
+            </div>
+
+            {/* 45.12 Spatial QA Check */}
+            <div style={{
+              borderTop: '1px solid #f0f0f0', marginTop: 12, paddingTop: 12,
+              background: settings.spatialQaOn ? '#f0fdf4' : 'transparent',
+              borderRadius: 6, padding: settings.spatialQaOn ? 10 : 12,
+              paddingTop: settings.spatialQaOn ? 10 : 12,
+            }}>
+              <Toggle
+                label="Spatial quality check"
+                hint="Analyze stereo balance & phase issues"
+                checked={!!settings.spatialQaOn}
+                onChange={(v) => onChange({ spatialQaOn: v })}
+              />
+              {settings.spatialQaOn && (
+                <SpatialQaPanel settings={settings} />
+              )}
+            </div>
+          </>
+        )}
+
         {tab === 'tracks' && hasTracks && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {audioTracks!.map((t) => {
@@ -189,3 +250,61 @@ export default function AudioSettings({
     </div>
   );
 }
+
+/* ---------- 45.12 Spatial QA Panel ---------- */
+function SpatialQaPanel({ settings }: { settings: AudioEngineSettings }) {
+  const [status, setStatus] = useState<{ label: string; ok: boolean; hint: string }[]>([]);
+
+  useEffect(() => {
+    const s = [
+      {
+        label: 'Spatial engine',
+        ok: !!settings.spatialEnabled,
+        hint: settings.spatialEnabled ? 'HRTF panner active' : 'Enable 3D spatial to activate',
+      },
+      {
+        label: 'Stereo balance',
+        ok: Math.abs(settings.spatialX ?? 0) < 0.7,
+        hint: Math.abs(settings.spatialX ?? 0) < 0.7 ? 'Balanced' : 'Sound pushed far to one side',
+      },
+      {
+        label: 'Stereo width',
+        ok: (settings.stereoWidth ?? 1) >= 0.5,
+        hint: (settings.stereoWidth ?? 1) < 0.5 ? 'Too narrow — almost mono' : 'OK',
+      },
+      {
+        label: 'Distance',
+        ok: (settings.spatialDistance ?? 1) >= 0.5 && (settings.spatialDistance ?? 1) <= 4,
+        hint: 'Recommended 0.5–4 m',
+      },
+      {
+        label: 'Binaural preview',
+        ok: !!settings.binauralEnabled,
+        hint: settings.binauralEnabled ? 'Optimized for headphones' : 'Consider enabling for headphone listeners',
+      },
+      {
+        label: 'Normalization',
+        ok: !!settings.normalization,
+        hint: settings.normalization ? 'Loudness smoothed' : 'Spatial effects may cause level jumps',
+      },
+    ];
+    setStatus(s);
+  }, [settings]);
+
+  return (
+    <div style={{ marginTop: 10, fontSize: 12 }}>
+      {status.map((row, i) => (
+        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 6 }}>
+          <span style={{ color: row.ok ? '#16a34a' : '#d97706', fontWeight: 700 }}>
+            {row.ok ? '✓' : '!'}
+          </span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 500, color: '#0f0f0f' }}>{row.label}</div>
+            <div style={{ fontSize: 11, color: '#606060' }}>{row.hint}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
