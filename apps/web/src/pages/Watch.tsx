@@ -549,7 +549,7 @@ export default function Watch({ onSignIn }: Props) {
 
           <GuestBanner onSignIn={onSignIn} />
 
-          <CommentSection videoId={video.id} videoOwnerId={video.owner_id} onSignIn={onSignIn} />
+          <CommentSection videoId={video.id} videoOwnerId={video.owner_id} onSignIn={onSignIn} onSeek={(sec) => setSeekTarget({ time: sec, nonce: seekNonceRef.current += 1 })} />
         </div>
 
         <div>

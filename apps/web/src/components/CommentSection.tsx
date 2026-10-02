@@ -12,6 +12,7 @@ interface Props {
   videoId: string;
   videoOwnerId?: string;
   onSignIn: () => void;
+  onSeek?: (seconds: number) => void;
 }
 
 const REPORT_REASONS = [
@@ -41,8 +42,52 @@ function avatarInitial(c: Comment): string {
   return (name[0] ?? '?').toUpperCase();
 }
 
+const TIMESTAMP_RE = /\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b/g;
+
+function timestampToSeconds(ts: string): number {
+  const parts = ts.split(':').map((n) => parseInt(n, 10) || 0);
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return parts[0] * 60 + parts[1];
+}
+
+function renderWithTimestamps(
+  content: string,
+  onSeek?: (seconds: number) => void,
+): React.ReactNode {
+  if (!onSeek) return content;
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let key = 0;
+  TIMESTAMP_RE.lastIndex = 0;
+  while ((m = TIMESTAMP_RE.exec(content)) !== null) {
+    if (m.index > last) parts.push(content.slice(last, m.index));
+    const ts = m[0];
+    const secs = timestampToSeconds(ts);
+    parts.push(
+      <span
+        key={`ts-${key++}`}
+        onClick={() => onSeek(secs)}
+        title={`Jump to ${ts}`}
+        style={{
+          color: '#065fd4',
+          cursor: 'pointer',
+          textDecoration: 'underline',
+          textDecorationStyle: 'dotted',
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {ts}
+      </span>,
+    );
+    last = m.index + ts.length;
+  }
+  if (last < content.length) parts.push(content.slice(last));
+  return parts.length > 0 ? parts : content;
+}
+
 function CommentItem({
-  comment, currentUserId, videoOwnerId, onRefresh, onSignIn, isReply = false,
+  comment, currentUserId, videoOwnerId, onRefresh, onSignIn, isReply = false, onSeek,
 }: {
   comment: Comment;
   currentUserId: string | null;
@@ -50,6 +95,7 @@ function CommentItem({
   onRefresh: () => void;
   onSignIn: () => void;
   isReply?: boolean;
+  onSeek?: (seconds: number) => void;
 }) {
   const [liked, setLiked] = useState<boolean>(!!comment.user_reaction);
   const [likeCount, setLikeCount] = useState(comment.like_count);
@@ -205,7 +251,7 @@ function CommentItem({
         ) : (
           <>
             <div className={`mf-comment-content ${isDeleted ? 'deleted' : ''}`}>
-              {isDeleted ? '[Comment deleted]' : comment.content}
+              {isDeleted ? '[Comment deleted]' : renderWithTimestamps(comment.content, onSeek)}
             </div>
 
             {hasHeart && !isDeleted && (
@@ -343,6 +389,7 @@ function CommentItem({
                     videoOwnerId={videoOwnerId}
                     onRefresh={onRefresh}
                     onSignIn={onSignIn}
+                    onSeek={onSeek}
                     isReply
                   />
                 ))}
@@ -378,7 +425,7 @@ function CommentItem({
   );
 }
 
-export default function CommentSection({ videoId, videoOwnerId, onSignIn }: Props) {
+export default function CommentSection({ videoId, videoOwnerId, onSignIn, onSeek }: Props) {
   const me = getCachedUser();
   const [comments, setComments] = useState<Comment[]>([]);
   const [total, setTotal] = useState(0);
@@ -507,6 +554,7 @@ export default function CommentSection({ videoId, videoOwnerId, onSignIn }: Prop
                 videoOwnerId={videoOwnerId}
                 onRefresh={() => load(true)}
                 onSignIn={onSignIn}
+            onSeek={onSeek}
               />
             ))}
           </div>
