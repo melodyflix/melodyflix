@@ -4,6 +4,7 @@ import { api, type User, type Channel as ChannelType, type Video } from '../lib/
 import VideoCard from '../components/VideoCard';
 import CustomizationEditor from '../components/CustomizationEditor';
 import IntroOutroEditor from '../components/IntroOutroEditor';
+import OverlaysEditor from '../components/OverlaysEditor';
 
 interface Props {
   user: User | null;
@@ -79,6 +80,7 @@ export default function MyChannel({ user, onSignIn }: Props) {
 
   const [showCustomization, setShowCustomization] = useState(false);
   const [showIntroOutro, setShowIntroOutro] = useState(false);
+  const [showOverlays, setShowOverlays] = useState(false);
   const initial = channel.name[0].toUpperCase();
 
   return (
@@ -157,6 +159,32 @@ export default function MyChannel({ user, onSignIn }: Props) {
         {showIntroOutro && (
           <div style={{ marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 16 }}>
             <IntroOutroEditor
+              channelId={channel.id}
+              onToast={(m) => alert(m)}
+            />
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginBottom: 24, background: '#fff', border: '1px solid #e5e5e5', borderRadius: 12, padding: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 2 }}>📊 Overlays & Transitions</div>
+            <div style={{ fontSize: 12, color: '#606060' }}>
+              Add timed lower thirds (name plates, sponsor tags) and pick transitions between intro → video → outro.
+            </div>
+          </div>
+          <button
+            className="mf-btn-secondary"
+            onClick={() => setShowOverlays((v) => !v)}
+            style={{ fontSize: 13, padding: '8px 16px' }}
+          >
+            {showOverlays ? 'Close' : 'Configure'}
+          </button>
+        </div>
+        {showOverlays && (
+          <div style={{ marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 16 }}>
+            <OverlaysEditor
               channelId={channel.id}
               onToast={(m) => alert(m)}
             />

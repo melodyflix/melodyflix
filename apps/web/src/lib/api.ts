@@ -539,6 +539,112 @@ export async function getVideosByGenre(genre: string, limit = 60): Promise<{ vid
 
 
 
+
+// ============ Lower Thirds + Transitions (30.6, 30.7) ============
+export type LowerThirdPosition = 'left' | 'center' | 'right';
+export type LowerThirdStyle = 'minimal' | 'solid' | 'glass' | 'accent' | 'bar';
+export type LowerThirdAnimation = 'slide-up' | 'slide-left' | 'fade' | 'pop';
+export type TransitionKind = 'none' | 'fade' | 'slide-left' | 'slide-right' | 'zoom-in' | 'dissolve' | 'wipe' | 'glitch';
+
+export interface LowerThird {
+  id: string;
+  channel_id: string;
+  title: string;
+  subtitle: string | null;
+  accent_color: string;
+  text_color: string;
+  bg_color: string;
+  position: LowerThirdPosition;
+  style: LowerThirdStyle;
+  animation: LowerThirdAnimation;
+  start_seconds: number;
+  end_seconds: number;
+  is_enabled: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LowerThirdInput {
+  title: string;
+  subtitle?: string | null;
+  accent_color?: string;
+  text_color?: string;
+  bg_color?: string;
+  position?: LowerThirdPosition;
+  style?: LowerThirdStyle;
+  animation?: LowerThirdAnimation;
+  start_seconds?: number;
+  end_seconds?: number;
+  is_enabled?: boolean;
+}
+
+export interface ChannelTransition {
+  channel_id: string;
+  intro_to_video: TransitionKind;
+  video_to_outro: TransitionKind;
+  duration_ms: number;
+  updated_at: string;
+}
+
+export interface TransitionResponse {
+  transition: ChannelTransition;
+  css_intro_to_video?: string;
+  css_video_to_outro?: string;
+}
+
+export async function getOverlayPresets(): Promise<{
+  lower_third_styles: { id: LowerThirdStyle; label: string }[];
+  lower_third_animations: { id: LowerThirdAnimation; label: string }[];
+  transitions: { id: TransitionKind; label: string; icon: string }[];
+}> {
+  return request<any>('/api/v1/videos/overlays/presets');
+}
+
+export async function listLowerThirds(channelId: string): Promise<{ lower_thirds: LowerThird[] }> {
+  return request<{ lower_thirds: LowerThird[] }>(`/api/v1/videos/channels/${channelId}/lower-thirds`);
+}
+
+export async function createLowerThird(channelId: string, input: LowerThirdInput): Promise<{ lower_third: LowerThird }> {
+  return request<{ lower_third: LowerThird }>(`/api/v1/videos/channels/${channelId}/lower-thirds`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateLowerThird(channelId: string, id: string, input: Partial<LowerThirdInput>): Promise<{ lower_third: LowerThird }> {
+  return request<{ lower_third: LowerThird }>(`/api/v1/videos/channels/${channelId}/lower-thirds/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteLowerThird(channelId: string, id: string): Promise<{ removed: boolean }> {
+  return request<{ removed: boolean }>(`/api/v1/videos/channels/${channelId}/lower-thirds/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function getChannelTransition(channelId: string): Promise<TransitionResponse> {
+  return request<TransitionResponse>(`/api/v1/videos/channels/${channelId}/transition`);
+}
+
+export async function setChannelTransition(channelId: string, input: {
+  intro_to_video?: TransitionKind;
+  video_to_outro?: TransitionKind;
+  duration_ms?: number;
+}): Promise<TransitionResponse> {
+  return request<TransitionResponse>(`/api/v1/videos/channels/${channelId}/transition`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function resetChannelTransition(channelId: string): Promise<TransitionResponse> {
+  return request<TransitionResponse>(`/api/v1/videos/channels/${channelId}/transition`, {
+    method: 'DELETE',
+  });
+}
+
 // ============ Custom Intro/Outro (30.3, 30.5) ============
 export type IntroKind = 'intro' | 'outro';
 
