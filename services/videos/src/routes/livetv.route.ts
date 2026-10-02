@@ -22,6 +22,12 @@ import {
   deleteRecording, getDueRecordings, getExpiredRecordings,
   markRecordingStarted, markRecordingCompleted, markRecordingFailed,
   setRecordingFilePath, recordingStats,
+  ensureLiveTvTimeshiftSchema, timeshiftWindowSeconds,
+  getTimeshiftWindow, listTimeshiftSegments, addTimeshiftSegment,
+  pruneTimeshiftSegments, startTimeshiftSession, getTimeshiftSession,
+  heartbeatTimeshiftSession, endTimeshiftSession, activeTimeshiftChannels,
+  seekTimeshift,
+  getCatchUpChannel, getCatchUpSummary, getCatchUpForProgram,
 } from '../services/livetv.service.js';
 
 const CreateSchema = z.object({
@@ -839,6 +845,165 @@ export async function liveTvRoutes(app: FastifyInstance) {
     const body = req.body as { error?: string };
     markRecordingFailed(id, body?.error ?? 'unknown');
     return reply.send({ success: true, data: { failed: true } });
+  });
+
+
+  // ---- Time-Shift TV (40.5) ----
+
+  const SeekSchema = z.object({ at_ts: z.string() });
+  const SegmentSchema = z.object({
+    segment_path: z.string().min(1),
+    start_ts: z.string(),
+    duration_seconds: z.number().min(0),
+    bytes: z.number().min(0).optional(),
+  });
+
+  // GET /live-tv/timeshift/window/:channelId — how far back can we go?
+  app.get('/live-tv/timeshift/window/:channelId', async (req, reply) => {
+    const { channelId } = req.params as { channelId: string };
+    const win = getTimeshiftWindow(channelId);
+    return reply.send({ success: true, data: win });
+  });
+
+  // GET /live-tv/timeshift/segments/:channelId — list current window segments
+  app.get('/live-tv/timeshift/segments/:channelId', async (req, reply) => {
+    const { channelId } = req.params as { channelId: string };
+    const q = req.query as { from?: string; to?: string };
+    const segments = listTimeshiftSegments(channelId, q.from, q.to);
+    return reply.send({ success: true, data: { segments, count: segments.length } });
+  });
+
+  // POST /live-tv/timeshift/seek/:channelId — validate a seek-back position
+  app.post('/live-tv/timeshift/seek/:channelId', async (req, reply) => {
+    const { channelId } = req.params as { channelId: string };
+    const parsed = SeekSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    }
+    try {
+      const result = seekTimeshift(channelId, parsed.data.at_ts);
+      return reply.send({ success: true, data: result });
+    } catch (e: any) {
+      return reply.code(400).send({ success: false, error: e?.message ?? 'Seek failed' });
+    }
+  });
+
+  // Session lifecycle (user-scoped)
+  app.post('/live-tv/timeshift/session/:channelId', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { channelId } = req.params as { channelId: string };
+    try {
+      const session = startTimeshiftSession(me, channelId);
+      return reply.send({ success: true, data: { session } });
+    } catch (e: any) {
+      if (e?.message === 'Channel not found') {
+        return reply.code(404).send({ success: false, error: 'Channel not found' });
+      }
+      throw e;
+    }
+  });
+
+  app.get('/live-tv/timeshift/session', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    return reply.send({ success: true, data: { session: getTimeshiftSession(me) } });
+  });
+
+  app.patch('/live-tv/timeshift/session/heartbeat', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    heartbeatTimeshiftSession(me);
+    return reply.send({ success: true, data: { ok: true } });
+  });
+
+  app.delete('/live-tv/timeshift/session', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    endTimeshiftSession(me);
+    return reply.send({ success: true, data: { ended: true } });
+  });
+
+  // Worker / poller endpoints (shared-secret protected)
+  app.get('/live-tv/timeshift/active-channels', async (req, reply) => {
+    const secret = req.headers['x-internal-secret'];
+    const expected = process.env.MELODYFLIX_INTERNAL_SECRET ?? '';
+    if (expected && secret !== expected) return reply.code(403).send({ success: false, error: 'Forbidden' });
+    const q = req.query as { idle_seconds?: string };
+    const idle = q.idle_seconds ? parseInt(q.idle_seconds) : 120;
+    return reply.send({ success: true, data: { channels: activeTimeshiftChannels(idle) } });
+  });
+
+  app.post('/live-tv/timeshift/segment/:channelId', async (req, reply) => {
+    const secret = req.headers['x-internal-secret'];
+    const expected = process.env.MELODYFLIX_INTERNAL_SECRET ?? '';
+    if (expected && secret !== expected) return reply.code(403).send({ success: false, error: 'Forbidden' });
+    const { channelId } = req.params as { channelId: string };
+    const parsed = SegmentSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    }
+    const seg = addTimeshiftSegment(
+      channelId,
+      parsed.data.segment_path,
+      parsed.data.start_ts,
+      parsed.data.duration_seconds,
+      parsed.data.bytes ?? 0
+    );
+    return reply.code(201).send({ success: true, data: { segment: seg } });
+  });
+
+  app.post('/live-tv/timeshift/prune/:channelId', async (req, reply) => {
+    const secret = req.headers['x-internal-secret'];
+    const expected = process.env.MELODYFLIX_INTERNAL_SECRET ?? '';
+    if (expected && secret !== expected) return reply.code(403).send({ success: false, error: 'Forbidden' });
+    const { channelId } = req.params as { channelId: string };
+    const pruned = pruneTimeshiftSegments(channelId);
+    return reply.send({ success: true, data: { pruned } });
+  });
+
+
+  // ---- Catch-Up TV (40.8) ----
+
+  // GET /live-tv/catchup/:channelId — past EPG programs + replay availability
+  app.get('/live-tv/catchup/:channelId', async (req, reply) => {
+    const { channelId } = req.params as { channelId: string };
+    const q = req.query as { from?: string; to?: string; limit?: string };
+    try {
+      const entries = getCatchUpChannel({
+        channel_id: channelId,
+        from: q.from,
+        to: q.to,
+        limit: q.limit ? parseInt(q.limit) : 100,
+      });
+      return reply.send({ success: true, data: { entries, count: entries.length } });
+    } catch (e: any) {
+      return reply.code(500).send({ success: false, error: e?.message ?? 'Failed' });
+    }
+  });
+
+  // GET /live-tv/catchup/:channelId/summary — availability summary
+  app.get('/live-tv/catchup/:channelId/summary', async (req, reply) => {
+    const { channelId } = req.params as { channelId: string };
+    const q = req.query as { from?: string };
+    try {
+      const summary = getCatchUpSummary(channelId, q.from);
+      return reply.send({ success: true, data: summary });
+    } catch (e: any) {
+      return reply.code(500).send({ success: false, error: e?.message ?? 'Failed' });
+    }
+  });
+
+  // GET /live-tv/catchup/program/:programId — single program lookup
+  app.get('/live-tv/catchup/program/:programId', async (req, reply) => {
+    const { programId } = req.params as { programId: string };
+    try {
+      const entry = getCatchUpForProgram(programId);
+      if (!entry) return reply.code(404).send({ success: false, error: 'Program not found' });
+      return reply.send({ success: true, data: { entry } });
+    } catch (e: any) {
+      return reply.code(500).send({ success: false, error: e?.message ?? 'Failed' });
+    }
   });
 
 }

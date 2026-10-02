@@ -474,10 +474,10 @@ Legend:
 - [x] 40.2 Electronic Program Guide (EPG)
 - [x] 40.3 Channel Switching
 - [x] 40.4 Live TV Recording (DVR)
-- [ ] 40.5 Time-Shift TV
+- [x] 40.5 Time-Shift TV
 - [x] 40.6 Multi-Channel Support
 - [x] 40.7 TV Schedule
-- [ ] 40.8 Catch-Up TV
+- [x] 40.8 Catch-Up TV
 - [x] 40.9 Live TV Chat
 - [x] 40.10 Picture-in-Picture
 - [x] 40.11 Channel Favorites

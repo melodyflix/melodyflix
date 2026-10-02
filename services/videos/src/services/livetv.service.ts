@@ -1804,3 +1804,359 @@ export async function ensureRecordingsDir(): Promise<string> {
   await fsp.mkdir(dir, { recursive: true });
   return dir;
 }
+
+// ============================================================
+// 40.5 — Time-Shift TV
+// Rolling buffer: last N minutes of a channel stream available
+// for seek-back. Layer 1 = metadata + session tracking.
+// Layer 3 = continuous FFmpeg segmenter (opt-in, same as DVR).
+// ============================================================
+
+export interface TimeshiftSegment {
+  id: string;
+  channel_id: string;
+  segment_path: string;
+  start_ts: string;
+  duration_seconds: number;
+  bytes: number;
+  created_at: string;
+}
+
+export interface TimeshiftSession {
+  user_id: string;
+  channel_id: string;
+  session_start_ts: string;
+  last_seen_ts: string;
+}
+
+export function ensureLiveTvTimeshiftSchema(): void {
+  const db = getDb();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS live_tv_timeshift_segments (
+      id TEXT PRIMARY KEY,
+      channel_id TEXT NOT NULL,
+      segment_path TEXT NOT NULL,
+      start_ts TEXT NOT NULL,
+      duration_seconds REAL NOT NULL DEFAULT 0,
+      bytes INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_livetv_ts_channel_time
+      ON live_tv_timeshift_segments(channel_id, start_ts DESC);
+
+    CREATE TABLE IF NOT EXISTS live_tv_timeshift_sessions (
+      user_id TEXT PRIMARY KEY,
+      channel_id TEXT NOT NULL,
+      session_start_ts TEXT NOT NULL,
+      last_seen_ts TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_livetv_ts_sessions_channel
+      ON live_tv_timeshift_sessions(channel_id, last_seen_ts DESC);
+  `);
+}
+
+export function timeshiftWindowSeconds(): number {
+  const raw = process.env.MELODYFLIX_TIMESHIFT_WINDOW_SECONDS;
+  const n = raw ? parseInt(raw, 10) : 7200; // default 2 hours
+  return Math.min(Math.max(n, 60), 6 * 3600); // 1 min .. 6 hours
+}
+
+export interface TimeshiftWindow {
+  channel_id: string;
+  window_seconds: number;
+  earliest_ts: string | null;
+  latest_ts: string | null;
+  segment_count: number;
+}
+
+export function getTimeshiftWindow(channelId: string): TimeshiftWindow {
+  const db = getDb();
+  const win = timeshiftWindowSeconds();
+  const now = Date.now();
+  const cutoff = new Date(now - win * 1000).toISOString();
+
+  const rows = db.prepare(`
+    SELECT MIN(start_ts) as earliest, MAX(start_ts) as latest, COUNT(*) as n
+    FROM live_tv_timeshift_segments
+    WHERE channel_id = ? AND start_ts >= ?
+  `).get(channelId, cutoff) as any;
+
+  return {
+    channel_id: channelId,
+    window_seconds: win,
+    earliest_ts: rows?.earliest ?? null,
+    latest_ts: rows?.latest ?? null,
+    segment_count: rows?.n ?? 0,
+  };
+}
+
+export function listTimeshiftSegments(
+  channelId: string,
+  fromTs?: string,
+  toTs?: string
+): TimeshiftSegment[] {
+  const db = getDb();
+  const win = timeshiftWindowSeconds();
+  const cutoff = new Date(Date.now() - win * 1000).toISOString();
+  const where: string[] = ['channel_id = ?', 'start_ts >= ?'];
+  const params: any[] = [channelId, cutoff];
+  if (fromTs) { where.push('start_ts >= ?'); params.push(fromTs); }
+  if (toTs)   { where.push('start_ts <= ?'); params.push(toTs); }
+  return db.prepare(`
+    SELECT * FROM live_tv_timeshift_segments
+    WHERE ${where.join(' AND ')}
+    ORDER BY start_ts ASC
+  `).all(...params) as TimeshiftSegment[];
+}
+
+export function addTimeshiftSegment(
+  channelId: string,
+  segmentPath: string,
+  startTs: string,
+  durationSeconds: number,
+  bytes = 0
+): TimeshiftSegment {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const id = randomUUID();
+  db.prepare(`
+    INSERT INTO live_tv_timeshift_segments
+      (id, channel_id, segment_path, start_ts, duration_seconds, bytes, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, channelId, segmentPath, startTs, durationSeconds, bytes, now);
+  return db.prepare('SELECT * FROM live_tv_timeshift_segments WHERE id = ?')
+    .get(id) as TimeshiftSegment;
+}
+
+export function pruneTimeshiftSegments(channelId: string): number {
+  const db = getDb();
+  const win = timeshiftWindowSeconds();
+  const cutoff = new Date(Date.now() - win * 1000).toISOString();
+  const r = db.prepare(`
+    DELETE FROM live_tv_timeshift_segments
+    WHERE channel_id = ? AND start_ts < ?
+  `).run(channelId, cutoff);
+  return r.changes;
+}
+
+// ---- Sessions (per-user) ----
+
+export function startTimeshiftSession(userId: string, channelId: string): TimeshiftSession {
+  const ch = getChannel(channelId);
+  if (!ch) throw new Error('Channel not found');
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO live_tv_timeshift_sessions
+      (user_id, channel_id, session_start_ts, last_seen_ts)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET
+      channel_id = excluded.channel_id,
+      session_start_ts = CASE
+        WHEN live_tv_timeshift_sessions.channel_id = excluded.channel_id
+          THEN live_tv_timeshift_sessions.session_start_ts
+        ELSE excluded.session_start_ts
+      END,
+      last_seen_ts = excluded.last_seen_ts
+  `).run(userId, channelId, now, now);
+  return getTimeshiftSession(userId)!;
+}
+
+export function getTimeshiftSession(userId: string): TimeshiftSession | null {
+  const db = getDb();
+  const row = db.prepare(
+    'SELECT * FROM live_tv_timeshift_sessions WHERE user_id = ?'
+  ).get(userId) as TimeshiftSession | undefined;
+  return row ?? null;
+}
+
+export function heartbeatTimeshiftSession(userId: string): void {
+  const db = getDb();
+  db.prepare(
+    'UPDATE live_tv_timeshift_sessions SET last_seen_ts = ? WHERE user_id = ?'
+  ).run(new Date().toISOString(), userId);
+}
+
+export function endTimeshiftSession(userId: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM live_tv_timeshift_sessions WHERE user_id = ?').run(userId);
+}
+
+// Which channels have active viewers right now? (worker uses this)
+export function activeTimeshiftChannels(idleSeconds = 120): { channel_id: string; viewers: number }[] {
+  const db = getDb();
+  const cutoff = new Date(Date.now() - idleSeconds * 1000).toISOString();
+  return db.prepare(`
+    SELECT channel_id, COUNT(*) as viewers
+    FROM live_tv_timeshift_sessions
+    WHERE last_seen_ts >= ?
+    GROUP BY channel_id
+    ORDER BY viewers DESC
+  `).all(cutoff) as { channel_id: string; viewers: number }[];
+}
+
+// Seek-back position validator: user wants to jump to at_ts?
+export interface TimeshiftSeekResult {
+  allowed: boolean;
+  reason: 'ok' | 'before_window' | 'future';
+  at_ts: string;
+  earliest_ts: string | null;
+  latest_ts: string | null;
+  segments: TimeshiftSegment[];
+}
+
+export function seekTimeshift(channelId: string, atTs: string): TimeshiftSeekResult {
+  const win = getTimeshiftWindow(channelId);
+  const at = new Date(atTs).getTime();
+  if (isNaN(at)) throw new Error('Invalid at_ts');
+  const now = Date.now();
+
+  if (at > now + 5000) {
+    return { allowed: false, reason: 'future', at_ts: atTs,
+      earliest_ts: win.earliest_ts, latest_ts: win.latest_ts, segments: [] };
+  }
+  if (win.earliest_ts) {
+    const earliest = new Date(win.earliest_ts).getTime();
+    if (at < earliest) {
+      return { allowed: false, reason: 'before_window', at_ts: atTs,
+        earliest_ts: win.earliest_ts, latest_ts: win.latest_ts, segments: [] };
+    }
+  }
+  const segments = listTimeshiftSegments(channelId, atTs);
+  return { allowed: true, reason: 'ok', at_ts: atTs,
+    earliest_ts: win.earliest_ts, latest_ts: win.latest_ts, segments };
+}
+
+// ============================================================
+// 40.8 — Catch-Up TV
+// Links past EPG entries to available recordings/replays.
+// ============================================================
+
+export interface CatchUpEntry {
+  program_id: string;
+  channel_id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  start_ts: string;
+  stop_ts: string;
+  duration_seconds: number;
+  available: boolean;
+  recording_id: string | null;
+  file_path: string | null;
+  replay_url: string | null;
+  source: 'recording' | 'none';
+}
+
+export interface CatchUpQuery {
+  channel_id: string;
+  from?: string;   // default: 7 days ago
+  to?: string;     // default: now
+  limit?: number;
+}
+
+export function getCatchUpChannel(q: CatchUpQuery): CatchUpEntry[] {
+  const db = getDb();
+  const now = new Date();
+  const toIso = q.to ?? now.toISOString();
+  const fromIso = q.from ?? new Date(now.getTime() - 7 * 24 * 3600 * 1000).toISOString();
+  const limit = Math.min(Math.max(q.limit ?? 100, 1), 500);
+
+  // Pull past EPG programs for the channel
+  const programs = db.prepare(`
+    SELECT id, channel_id, start_ts, stop_ts, title, description, category
+    FROM xmltv_programs
+    WHERE channel_id = ? AND stop_ts <= ? AND stop_ts >= ?
+    ORDER BY start_ts DESC LIMIT ?
+  `).all(q.channel_id, toIso, fromIso, limit) as {
+    id: string; channel_id: string; start_ts: string; stop_ts: string;
+    title: string; description: string | null; category: string | null;
+  }[];
+
+  if (programs.length === 0) return [];
+
+  // Find recordings that "belong" to each program.
+  // Match rule: same channel, completed, and the recording STARTED within
+  // [program.start - 15min, program.stop]. This prefers recordings that
+  // were scheduled for this specific program rather than overlapping ones.
+  const recStmt = db.prepare(`
+    SELECT id, file_path, start_ts, stop_ts, status
+    FROM live_tv_recordings
+    WHERE channel_id = ?
+      AND status = 'completed'
+      AND start_ts >= ?
+      AND start_ts <= ?
+    ORDER BY ABS(julianday(start_ts) - julianday(?)) ASC
+    LIMIT 1
+  `);
+
+  return programs.map((p) => {
+    const startTs = new Date(p.start_ts).getTime();
+    const before15m = new Date(startTs - 15 * 60 * 1000).toISOString();
+    const rec = recStmt.get(p.channel_id, before15m, p.stop_ts, p.start_ts) as
+      | { id: string; file_path: string | null; start_ts: string; stop_ts: string; status: string }
+      | undefined;
+
+    const durationS = Math.max(0,
+      (new Date(p.stop_ts).getTime() - startTs) / 1000);
+
+    return {
+      program_id: p.id,
+      channel_id: p.channel_id,
+      title: p.title,
+      description: p.description,
+      category: p.category,
+      start_ts: p.start_ts,
+      stop_ts: p.stop_ts,
+      duration_seconds: durationS,
+      available: !!rec && !!rec.file_path,
+      recording_id: rec?.id ?? null,
+      file_path: rec?.file_path ?? null,
+      replay_url: rec?.file_path
+        ? `/api/v1/videos/live-tv/recordings/${rec.id}/stream`
+        : null,
+      source: rec ? 'recording' : 'none',
+    };
+  });
+}
+
+export interface CatchUpSummary {
+  channel_id: string;
+  from_ts: string;
+  to_ts: string;
+  program_count: number;
+  available_count: number;
+  earliest_available_ts: string | null;
+  latest_available_ts: string | null;
+}
+
+export function getCatchUpSummary(channelId: string, fromTs?: string): CatchUpSummary {
+  const entries = getCatchUpChannel({ channel_id: channelId, from: fromTs, limit: 500 });
+  const avail = entries.filter((e) => e.available);
+  const availTimes = avail.map((e) => e.start_ts).sort();
+  return {
+    channel_id: channelId,
+    from_ts: fromTs ?? new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString(),
+    to_ts: new Date().toISOString(),
+    program_count: entries.length,
+    available_count: avail.length,
+    earliest_available_ts: availTimes[0] ?? null,
+    latest_available_ts: availTimes[availTimes.length - 1] ?? null,
+  };
+}
+
+// Retrieve a replay URL by program_id (helper used by the route)
+export function getCatchUpForProgram(programId: string): CatchUpEntry | null {
+  const db = getDb();
+  const p = db.prepare(`
+    SELECT channel_id, start_ts FROM xmltv_programs WHERE id = ?
+  `).get(programId) as { channel_id: string; start_ts: string } | undefined;
+  if (!p) return null;
+  const entries = getCatchUpChannel({
+    channel_id: p.channel_id,
+    from: new Date(new Date(p.start_ts).getTime() - 24 * 3600 * 1000).toISOString(),
+    to: new Date(new Date(p.start_ts).getTime() + 24 * 3600 * 1000).toISOString(),
+    limit: 500,
+  });
+  return entries.find((e) => e.program_id === programId) ?? null;
+}
