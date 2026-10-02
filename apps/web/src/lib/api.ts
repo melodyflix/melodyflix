@@ -345,6 +345,81 @@ export async function toggleCreatorHeart(commentId: string): Promise<{ ok: boole
 
 
 
+
+// ============ Video Genres ============
+export const GENRE_LIST = [
+  { id: 'action', label: 'Action' },
+  { id: 'adventure', label: 'Adventure' },
+  { id: 'animation', label: 'Animation' },
+  { id: 'comedy', label: 'Comedy' },
+  { id: 'crime', label: 'Crime' },
+  { id: 'documentary', label: 'Documentary' },
+  { id: 'drama', label: 'Drama' },
+  { id: 'family', label: 'Family' },
+  { id: 'fantasy', label: 'Fantasy' },
+  { id: 'history', label: 'History' },
+  { id: 'horror', label: 'Horror' },
+  { id: 'music', label: 'Music' },
+  { id: 'mystery', label: 'Mystery' },
+  { id: 'news', label: 'News' },
+  { id: 'reality', label: 'Reality' },
+  { id: 'romance', label: 'Romance' },
+  { id: 'sci-fi', label: 'Sci-Fi' },
+  { id: 'sport', label: 'Sport' },
+  { id: 'thriller', label: 'Thriller' },
+  { id: 'education', label: 'Education' },
+] as const;
+
+export interface VideoGenre {
+  id: string;
+  video_id: string;
+  genre: string;
+  created_at: string;
+}
+
+export interface GenreWithCount {
+  genre: string;
+  label: string;
+  video_count: number;
+}
+
+export function genreLabel(id: string): string {
+  const g = GENRE_LIST.find((x) => x.id === id);
+  return g?.label ?? id;
+}
+
+export async function getGenresWithCounts(): Promise<{ genres: GenreWithCount[] }> {
+  return request<{ genres: GenreWithCount[] }>('/api/v1/videos/genres');
+}
+
+export async function listVideoGenres(videoId: string): Promise<{ genres: VideoGenre[] }> {
+  return request<{ genres: VideoGenre[] }>(`/api/v1/videos/${videoId}/genres`);
+}
+
+export async function replaceVideoGenres(videoId: string, genres: string[]): Promise<{ genres: VideoGenre[] }> {
+  return request<{ genres: VideoGenre[] }>(`/api/v1/videos/${videoId}/genres`, {
+    method: 'PUT',
+    body: JSON.stringify({ genres }),
+  });
+}
+
+export async function addVideoGenre(videoId: string, genre: string): Promise<{ genre: VideoGenre }> {
+  return request<{ genre: VideoGenre }>(`/api/v1/videos/${videoId}/genres`, {
+    method: 'POST',
+    body: JSON.stringify({ genre }),
+  });
+}
+
+export async function removeVideoGenre(videoId: string, genre: string): Promise<{ removed: boolean }> {
+  return request<{ removed: boolean }>(`/api/v1/videos/${videoId}/genres/${encodeURIComponent(genre)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function getVideosByGenre(genre: string, limit = 60): Promise<{ videos: any[] }> {
+  return request<{ videos: any[] }>(`/api/v1/videos/genres/${encodeURIComponent(genre)}/videos?limit=${limit}`);
+}
+
 // ============ Video Tags & Hashtags ============
 export interface VideoTag {
   id: string;
