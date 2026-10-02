@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { listVideoSubtitles, type SubtitleTrack, listVideoAudioTracks, setAudioTrackPreference, type AudioTrack } from '../lib/api';
-import { getVideoVr, type VrMetadata, getChannelCustomization, type PlayerCustomization } from '../lib/api';
+import { getVideoVr, type VrMetadata, getChannelCustomization, type PlayerCustomization, listChannelIntros, type ChannelIntro } from '../lib/api';
 import { lazy, Suspense } from 'react';
 const VrPlayer = lazy(() => import('./VrPlayer'));
 import { useAudioEngine, type AudioEngineSettings } from './useAudioEngine';
@@ -101,6 +101,9 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
   });
   const [showAudioPanel, setShowAudioPanel] = useState(false);
   const [localCustomization, setLocalCustomization] = useState<PlayerCustomization | null>(customization ?? null);
+  const [introBundle, setIntroBundle] = useState<{ intro: ChannelIntro | null; outro: ChannelIntro | null }>({ intro: null, outro: null });
+  const [introPlaying, setIntroPlaying] = useState<'intro' | 'outro' | null>(null);
+  const [introSkippable, setIntroSkippable] = useState(false);
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
   const [activeAudioTrack, setActiveAudioTrack] = useState<string | null>(null);
   const [vrMeta, setVrMeta] = useState<VrMetadata | null>(null);
@@ -217,6 +220,37 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
       .then((res) => setLocalCustomization(res.customization))
       .catch(() => setLocalCustomization(null));
   }, [channelId, customization]);
+
+  // Fetch intro/outro bundle
+  useEffect(() => {
+    if (!channelId) { setIntroBundle({ intro: null, outro: null }); return; }
+    listChannelIntros(channelId)
+      .then((res) => setIntroBundle(res.bundle))
+      .catch(() => setIntroBundle({ intro: null, outro: null }));
+  }, [channelId]);
+
+  // Start intro when video first loads (only once per video)
+  useEffect(() => {
+    if (!videoId || !introBundle.intro || introBundle.intro.is_enabled !== 1) return;
+    // only if not already played for this video this session
+    const key = `mf-intro-played-${videoId}`;
+    if (sessionStorage.getItem(key)) return;
+    setIntroPlaying('intro');
+    setIntroSkippable(false);
+    sessionStorage.setItem(key, '1');
+  }, [videoId, introBundle.intro]);
+
+  // Intro skip timer
+  useEffect(() => {
+    if (!introPlaying) return;
+    const current = introPlaying === 'intro' ? introBundle.intro : introBundle.outro;
+    if (!current) { setIntroPlaying(null); return; }
+    setIntroSkippable(false);
+    if (current.skip_after_seconds > 0) {
+      const t = window.setTimeout(() => setIntroSkippable(true), current.skip_after_seconds * 1000);
+      return () => window.clearTimeout(t);
+    }
+  }, [introPlaying, introBundle]);
 
   // Fetch VR metadata for this video
   useEffect(() => {
@@ -701,6 +735,46 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
           🥽
         </button>
       )}
+
+      {/* Intro/Outro overlay (30.3) */}
+      {introPlaying && (() => {
+        const current = introPlaying === 'intro' ? introBundle.intro : introBundle.outro;
+        if (!current) return null;
+        return (
+          <div className="mf-intro-overlay" style={{
+            position: 'absolute', inset: 0, background: '#000',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 40,
+          }}>
+            <video
+              src={current.video_url}
+              poster={current.thumbnail_url ?? undefined}
+              autoPlay
+              playsInline
+              onEnded={() => setIntroPlaying(null)}
+              onError={() => setIntroPlaying(null)}
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            />
+            {introSkippable && (
+              <button
+                type="button"
+                onClick={() => setIntroPlaying(null)}
+                className="mf-intro-skip"
+                style={{
+                  position: 'absolute', bottom: 20, right: 20,
+                  background: 'rgba(0,0,0,0.75)', color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  padding: '8px 16px', borderRadius: 4,
+                  fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+                  fontWeight: 500,
+                }}
+              >
+                Skip {introPlaying === 'intro' ? 'intro' : 'outro'} →
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Color grading tint overlay (30.8) */}
       {localCustomization && localCustomization.tint_alpha > 0 && (

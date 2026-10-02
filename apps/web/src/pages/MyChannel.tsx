@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api, type User, type Channel as ChannelType, type Video } from '../lib/api';
 import VideoCard from '../components/VideoCard';
 import CustomizationEditor from '../components/CustomizationEditor';
+import IntroOutroEditor from '../components/IntroOutroEditor';
 
 interface Props {
   user: User | null;
@@ -77,6 +78,7 @@ export default function MyChannel({ user, onSignIn }: Props) {
   }
 
   const [showCustomization, setShowCustomization] = useState(false);
+  const [showIntroOutro, setShowIntroOutro] = useState(false);
   const initial = channel.name[0].toUpperCase();
 
   return (
@@ -129,6 +131,32 @@ export default function MyChannel({ user, onSignIn }: Props) {
         {showCustomization && (
           <div style={{ marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 16 }}>
             <CustomizationEditor
+              channelId={channel.id}
+              onToast={(m) => alert(m)}
+            />
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginBottom: 24, background: '#fff', border: '1px solid #e5e5e5', borderRadius: 12, padding: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 2 }}>🎬 Intro & Outro</div>
+            <div style={{ fontSize: 12, color: '#606060' }}>
+              Add a branded intro at the start and an end-card outro to every video.
+            </div>
+          </div>
+          <button
+            className="mf-btn-secondary"
+            onClick={() => setShowIntroOutro((v) => !v)}
+            style={{ fontSize: 13, padding: '8px 16px' }}
+          >
+            {showIntroOutro ? 'Close' : 'Configure'}
+          </button>
+        </div>
+        {showIntroOutro && (
+          <div style={{ marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 16 }}>
+            <IntroOutroEditor
               channelId={channel.id}
               onToast={(m) => alert(m)}
             />

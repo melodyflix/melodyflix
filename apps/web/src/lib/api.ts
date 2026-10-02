@@ -538,6 +538,74 @@ export async function getVideosByGenre(genre: string, limit = 60): Promise<{ vid
 
 
 
+
+// ============ Custom Intro/Outro (30.3, 30.5) ============
+export type IntroKind = 'intro' | 'outro';
+
+export interface ChannelIntro {
+  id: string;
+  channel_id: string;
+  kind: IntroKind;
+  video_url: string;
+  thumbnail_url: string | null;
+  duration_seconds: number;
+  skip_after_seconds: number;
+  is_enabled: number;
+  template_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IntroTemplate {
+  id: string;
+  label: string;
+  description: string;
+  duration_seconds: number;
+  kind: IntroKind;
+  preview_color: string;
+  preview_icon: string;
+}
+
+export interface IntroInput {
+  kind: IntroKind;
+  video_url: string;
+  thumbnail_url?: string | null;
+  duration_seconds?: number;
+  skip_after_seconds?: number;
+  is_enabled?: boolean;
+  template_id?: string | null;
+}
+
+export interface IntroBundle {
+  intro: ChannelIntro | null;
+  outro: ChannelIntro | null;
+}
+
+export async function getIntroTemplates(): Promise<{ templates: IntroTemplate[] }> {
+  return request<{ templates: IntroTemplate[] }>('/api/v1/videos/intros/templates');
+}
+
+export async function listChannelIntros(channelId: string): Promise<{ intros: ChannelIntro[]; bundle: IntroBundle }> {
+  return request<{ intros: ChannelIntro[]; bundle: IntroBundle }>(`/api/v1/videos/channels/${channelId}/intros`);
+}
+
+export async function getChannelIntro(channelId: string, kind: IntroKind): Promise<{ intro: ChannelIntro | null }> {
+  return request<{ intro: ChannelIntro | null }>(`/api/v1/videos/channels/${channelId}/intros/${kind}`);
+}
+
+export async function setChannelIntro(channelId: string, input: IntroInput): Promise<{ intro: ChannelIntro }> {
+  return request<{ intro: ChannelIntro }>(`/api/v1/videos/channels/${channelId}/intros`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function removeChannelIntro(channelId: string, kind: IntroKind): Promise<{ removed: boolean }> {
+  return request<{ removed: boolean }>(`/api/v1/videos/channels/${channelId}/intros/${kind}`, {
+    method: 'DELETE',
+  });
+}
+
 // ============ Player Customization (30.1, 30.2, 30.4, 30.8) ============
 export interface PlayerCustomization {
   channel_id: string;
