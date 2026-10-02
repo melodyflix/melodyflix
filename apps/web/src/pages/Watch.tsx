@@ -24,6 +24,7 @@ import SaveToPlaylistModal from '../components/SaveToPlaylistModal';
 import Chapters from '../components/Chapters';
 import WatchQueue from '../components/WatchQueue';
 import StarRating from '../components/StarRating';
+import VideoPoll from '../components/VideoPoll';
 import { usePlayer } from '../components/PlayerContext';
 
 type Reaction = 'like' | 'dislike' | null;
@@ -511,6 +512,13 @@ export default function Watch({ onSignIn }: Props) {
                   size={18}
                 />
               </div>
+
+              <VideoPoll
+                videoId={video.id}
+                videoOwnerId={video.owner_id}
+                onSignIn={onSignIn}
+                onToast={showToast}
+              />
 
               <button
                 className="mf-sub-btn"

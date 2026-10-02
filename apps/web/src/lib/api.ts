@@ -341,6 +341,58 @@ export async function toggleCreatorHeart(commentId: string): Promise<{ ok: boole
 
 
 
+
+// ============ Video Poll ============
+export interface PollOption {
+  id: string;
+  text: string;
+  order_index: number;
+  vote_count: number;
+}
+
+export interface Poll {
+  id: string;
+  video_id: string;
+  question: string;
+  is_closed: number;
+  created_at: string;
+  closes_at: string | null;
+  options: PollOption[];
+  total_votes: number;
+  user_vote_option_id: string | null;
+}
+
+export async function getVideoPoll(videoId: string): Promise<{ poll: Poll | null }> {
+  return request<{ poll: Poll | null }>(`/api/v1/videos/${videoId}/poll`);
+}
+
+export async function createVideoPoll(
+  videoId: string,
+  question: string,
+  options: string[],
+  closesAt?: string | null,
+): Promise<{ poll: Poll }> {
+  return request<{ poll: Poll }>(`/api/v1/videos/${videoId}/poll`, {
+    method: 'POST',
+    body: JSON.stringify({ question, options, closes_at: closesAt ?? null }),
+  });
+}
+
+export async function votePoll(pollId: string, optionId: string): Promise<{ poll: Poll }> {
+  return request<{ poll: Poll }>(`/api/v1/videos/polls/${pollId}/vote`, {
+    method: 'POST',
+    body: JSON.stringify({ option_id: optionId }),
+  });
+}
+
+export async function closePoll(pollId: string): Promise<{ poll: Poll }> {
+  return request<{ poll: Poll }>(`/api/v1/videos/polls/${pollId}/close`, { method: 'POST' });
+}
+
+export async function deletePoll(pollId: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/videos/polls/${pollId}`, { method: 'DELETE' });
+}
+
 // ============ Video Rating (5-star) ============
 export interface RatingStats {
   avg: number;
