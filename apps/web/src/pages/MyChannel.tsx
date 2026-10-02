@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, type User, type Channel as ChannelType, type Video } from '../lib/api';
 import VideoCard from '../components/VideoCard';
+import CustomizationEditor from '../components/CustomizationEditor';
 
 interface Props {
   user: User | null;
@@ -75,6 +76,7 @@ export default function MyChannel({ user, onSignIn }: Props) {
     );
   }
 
+  const [showCustomization, setShowCustomization] = useState(false);
   const initial = channel.name[0].toUpperCase();
 
   return (
@@ -108,7 +110,33 @@ export default function MyChannel({ user, onSignIn }: Props) {
       </div>
 
       <div className="mf-container">
-        <h2 style={{ fontSize: 18, marginBottom: 16 }}>Your videos</h2>
+        <div style={{ marginBottom: 24, background: '#fff', border: '1px solid #e5e5e5', borderRadius: 12, padding: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 2 }}>🎨 Player & Branding</div>
+            <div style={{ fontSize: 12, color: '#606060' }}>
+              Customize how your videos look: colors, logo, filters, color grading.
+            </div>
+          </div>
+          <button
+            className="mf-btn-secondary"
+            onClick={() => setShowCustomization((v) => !v)}
+            style={{ fontSize: 13, padding: '8px 16px' }}
+          >
+            {showCustomization ? 'Close' : 'Customize'}
+          </button>
+        </div>
+        {showCustomization && (
+          <div style={{ marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 16 }}>
+            <CustomizationEditor
+              channelId={channel.id}
+              onToast={(m) => alert(m)}
+            />
+          </div>
+        )}
+      </div>
+
+      <h2 style={{ fontSize: 18, marginBottom: 16 }}>Your videos</h2>
         {videos.length === 0 ? (
           <div className="mf-empty">
             <div className="mf-empty-icon">📭</div>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { listVideoSubtitles, type SubtitleTrack, listVideoAudioTracks, setAudioTrackPreference, type AudioTrack } from '../lib/api';
-import { getVideoVr, type VrMetadata } from '../lib/api';
+import { getVideoVr, type VrMetadata, getChannelCustomization, type PlayerCustomization } from '../lib/api';
 import { lazy, Suspense } from 'react';
 const VrPlayer = lazy(() => import('./VrPlayer'));
 import { useAudioEngine, type AudioEngineSettings } from './useAudioEngine';
@@ -26,6 +26,9 @@ interface Props {
   mediaArtist?: string;
   mediaArtwork?: string;
   mediaAlbum?: string;
+  // Player customization (30.x)
+  customization?: PlayerCustomization | null;
+  channelId?: string;
 }
 
 type QualityLevel = { index: number; height: number; bitrate: number };
@@ -33,7 +36,7 @@ type QualityLevel = { index: number; height: number; bitrate: number };
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 const SLEEP_OPTIONS = [10, 20, 30, 60, 120];
 
-export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateChange, onEnded, videoId, subtitlesEnabled = true, mediaTitle, mediaArtist, mediaArtwork, mediaAlbum }: Props) {
+export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateChange, onEnded, videoId, subtitlesEnabled = true, mediaTitle, mediaArtist, mediaArtwork, mediaAlbum, customization, channelId }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<any>(null);
   const [error, setError] = useState('');
@@ -97,6 +100,7 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
     } catch { return {}; }
   });
   const [showAudioPanel, setShowAudioPanel] = useState(false);
+  const [localCustomization, setLocalCustomization] = useState<PlayerCustomization | null>(customization ?? null);
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
   const [activeAudioTrack, setActiveAudioTrack] = useState<string | null>(null);
   const [vrMeta, setVrMeta] = useState<VrMetadata | null>(null);
@@ -201,6 +205,18 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
 
   // Hook up Web Audio engine (builds graph lazily on first play)
   useAudioEngine(videoRef.current, audioSettings);
+
+  // Fetch channel customization if not passed as prop
+  useEffect(() => {
+    if (customization !== undefined) {
+      setLocalCustomization(customization ?? null);
+      return;
+    }
+    if (!channelId) { setLocalCustomization(null); return; }
+    getChannelCustomization(channelId)
+      .then((res) => setLocalCustomization(res.customization))
+      .catch(() => setLocalCustomization(null));
+  }, [channelId, customization]);
 
   // Fetch VR metadata for this video
   useEffect(() => {
@@ -635,7 +651,12 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
           height: '100%',
           display: 'block',
           visibility: audioSettings.audioOnlyMode ? 'hidden' : 'visible',
-          filter: brightness !== 1 ? `brightness(${brightness})` : undefined,
+          filter: [
+            brightness !== 1 ? `brightness(${brightness})` : '',
+            localCustomization && localCustomization.filter_preset !== 'none'
+              ? `brightness(${localCustomization.brightness}) contrast(${localCustomization.contrast}) saturate(${localCustomization.saturation}) hue-rotate(${localCustomization.hue_rotate}deg) sepia(${localCustomization.sepia}) blur(${localCustomization.blur}px)`
+              : '',
+          ].filter(Boolean).join(' ') || undefined,
         }}
       >
         {subtitleTracks.map((t) => (
@@ -679,6 +700,64 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
         >
           🥽
         </button>
+      )}
+
+      {/* Color grading tint overlay (30.8) */}
+      {localCustomization && localCustomization.tint_alpha > 0 && (
+        <div
+          className="mf-customization-tint"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: `rgba(${localCustomization.tint_r}, ${localCustomization.tint_g}, ${localCustomization.tint_b}, ${localCustomization.tint_alpha})`,
+            pointerEvents: 'none',
+            zIndex: 2,
+            mixBlendMode: 'multiply',
+          }}
+        />
+      )}
+
+      {/* Logo overlay (30.2) */}
+      {localCustomization?.logo_url && (
+        <div
+          className="mf-customization-logo"
+          style={{
+            position: 'absolute',
+            [localCustomization.logo_position.includes('top') ? 'top' : 'bottom']: 12,
+            [localCustomization.logo_position.includes('left') ? 'left' : 'right']: 12,
+            opacity: localCustomization.logo_opacity,
+            pointerEvents: 'none',
+            zIndex: 3,
+          }}
+        >
+          <img
+            src={localCustomization.logo_url}
+            alt="Channel logo"
+            style={{ maxWidth: 80, maxHeight: 80, display: 'block' }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+        </div>
+      )}
+
+      {/* Watermark text (30.2) */}
+      {localCustomization?.watermark_text && (
+        <div
+          className="mf-customization-watermark"
+          style={{
+            position: 'absolute',
+            bottom: 12,
+            right: 12,
+            color: '#fff',
+            fontSize: 12,
+            fontWeight: 600,
+            opacity: 0.7,
+            textShadow: '0 1px 3px rgba(0,0,0,0.7)',
+            pointerEvents: 'none',
+            zIndex: 3,
+          }}
+        >
+          {localCustomization.watermark_text}
+        </div>
       )}
 
       {/* Audio-only mode overlay */}

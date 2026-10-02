@@ -537,6 +537,85 @@ export async function getVideosByGenre(genre: string, limit = 60): Promise<{ vid
 
 
 
+
+// ============ Player Customization (30.1, 30.2, 30.4, 30.8) ============
+export interface PlayerCustomization {
+  channel_id: string;
+  accent_color: string;
+  background_color: string;
+  progress_color: string;
+  logo_url: string | null;
+  logo_position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  logo_opacity: number;
+  watermark_text: string | null;
+  filter_preset: string;
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  hue_rotate: number;
+  sepia: number;
+  blur: number;
+  color_grading_preset: string;
+  tint_r: number;
+  tint_g: number;
+  tint_b: number;
+  tint_alpha: number;
+  updated_at: string;
+}
+
+export interface CustomizationInput {
+  accent_color?: string;
+  background_color?: string;
+  progress_color?: string;
+  logo_url?: string | null;
+  logo_position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  logo_opacity?: number;
+  watermark_text?: string | null;
+  filter_preset?: string;
+  brightness?: number;
+  contrast?: number;
+  saturation?: number;
+  hue_rotate?: number;
+  sepia?: number;
+  blur?: number;
+  color_grading_preset?: string;
+  tint_r?: number;
+  tint_g?: number;
+  tint_b?: number;
+  tint_alpha?: number;
+}
+
+export interface CustomizationResponse {
+  customization: PlayerCustomization;
+  css_filter: string;
+}
+
+export async function getChannelCustomization(channelId: string): Promise<CustomizationResponse> {
+  return request<CustomizationResponse>(`/api/v1/videos/channels/${channelId}/customization`);
+}
+
+export async function setChannelCustomization(channelId: string, input: CustomizationInput): Promise<CustomizationResponse> {
+  return request<CustomizationResponse>(`/api/v1/videos/channels/${channelId}/customization`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function resetChannelCustomization(channelId: string): Promise<CustomizationResponse> {
+  return request<CustomizationResponse>(`/api/v1/videos/channels/${channelId}/customization`, {
+    method: 'DELETE',
+  });
+}
+
+export async function getCustomizationPresets(): Promise<{
+  filters: { id: string; label: string }[];
+  grading: { id: string; label: string }[];
+}> {
+  return request<{ filters: { id: string; label: string }[]; grading: { id: string; label: string }[] }>(
+    '/api/v1/videos/customizations/presets'
+  );
+}
+
 // ============ Referral Program (27.2) ============
 export interface ReferralCode {
   user_id: string;

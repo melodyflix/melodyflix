@@ -331,6 +331,7 @@ export default function Watch({ onSignIn }: Props) {
                 startTime={resumeAt}
                 seekTo={seekTarget}
                 videoId={video.id}
+                channelId={channel?.id}
                 mediaTitle={video.title}
                 mediaArtist={channel?.name ?? video.channel_id ?? "MelodyFlix"}
                 mediaArtwork={poster}
@@ -520,6 +521,7 @@ export default function Watch({ onSignIn }: Props) {
                 <span style={{ fontSize: 13, color: '#606060' }}>Rate:</span>
                 <StarRating
                   videoId={video.id}
+                  channelId={channel?.id}
                   mediaTitle={video.title}
                   mediaArtist={channel?.name ?? video.channel_id ?? "MelodyFlix"}
                   mediaArtwork={poster}
@@ -553,6 +555,7 @@ export default function Watch({ onSignIn }: Props) {
 
               <VideoPoll
                 videoId={video.id}
+                channelId={channel?.id}
                 mediaTitle={video.title}
                 mediaArtist={channel?.name ?? video.channel_id ?? "MelodyFlix"}
                 mediaArtwork={poster}
@@ -564,6 +567,7 @@ export default function Watch({ onSignIn }: Props) {
 
               <VideoQuiz
                 videoId={video.id}
+                channelId={channel?.id}
                 mediaTitle={video.title}
                 mediaArtist={channel?.name ?? video.channel_id ?? "MelodyFlix"}
                 mediaArtwork={poster}
@@ -604,6 +608,7 @@ export default function Watch({ onSignIn }: Props) {
 
           <Chapters
             videoId={video.id}
+            channelId={channel?.id}
             mediaTitle={video.title}
             mediaArtist={channel?.name ?? video.channel_id ?? "MelodyFlix"}
             mediaArtwork={poster}
@@ -647,6 +652,7 @@ export default function Watch({ onSignIn }: Props) {
       {showPlaylistModal && video && (
         <SaveToPlaylistModal
           videoId={video.id}
+          channelId={channel?.id}
           mediaTitle={video.title}
           mediaArtist={channel?.name ?? video.channel_id ?? "MelodyFlix"}
           mediaArtwork={poster}
@@ -660,6 +666,7 @@ export default function Watch({ onSignIn }: Props) {
         <div className="mf-transcript-overlay">
           <TranscriptPanel
             videoId={video.id}
+            channelId={channel?.id}
             mediaTitle={video.title}
             mediaArtist={channel?.name ?? video.channel_id ?? "MelodyFlix"}
             mediaArtwork={poster}
@@ -678,6 +685,7 @@ export default function Watch({ onSignIn }: Props) {
       {showClipModal && video && (
         <ClipModal
           videoId={video.id}
+          channelId={channel?.id}
           mediaTitle={video.title}
           mediaArtist={channel?.name ?? video.channel_id ?? "MelodyFlix"}
           mediaArtwork={poster}
