@@ -29,6 +29,7 @@ import VideoQuiz from '../components/VideoQuiz';
 import ClipModal from '../components/ClipModal';
 import TagChips from '../components/TagChips';
 import GenreChips from '../components/GenreChips';
+import CastCrewList from '../components/CastCrewList';
 import { usePlayer } from '../components/PlayerContext';
 
 type Reaction = 'like' | 'dislike' | null;
@@ -580,6 +581,7 @@ export default function Watch({ onSignIn }: Props) {
 
           <TagChips videoId={video.id} />
           <GenreChips videoId={video.id} />
+          <CastCrewList videoId={video.id} />
 
           <CommentSection videoId={video.id} videoOwnerId={video.owner_id} onSignIn={onSignIn} onSeek={(sec) => setSeekTarget({ time: sec, nonce: seekNonceRef.current += 1 })} />
         </div>

@@ -29,6 +29,7 @@ import Preferences from './pages/Preferences';
 import ClipView from './pages/ClipView';
 import TagView from './pages/TagView';
 import GenreView from './pages/GenreView';
+import PersonView from './pages/PersonView';
 import Podcasts from './pages/Podcasts';
 import SeriesList from './pages/SeriesList';
 import SeriesDetail from './pages/SeriesDetail';
@@ -120,6 +121,7 @@ function AppInner() {
         <Route path="/clip/:id" element={<ClipView onSignIn={requireSignIn} />} />
         <Route path="/tag/:tag" element={<TagView />} />
         <Route path="/genre/:genre" element={<GenreView />} />
+        <Route path="/person/:name" element={<PersonView />} />
         <Route path="/watch-later" element={<WatchLater onSignIn={requireSignIn} />} />
         <Route path="/subscriptions" element={<Subscriptions onSignIn={requireSignIn} />} />
         <Route path="/notifications" element={<Notifications onSignIn={requireSignIn} />} />

@@ -346,6 +346,88 @@ export async function toggleCreatorHeart(commentId: string): Promise<{ ok: boole
 
 
 
+
+// ============ Video Cast & Crew ============
+export const CREW_ROLES = [
+  { id: 'actor', label: 'Actor', emoji: '🎭', isCast: true },
+  { id: 'director', label: 'Director', emoji: '🎬', isCast: false },
+  { id: 'producer', label: 'Producer', emoji: '💼', isCast: false },
+  { id: 'writer', label: 'Writer', emoji: '✍️', isCast: false },
+  { id: 'composer', label: 'Composer', emoji: '🎵', isCast: false },
+  { id: 'cinematographer', label: 'Cinematographer', emoji: '📷', isCast: false },
+  { id: 'editor', label: 'Editor', emoji: '✂️', isCast: false },
+  { id: 'animator', label: 'Animator', emoji: '🎨', isCast: false },
+  { id: 'voice_actor', label: 'Voice Actor', emoji: '🎙️', isCast: true },
+  { id: 'presenter', label: 'Presenter', emoji: '📢', isCast: true },
+  { id: 'researcher', label: 'Researcher', emoji: '🔍', isCast: false },
+  { id: 'other', label: 'Other', emoji: '👤', isCast: false },
+] as const;
+
+export interface Person {
+  id: string;
+  video_id: string;
+  name: string;
+  role: string;
+  character_name: string | null;
+  order_index: number;
+  created_at: string;
+}
+
+export interface PersonInput {
+  name: string;
+  role: string;
+  character_name?: string | null;
+}
+
+export interface VideoCredits {
+  id: string;
+  title: string;
+  thumbnail_url: string | null;
+  role: string;
+  character_name: string | null;
+  created_at: string;
+}
+
+export function roleLabel(id: string): string {
+  const r = CREW_ROLES.find((x) => x.id === id);
+  return r?.label ?? id;
+}
+
+export function roleEmoji(id: string): string {
+  const r = CREW_ROLES.find((x) => x.id === id);
+  return r?.emoji ?? '👤';
+}
+
+export async function listVideoCredits(videoId: string): Promise<{ people: Person[] }> {
+  return request<{ people: Person[] }>(`/api/v1/videos/${videoId}/credits`);
+}
+
+export async function replaceVideoCredits(videoId: string, people: PersonInput[]): Promise<{ people: Person[] }> {
+  return request<{ people: Person[] }>(`/api/v1/videos/${videoId}/credits`, {
+    method: 'PUT',
+    body: JSON.stringify({ people }),
+  });
+}
+
+export async function addVideoCredit(videoId: string, person: PersonInput): Promise<{ person: Person }> {
+  return request<{ person: Person }>(`/api/v1/videos/${videoId}/credits`, {
+    method: 'POST',
+    body: JSON.stringify(person),
+  });
+}
+
+export async function removeVideoCredit(videoId: string, personId: string): Promise<{ removed: boolean }> {
+  return request<{ removed: boolean }>(`/api/v1/videos/${videoId}/credits/${personId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function getVideosByPerson(name: string): Promise<{ name: string; videos: VideoCredits[] }> {
+  return request<{ name: string; videos: VideoCredits[] }>(
+    `/api/v1/videos/people/${encodeURIComponent(name)}/videos`,
+  );
+}
+
 // ============ Video Genres ============
 export const GENRE_LIST = [
   { id: 'action', label: 'Action' },
