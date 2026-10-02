@@ -869,3 +869,108 @@ export function clearWatchState(userId: string): void {
   const db = getDb();
   db.prepare('DELETE FROM live_tv_watch_state WHERE user_id = ?').run(userId);
 }
+
+// ============================================================
+// 40.11 — Channel Favorites
+// ============================================================
+
+export interface FavoriteRow {
+  user_id: string;
+  channel_id: string;
+  created_at: string;
+  sort_order: number;
+}
+
+export interface FavoriteWithChannel extends FavoriteRow {
+  channel: LiveTvChannel | null;
+}
+
+export function ensureLiveTvFavoritesSchema(): void {
+  const db = getDb();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS live_tv_favorites (
+      user_id TEXT NOT NULL,
+      channel_id TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, channel_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_livetv_fav_user ON live_tv_favorites(user_id, sort_order, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_livetv_fav_channel ON live_tv_favorites(channel_id);
+  `);
+}
+
+export function addFavorite(userId: string, channelId: string, sortOrder = 0): FavoriteRow {
+  const ch = getChannel(channelId);
+  if (!ch) throw new Error('Channel not found');
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO live_tv_favorites (user_id, channel_id, sort_order, created_at)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(user_id, channel_id) DO NOTHING
+  `).run(userId, channelId, sortOrder, now);
+  const row = db.prepare(
+    'SELECT * FROM live_tv_favorites WHERE user_id = ? AND channel_id = ?'
+  ).get(userId, channelId) as FavoriteRow;
+  return row;
+}
+
+export function removeFavorite(userId: string, channelId: string): boolean {
+  const db = getDb();
+  const r = db.prepare(
+    'DELETE FROM live_tv_favorites WHERE user_id = ? AND channel_id = ?'
+  ).run(userId, channelId);
+  return r.changes > 0;
+}
+
+export function isFavorite(userId: string, channelId: string): boolean {
+  const db = getDb();
+  const row = db.prepare(
+    'SELECT 1 FROM live_tv_favorites WHERE user_id = ? AND channel_id = ? LIMIT 1'
+  ).get(userId, channelId);
+  return !!row;
+}
+
+export function toggleFavorite(userId: string, channelId: string): { favorited: boolean } {
+  const db = getDb();
+  const exists = isFavorite(userId, channelId);
+  if (exists) {
+    removeFavorite(userId, channelId);
+    return { favorited: false };
+  }
+  addFavorite(userId, channelId);
+  return { favorited: true };
+}
+
+export function listFavorites(userId: string, limit = 200): FavoriteWithChannel[] {
+  const db = getDb();
+  const n = Math.min(Math.max(limit, 1), 500);
+  const rows = db.prepare(
+    'SELECT * FROM live_tv_favorites WHERE user_id = ? ORDER BY sort_order ASC, created_at DESC LIMIT ?'
+  ).all(userId, n) as FavoriteRow[];
+  return rows.map(r => ({ ...r, channel: getChannel(r.channel_id) }));
+}
+
+export function countFavorites(userId: string): number {
+  const db = getDb();
+  const r = db.prepare(
+    'SELECT COUNT(*) as n FROM live_tv_favorites WHERE user_id = ?'
+  ).get(userId) as { n: number };
+  return r.n;
+}
+
+export function setFavoriteOrder(userId: string, channelIds: string[]): void {
+  const db = getDb();
+  const upd = db.prepare(
+    'UPDATE live_tv_favorites SET sort_order = ? WHERE user_id = ? AND channel_id = ?'
+  );
+  db.exec('BEGIN');
+  try {
+    channelIds.forEach((cid, idx) => upd.run(idx, userId, cid));
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+}

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   listLiveTvChannels, listLiveTvCategories,
   LiveTvChannel,
+  listLiveTvFavorites, toggleLiveTvFavorite,
 } from '../lib/api';
 
 interface Props {
@@ -19,6 +20,8 @@ export default function LiveTV({ onSignIn: _onSignIn }: Props) {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +35,12 @@ export default function LiveTV({ onSignIn: _onSignIn }: Props) {
         if (cancelled) return;
         setChannels(chRes.channels);
         setCategories(catRes.categories);
+        // best-effort favorites fetch — ignore auth failure
+        listLiveTvFavorites(500)
+          .then((f) => {
+            if (!cancelled) setFavoriteIds(new Set(f.favorites.map((x) => x.channel_id)));
+          })
+          .catch(() => {});
       } catch (e: any) {
         if (!cancelled) setError(e?.message ?? 'Failed to load channels');
       } finally {
@@ -44,6 +53,7 @@ export default function LiveTV({ onSignIn: _onSignIn }: Props) {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return channels.filter((c) => {
+      if (onlyFavorites && !favoriteIds.has(c.id)) return false;
       if (selectedCategory && c.category !== selectedCategory) return false;
       if (!q) return true;
       return (
@@ -52,7 +62,7 @@ export default function LiveTV({ onSignIn: _onSignIn }: Props) {
         (c.tvg_id ?? '').toLowerCase().includes(q)
       );
     });
-  }, [channels, selectedCategory, search]);
+  }, [channels, selectedCategory, search, onlyFavorites, favoriteIds]);
 
   return (
     <div style={{ padding: 24, maxWidth: 1280, margin: '0 auto' }}>
@@ -86,6 +96,20 @@ export default function LiveTV({ onSignIn: _onSignIn }: Props) {
             </option>
           ))}
         </select>
+        <label style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8,
+          fontSize: 14, cursor: 'pointer', userSelect: 'none',
+          background: onlyFavorites ? '#fff8e1' : '#fff',
+        }}>
+          <input
+            type="checkbox"
+            checked={onlyFavorites}
+            onChange={(e) => setOnlyFavorites(e.target.checked)}
+            style={{ margin: 0 }}
+          />
+          ★ Only favorites
+        </label>
       </div>
 
       {loading && <p style={{ color: '#666' }}>Loading…</p>}
@@ -109,7 +133,7 @@ export default function LiveTV({ onSignIn: _onSignIn }: Props) {
             onClick={() => navigate(`/live-tv/${ch.id}`)}
             style={{
               display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
-              gap: 8, padding: 12, background: '#fff',
+              gap: 8, padding: 12, background: '#fff', position: 'relative',
               border: '1px solid #eaeaea', borderRadius: 12, cursor: 'pointer',
               textAlign: 'left', transition: 'box-shadow .15s ease',
             }}
@@ -137,6 +161,35 @@ export default function LiveTV({ onSignIn: _onSignIn }: Props) {
               {ch.category && <span>{ch.category}</span>}
               {ch.country && <span>· {ch.country}</span>}
             </div>
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                toggleLiveTvFavorite(ch.id)
+                  .then((r) => {
+                    setFavoriteIds((prev) => {
+                      const next = new Set(prev);
+                      if (r.favorited) next.add(ch.id);
+                      else next.delete(ch.id);
+                      return next;
+                    });
+                  })
+                  .catch(() => {});
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') (e.target as HTMLElement).click(); }}
+              title={favoriteIds.has(ch.id) ? 'Remove from favorites' : 'Add to favorites'}
+              style={{
+                position: 'absolute', top: 8, right: 8,
+                width: 32, height: 32, borderRadius: 16,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(255,255,255,0.92)', cursor: 'pointer',
+                fontSize: 16, userSelect: 'none',
+              }}
+            >
+              {favoriteIds.has(ch.id) ? '★' : '☆'}
+            </span>
           </button>
         ))}
       </div>

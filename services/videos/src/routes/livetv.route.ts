@@ -11,6 +11,7 @@ import {
   getSchedule, getScheduleForChannel,
   ensureLiveTvStateSchema, switchChannel, getWatchState,
   updatePosition, listRecentChannels, clearWatchState,
+  addFavorite, removeFavorite, toggleFavorite, listFavorites, isFavorite, setFavoriteOrder,
 } from '../services/livetv.service.js';
 
 const CreateSchema = z.object({
@@ -351,6 +352,82 @@ export async function liveTvRoutes(app: FastifyInstance) {
     const q = req.query as { limit?: string };
     const recent = listRecentChannels(me, q.limit ? parseInt(q.limit) : 10);
     return reply.send({ success: true, data: { recent, count: recent.length } });
+  });
+
+
+  // ---- Channel Favorites (40.11) ----
+
+  // GET /live-tv/favorites — my favorites
+  app.get('/live-tv/favorites', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const q = req.query as { limit?: string };
+    const favorites = listFavorites(me, q.limit ? parseInt(q.limit) : 200);
+    return reply.send({ success: true, data: { favorites, count: favorites.length } });
+  });
+
+  // POST /live-tv/favorites/:channelId — add to favorites
+  app.post('/live-tv/favorites/:channelId', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { channelId } = req.params as { channelId: string };
+    try {
+      const fav = addFavorite(me, channelId);
+      return reply.send({ success: true, data: { favorite: fav } });
+    } catch (e: any) {
+      if (e?.message === 'Channel not found') {
+        return reply.code(404).send({ success: false, error: 'Channel not found' });
+      }
+      throw e;
+    }
+  });
+
+  // DELETE /live-tv/favorites/:channelId — remove from favorites
+  app.delete('/live-tv/favorites/:channelId', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { channelId } = req.params as { channelId: string };
+    const removed = removeFavorite(me, channelId);
+    return reply.send({ success: true, data: { removed } });
+  });
+
+  // POST /live-tv/favorites/:channelId/toggle — toggle favorite
+  app.post('/live-tv/favorites/:channelId/toggle', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { channelId } = req.params as { channelId: string };
+    try {
+      const result = toggleFavorite(me, channelId);
+      return reply.send({ success: true, data: result });
+    } catch (e: any) {
+      if (e?.message === 'Channel not found') {
+        return reply.code(404).send({ success: false, error: 'Channel not found' });
+      }
+      throw e;
+    }
+  });
+
+  // GET /live-tv/favorites/:channelId — check favorite status
+  app.get('/live-tv/favorites/:channelId', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { channelId } = req.params as { channelId: string };
+    return reply.send({ success: true, data: { favorited: isFavorite(me, channelId) } });
+  });
+
+  // PUT /live-tv/favorites/order — reorder favorites
+  app.put('/live-tv/favorites/order', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const OrderSchema = z.object({
+      channel_ids: z.array(z.string()).max(500),
+    });
+    const parsed = OrderSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    }
+    setFavoriteOrder(me, parsed.data.channel_ids);
+    return reply.send({ success: true, data: { updated: true } });
   });
 
 }

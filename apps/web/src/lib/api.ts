@@ -3548,3 +3548,52 @@ export async function importLiveTvXmltv(
     body: JSON.stringify({ xml, ...opts }),
   });
 }
+
+// ---- Channel Favorites (40.11) ----
+
+export interface LiveTvFavorite {
+  user_id: string;
+  channel_id: string;
+  sort_order: number;
+  created_at: string;
+  channel: LiveTvChannel | null;
+}
+
+export async function listLiveTvFavorites(
+  limit = 200
+): Promise<{ favorites: LiveTvFavorite[]; count: number }> {
+  return request(`/api/v1/videos/live-tv/favorites?limit=${limit}`);
+}
+
+export async function addLiveTvFavorite(
+  channelId: string
+): Promise<{ favorite: LiveTvFavorite }> {
+  return request(`/api/v1/videos/live-tv/favorites/${channelId}`, { method: 'POST' });
+}
+
+export async function removeLiveTvFavorite(
+  channelId: string
+): Promise<{ removed: boolean }> {
+  return request(`/api/v1/videos/live-tv/favorites/${channelId}`, { method: 'DELETE' });
+}
+
+export async function toggleLiveTvFavorite(
+  channelId: string
+): Promise<{ favorited: boolean }> {
+  return request(`/api/v1/videos/live-tv/favorites/${channelId}/toggle`, { method: 'POST' });
+}
+
+export async function isLiveTvFavorite(
+  channelId: string
+): Promise<{ favorited: boolean }> {
+  return request(`/api/v1/videos/live-tv/favorites/${channelId}`);
+}
+
+export async function setLiveTvFavoriteOrder(
+  channelIds: string[]
+): Promise<{ updated: boolean }> {
+  return request('/api/v1/videos/live-tv/favorites/order', {
+    method: 'PUT',
+    body: JSON.stringify({ channel_ids: channelIds }),
+  });
+}
