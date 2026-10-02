@@ -7,6 +7,7 @@ import {
   listSubtitles, getSubtitle, uploadSubtitle, deleteSubtitle,
   setDefaultSubtitle, getSubtitleAsVtt, getDefaultSubtitle,
   getSubtitleCues, updateSubtitleCues,
+  generateAutoCues, autoGenerateSubtitle,
 } from '../services/subtitle.service.js';
 
 const UploadSchema = z.object({
@@ -26,6 +27,12 @@ const CueSchema = z.object({
 
 const CuesUpdateSchema = z.object({
   cues: z.array(CueSchema).max(5000),
+});
+
+const AutoGenSchema = z.object({
+  language: z.string().min(2).max(10).default('en'),
+  label: z.string().min(1).max(60).optional(),
+  kind: z.enum(['subtitles', 'captions']).optional(),
 });
 
 function checkVideoOwner(videoId: string, userId: string): boolean {
@@ -141,6 +148,47 @@ export async function subtitleRoutes(app: FastifyInstance) {
     try {
       const updated = updateSubtitleCues(trackId, parsed.data.cues);
       return reply.send({ success: true, data: { track: updated } });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // POST /:videoId/subtitles/auto-preview — generate cues WITHOUT saving (owner)
+  app.post('/:videoId/subtitles/auto-preview', { preHandler: [requireAuth] }, async (req, reply) => {
+    const { videoId } = req.params as { videoId: string };
+    const userId = (req as any).user?.id ?? (req as any).user?.sub;
+    if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    if (!checkVideoOwner(videoId, userId)) {
+      return reply.code(403).send({ success: false, error: 'Not your video' });
+    }
+    try {
+      const result = generateAutoCues(videoId);
+      return reply.send({ success: true, data: result });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // POST /:videoId/subtitles/auto-generate — generate + save as draft track
+  app.post('/:videoId/subtitles/auto-generate', { preHandler: [requireAuth] }, async (req, reply) => {
+    const { videoId } = req.params as { videoId: string };
+    const userId = (req as any).user?.id ?? (req as any).user?.sub;
+    if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    if (!checkVideoOwner(videoId, userId)) {
+      return reply.code(403).send({ success: false, error: 'Not your video' });
+    }
+    const parsed = AutoGenSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid body', errors: parsed.error.issues });
+    }
+    try {
+      const track = autoGenerateSubtitle(
+        videoId,
+        parsed.data.language,
+        parsed.data.label ?? `${parsed.data.language} (auto)`,
+        parsed.data.kind ?? 'subtitles',
+      );
+      return reply.send({ success: true, data: { track } });
     } catch (err) {
       return reply.code(400).send({ success: false, error: (err as Error).message });
     }

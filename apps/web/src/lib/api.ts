@@ -530,6 +530,33 @@ export async function getVideosByGenre(genre: string, limit = 60): Promise<{ vid
 
 
 
+
+// ============ Subtitle Auto-Generation (38.2) ============
+export interface AutoGenCuesResult {
+  cues: SubtitleCue[];
+  source: 'chapters' | 'description' | 'placeholder';
+  draft: boolean;
+}
+
+export async function previewAutoSubtitles(videoId: string): Promise<AutoGenCuesResult> {
+  return request<AutoGenCuesResult>(`/api/v1/videos/${videoId}/subtitles/auto-preview`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function autoGenerateSubtitle(
+  videoId: string,
+  language: string,
+  label?: string,
+  kind: 'subtitles' | 'captions' = 'subtitles',
+): Promise<{ track: SubtitleTrackWithContent }> {
+  return request<{ track: SubtitleTrackWithContent }>(`/api/v1/videos/${videoId}/subtitles/auto-generate`, {
+    method: 'POST',
+    body: JSON.stringify({ language, label, kind }),
+  });
+}
+
 // ============ Subtitle Editor (38.4) ============
 export interface SubtitleCue {
   start: number;

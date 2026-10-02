@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   SUBTITLE_LANGUAGES, listVideoSubtitles, uploadVideoSubtitle,
   setDefaultSubtitle, deleteSubtitleTrack,
+  autoGenerateSubtitle,
   type SubtitleTrack,
 } from '../lib/api';
 import SubtitleEditor from './SubtitleEditor';
@@ -20,6 +21,7 @@ export default function SubtitleManager({ videoId, onToast }: Props) {
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
+  const [autoBusy, setAutoBusy] = useState(false);
 
   async function load() {
     try {
@@ -97,6 +99,19 @@ export default function SubtitleManager({ videoId, onToast }: Props) {
     }
   }
 
+  async function handleAutoGenerate() {
+    setAutoBusy(true);
+    try {
+      const track = await autoGenerateSubtitle(videoId, language, `${label} (auto)`, kind);
+      onToast?.(`🤖 Auto-generated draft "${track.track.label}" — review & edit`);
+      await load();
+    } catch (err) {
+      onToast?.((err as Error).message || 'Auto-generation failed');
+    } finally {
+      setAutoBusy(false);
+    }
+  }
+
   return (
     <div style={{ marginTop: 12 }}>
       <div style={{ fontSize: 13, color: '#606060', marginBottom: 10 }}>
@@ -156,6 +171,36 @@ export default function SubtitleManager({ videoId, onToast }: Props) {
         {tracks.length === 0 && (
           <div style={{ fontSize: 12, color: '#909090' }}>No subtitle tracks yet.</div>
         )}
+      </div>
+
+      {/* Auto-generate (draft) block */}
+      <div style={{
+        marginTop: 4,
+        padding: '10px 12px',
+        background: '#f0f4ff',
+        border: '1px solid #c7d2fe',
+        borderRadius: 8,
+        marginBottom: 12,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#3730a3' }}>
+              🤖 Auto-Generate Draft
+            </div>
+            <div style={{ fontSize: 11, color: '#6366f1', marginTop: 2 }}>
+              Uses chapters / description timestamps. Edit after generating.
+            </div>
+          </div>
+          <button
+            type="button"
+            className="mf-btn-text mf-btn-text-primary"
+            onClick={handleAutoGenerate}
+            disabled={autoBusy || busy}
+            style={{ fontSize: 12 }}
+          >
+            {autoBusy ? 'Generating...' : '⚡ Generate'}
+          </button>
+        </div>
       </div>
 
       {/* Upload form */}

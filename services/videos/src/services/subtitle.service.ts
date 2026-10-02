@@ -236,3 +236,122 @@ export function updateSubtitleCues(trackId: string, cues: SubtitleCue[]): Subtit
   return getSubtitle(trackId);
 }
 
+// ---------- 38.2 Automatic Subtitle Generation (chapters/metadata fallback) ----------
+
+/**
+ * Auto-generate a draft subtitle track when no Whisper engine is available.
+ *
+ * Strategy:
+ *   1. If video has chapters -> emit one cue per chapter segment
+ *      ([chapter.start, nextChapter.start or video duration])
+ *   2. Else if description has timestamped lines -> same, using those
+ *   3. Else -> a single whole-video placeholder cue
+ *
+ * When Whisper / ASR is available later, swap the generator without touching routes.
+ */
+
+// Best-effort chapter reader (decoupled from chapter service types)
+function readVideoChapters(videoId: string): { start_seconds: number; title: string }[] {
+  const db = getDb();
+  try {
+    const rows = db.prepare(
+      'SELECT start_seconds, title FROM video_chapters WHERE video_id = ? ORDER BY order_index ASC, start_seconds ASC'
+    ).all(videoId) as { start_seconds: number; title: string }[];
+    return rows;
+  } catch {
+    return [];
+  }
+}
+
+function readVideoMeta(videoId: string): {
+  title: string | null;
+  description: string | null;
+  duration_seconds: number | null;
+} | null {
+  const db = getDb();
+  const row = db.prepare(
+    'SELECT title, description, duration_seconds FROM videos WHERE id = ?'
+  ).get(videoId) as { title: string | null; description: string | null; duration_seconds: number | null } | undefined;
+  return row ?? null;
+}
+
+// Fallback: timestamps embedded in the description body
+function parseTimestampedLines(description: string | null | undefined): { start_seconds: number; title: string }[] {
+  if (!description) return [];
+  const out: { start_seconds: number; title: string }[] = [];
+  for (const line of description.split(/\r?\n/)) {
+    const m = line.match(/^\s*(\d{1,2}:\d{2}(?::\d{2})?)\s*[-–—:]?\s*(.+?)\s*$/);
+    if (!m) continue;
+    const parts = m[1].split(':').map(Number);
+    let secs = 0;
+    if (parts.length === 2) secs = parts[0] * 60 + parts[1];
+    else if (parts.length === 3) secs = parts[0] * 3600 + parts[1] * 60 + parts[2];
+    const title = m[2].trim();
+    if (title) out.push({ start_seconds: secs, title });
+  }
+  return out;
+}
+
+export interface AutoGenResult {
+  cues: SubtitleCue[];
+  source: 'chapters' | 'description' | 'placeholder';
+  draft: boolean; // true = user should review/edit before publishing
+}
+
+export function generateAutoCues(videoId: string): AutoGenResult {
+  const meta = readVideoMeta(videoId);
+  const duration = Math.max(0, Math.floor(meta?.duration_seconds ?? 0));
+
+  // 1) Chapters
+  let segments = readVideoChapters(videoId);
+  let source: AutoGenResult['source'] = 'chapters';
+
+  // 2) Description fallback
+  if (segments.length === 0) {
+    segments = parseTimestampedLines(meta?.description ?? '');
+    if (segments.length > 0) source = 'description';
+  }
+
+  // 3) Placeholder
+  if (segments.length === 0) {
+    const text = meta?.title ? `[${meta.title}]` : '[Auto-generated draft — please review]';
+    return {
+      cues: [{ start: 0, end: duration > 0 ? duration : 5, text }],
+      source: 'placeholder',
+      draft: true,
+    };
+  }
+
+  // Sort + build cues from consecutive segments
+  segments.sort((a, b) => a.start_seconds - b.start_seconds);
+  const cues: SubtitleCue[] = [];
+  for (let i = 0; i < segments.length; i++) {
+    const cur = segments[i];
+    const next = segments[i + 1];
+    const start = Math.max(0, cur.start_seconds);
+    const endRaw = next ? next.start_seconds : (duration > 0 ? duration : start + 5);
+    const end = Math.max(start + 0.5, endRaw);
+    cues.push({ start, end, text: cur.title });
+  }
+  return { cues, source, draft: true };
+}
+
+// Persist an auto-generated draft as a subtitle track (language configurable)
+export function autoGenerateSubtitle(
+  videoId: string,
+  language: string,
+  label: string,
+  kind: 'subtitles' | 'captions' = 'subtitles',
+): SubtitleTrack {
+  const result = generateAutoCues(videoId);
+  const vtt = cuesToVtt(result.cues);
+  return uploadSubtitle(videoId, {
+    language,
+    label: label || `${language} (auto)`,
+    format: 'vtt',
+    kind,
+    content: vtt,
+    is_default: false,
+  });
+}
+
