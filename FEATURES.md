@@ -479,7 +479,7 @@ Legend:
 - [x] 40.7 TV Schedule
 - [ ] 40.8 Catch-Up TV
 - [ ] 40.9 Live TV Chat
-- [ ] 40.10 Picture-in-Picture
+- [x] 40.10 Picture-in-Picture
 - [ ] 40.11 Channel Favorites
 - [ ] 40.12 Channel Parental Control
 - [x] 40.13 M3U/M3U8 Import

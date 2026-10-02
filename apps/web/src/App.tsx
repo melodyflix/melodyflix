@@ -25,6 +25,8 @@ import MyVideos from './pages/MyVideos';
 import GoLive from './pages/GoLive';
 import LiveList from './pages/LiveList';
 import LiveWatch from './pages/LiveWatch';
+import LiveTV from './pages/LiveTV';
+import LiveTVWatch from './pages/LiveTVWatch';
 import TwoFASettings from './pages/TwoFASettings';
 import Preferences from './pages/Preferences';
 import ClipView from './pages/ClipView';
@@ -149,6 +151,8 @@ function AppInner() {
         <Route path="/series" element={<SeriesList onSignIn={requireSignIn} />} />
         <Route path="/series/:id" element={<SeriesDetail onSignIn={requireSignIn} />} />
         <Route path="/live/:id" element={<LiveWatch onSignIn={requireSignIn} />} />
+            <Route path="/live-tv" element={<LiveTV onSignIn={requireSignIn} />} />
+            <Route path="/live-tv/:id" element={<LiveTVWatch onSignIn={requireSignIn} />} />
         <Route path="/settings/security" element={<TwoFASettings user={user} onSignIn={requireSignIn} />} />
         <Route path="/settings/preferences" element={<Preferences onSignIn={requireSignIn} />} />
         <Route path="/go-live" element={<GoLive user={user} onSignIn={() => setShowLogin(true)} />} />

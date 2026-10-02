@@ -3265,3 +3265,286 @@ export function formatTime(seconds: number): string {
   if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
+
+// ============================================================
+// Live TV — Section 40 (channels, EPG, schedule, switch, imports)
+// ============================================================
+
+export interface LiveTvChannel {
+  id: string;
+  owner_id: string;
+  name: string;
+  stream_url: string;
+  logo_url: string | null;
+  category: string | null;
+  country: string | null;
+  language: string | null;
+  tvg_id: string | null;
+  tvg_name: string | null;
+  description: string | null;
+  is_active: number;
+  is_public: number;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LiveTvEpgEntry {
+  id: string;
+  channel_id: string;
+  start_ts: string;
+  stop_ts: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  episode_num: string | null;
+}
+
+export interface LiveTvWatchState {
+  user_id: string;
+  channel_id: string;
+  position_seconds: number;
+  device: string | null;
+  updated_at: string;
+  channel: LiveTvChannel | null;
+}
+
+export interface LiveTvRecentChannel {
+  channel_id: string;
+  last_watched_at: string;
+  watch_count: number;
+  channel: LiveTvChannel | null;
+}
+
+export interface LiveTvScheduleSlot {
+  channel_id: string;
+  channel_name: string;
+  channel_logo: string | null;
+  category: string | null;
+  now: LiveTvEpgEntry | null;
+  up_next: LiveTvEpgEntry[];
+}
+
+export interface LiveTvListFilters {
+  category?: string;
+  country?: string;
+  language?: string;
+  owner_id?: string;
+  limit?: number;
+}
+
+export interface CreateLiveTvChannelInput {
+  name: string;
+  stream_url: string;
+  logo_url?: string | null;
+  category?: string | null;
+  country?: string | null;
+  language?: string | null;
+  tvg_id?: string | null;
+  tvg_name?: string | null;
+  description?: string | null;
+  is_public?: boolean;
+  sort_order?: number;
+}
+
+// ---- Channels (40.1, 40.6, 40.15) ----
+
+export async function listLiveTvChannels(
+  filters: LiveTvListFilters = {}
+): Promise<{ channels: LiveTvChannel[]; count: number }> {
+  const params = new URLSearchParams();
+  if (filters.category) params.set('category', filters.category);
+  if (filters.country) params.set('country', filters.country);
+  if (filters.language) params.set('language', filters.language);
+  if (filters.owner_id) params.set('owner_id', filters.owner_id);
+  if (filters.limit) params.set('limit', String(filters.limit));
+  const qs = params.toString();
+  return request<{ channels: LiveTvChannel[]; count: number }>(
+    `/api/v1/videos/live-tv/channels${qs ? '?' + qs : ''}`
+  );
+}
+
+export async function listLiveTvCategories(): Promise<
+  { categories: { category: string; count: number }[] }
+> {
+  return request('/api/v1/videos/live-tv/categories');
+}
+
+export async function getLiveTvChannel(
+  id: string
+): Promise<{ channel: LiveTvChannel }> {
+  return request(`/api/v1/videos/live-tv/channels/${id}`);
+}
+
+export async function listMyLiveTvChannels(): Promise<{
+  channels: LiveTvChannel[];
+  count: number;
+}> {
+  return request('/api/v1/videos/live-tv/mine');
+}
+
+export async function createLiveTvChannel(
+  input: CreateLiveTvChannelInput
+): Promise<{ channel: LiveTvChannel }> {
+  return request('/api/v1/videos/live-tv/channels', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateLiveTvChannel(
+  id: string,
+  patch: Partial<CreateLiveTvChannelInput> & { is_active?: boolean }
+): Promise<{ channel: LiveTvChannel }> {
+  return request(`/api/v1/videos/live-tv/channels/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function deleteLiveTvChannel(id: string): Promise<{ deleted: boolean }> {
+  return request(`/api/v1/videos/live-tv/channels/${id}`, { method: 'DELETE' });
+}
+
+// ---- Stream Health (40.16) ----
+
+export async function checkLiveTvHealth(id: string): Promise<{
+  health: {
+    id: string;
+    channel_id: string;
+    status: 'ok' | 'error' | 'timeout';
+    http_code: number | null;
+    response_ms: number;
+    error_message: string | null;
+    checked_at: string;
+  };
+}> {
+  return request(`/api/v1/videos/live-tv/channels/${id}/health`, { method: 'POST' });
+}
+
+// ---- EPG (40.2, 40.14) ----
+
+export async function getLiveTvEpg(
+  channelId: string,
+  opts: { from?: string; to?: string } = {}
+): Promise<{ entries: LiveTvEpgEntry[]; count: number }> {
+  const params = new URLSearchParams();
+  if (opts.from) params.set('from', opts.from);
+  if (opts.to) params.set('to', opts.to);
+  const qs = params.toString();
+  return request(
+    `/api/v1/videos/live-tv/epg/${channelId}${qs ? '?' + qs : ''}`
+  );
+}
+
+export async function getLiveTvNowPlaying(
+  channelId: string,
+  at?: string
+): Promise<{ entry: LiveTvEpgEntry | null }> {
+  const qs = at ? `?at=${encodeURIComponent(at)}` : '';
+  return request(`/api/v1/videos/live-tv/epg/${channelId}/now${qs}`);
+}
+
+export async function getLiveTvUpNext(
+  channelId: string,
+  limit = 5
+): Promise<{ entries: LiveTvEpgEntry[] }> {
+  return request(`/api/v1/videos/live-tv/epg/${channelId}/up-next?limit=${limit}`);
+}
+
+// ---- Schedule (40.7) ----
+
+export async function getLiveTvSchedule(opts: {
+  at?: string;
+  mine?: boolean;
+  category?: string;
+  limit_channels?: number;
+  up_next_limit?: number;
+} = {}): Promise<{ at: string; count: number; slots: LiveTvScheduleSlot[] }> {
+  const params = new URLSearchParams();
+  if (opts.at) params.set('at', opts.at);
+  if (opts.mine) params.set('mine', 'true');
+  if (opts.category) params.set('category', opts.category);
+  if (opts.limit_channels) params.set('limit_channels', String(opts.limit_channels));
+  if (opts.up_next_limit) params.set('up_next_limit', String(opts.up_next_limit));
+  const qs = params.toString();
+  return request(`/api/v1/videos/live-tv/schedule${qs ? '?' + qs : ''}`);
+}
+
+// ---- Channel Switching / Watch State (40.3) ----
+
+export async function switchLiveTvChannel(
+  channelId: string,
+  opts: { device?: string; resume?: boolean } = {}
+): Promise<{
+  channel: LiveTvChannel;
+  resumed_at_seconds: number;
+  previous_channel_id: string | null;
+}> {
+  return request(`/api/v1/videos/live-tv/switch/${channelId}`, {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export async function getLiveTvState(): Promise<{ state: LiveTvWatchState | null }> {
+  return request('/api/v1/videos/live-tv/state');
+}
+
+export async function updateLiveTvPosition(
+  position_seconds: number
+): Promise<{ updated: boolean }> {
+  return request('/api/v1/videos/live-tv/state/position', {
+    method: 'PATCH',
+    body: JSON.stringify({ position_seconds }),
+  });
+}
+
+export async function clearLiveTvState(): Promise<{ cleared: boolean }> {
+  return request('/api/v1/videos/live-tv/state', { method: 'DELETE' });
+}
+
+export async function listRecentLiveTvChannels(
+  limit = 10
+): Promise<{ recent: LiveTvRecentChannel[]; count: number }> {
+  return request(`/api/v1/videos/live-tv/recent?limit=${limit}`);
+}
+
+// ---- Imports (40.13, 40.14) ----
+
+export async function importLiveTvM3U(
+  playlist: string,
+  opts: {
+    replace_existing?: boolean;
+    skip_duplicates_by_url?: boolean;
+    default_category?: string | null;
+    is_public?: boolean;
+  } = {}
+): Promise<{
+  parsed: number;
+  inserted: number;
+  skipped: number;
+  errors: string[];
+}> {
+  return request('/api/v1/videos/live-tv/import/m3u', {
+    method: 'POST',
+    body: JSON.stringify({ playlist, ...opts }),
+  });
+}
+
+export async function importLiveTvXmltv(
+  xml: string,
+  opts: { replace_programs?: boolean } = {}
+): Promise<{
+  channels_parsed: number;
+  programs_parsed: number;
+  channels_upserted: number;
+  programs_inserted: number;
+  programs_skipped: number;
+  errors: string[];
+}> {
+  return request('/api/v1/videos/live-tv/import/xmltv', {
+    method: 'POST',
+    body: JSON.stringify({ xml, ...opts }),
+  });
+}
