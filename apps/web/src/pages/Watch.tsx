@@ -331,6 +331,10 @@ export default function Watch({ onSignIn }: Props) {
                 startTime={resumeAt}
                 seekTo={seekTarget}
                 videoId={video.id}
+                mediaTitle={video.title}
+                mediaArtist={channel?.name ?? video.channel_id ?? "MelodyFlix"}
+                mediaArtwork={poster}
+                mediaAlbum="MelodyFlix"
             onEnded={handleVideoEnded}
                 onStateChange={(s) => { lastPlayerStateRef.current = s; setCurrentTime(s.currentTime); }}
               />
@@ -516,6 +520,10 @@ export default function Watch({ onSignIn }: Props) {
                 <span style={{ fontSize: 13, color: '#606060' }}>Rate:</span>
                 <StarRating
                   videoId={video.id}
+                  mediaTitle={video.title}
+                  mediaArtist={channel?.name ?? video.channel_id ?? "MelodyFlix"}
+                  mediaArtwork={poster}
+                  mediaAlbum="MelodyFlix"
                   onSignIn={onSignIn}
                   onToast={showToast}
                   size={18}
@@ -545,6 +553,10 @@ export default function Watch({ onSignIn }: Props) {
 
               <VideoPoll
                 videoId={video.id}
+                mediaTitle={video.title}
+                mediaArtist={channel?.name ?? video.channel_id ?? "MelodyFlix"}
+                mediaArtwork={poster}
+                mediaAlbum="MelodyFlix"
                 videoOwnerId={video.owner_id}
                 onSignIn={onSignIn}
                 onToast={showToast}
@@ -552,6 +564,10 @@ export default function Watch({ onSignIn }: Props) {
 
               <VideoQuiz
                 videoId={video.id}
+                mediaTitle={video.title}
+                mediaArtist={channel?.name ?? video.channel_id ?? "MelodyFlix"}
+                mediaArtwork={poster}
+                mediaAlbum="MelodyFlix"
                 videoOwnerId={video.owner_id}
                 onSignIn={onSignIn}
                 onToast={showToast}
@@ -588,6 +604,10 @@ export default function Watch({ onSignIn }: Props) {
 
           <Chapters
             videoId={video.id}
+            mediaTitle={video.title}
+            mediaArtist={channel?.name ?? video.channel_id ?? "MelodyFlix"}
+            mediaArtwork={poster}
+            mediaAlbum="MelodyFlix"
             currentTime={currentTime}
             onSeek={(s) => { seekNonceRef.current += 1; setSeekTarget({ time: s, nonce: seekNonceRef.current }); }}
           />
@@ -627,6 +647,10 @@ export default function Watch({ onSignIn }: Props) {
       {showPlaylistModal && video && (
         <SaveToPlaylistModal
           videoId={video.id}
+          mediaTitle={video.title}
+          mediaArtist={channel?.name ?? video.channel_id ?? "MelodyFlix"}
+          mediaArtwork={poster}
+          mediaAlbum="MelodyFlix"
           onClose={() => setShowPlaylistModal(false)}
           onToast={showToast}
         />
@@ -636,6 +660,10 @@ export default function Watch({ onSignIn }: Props) {
         <div className="mf-transcript-overlay">
           <TranscriptPanel
             videoId={video.id}
+            mediaTitle={video.title}
+            mediaArtist={channel?.name ?? video.channel_id ?? "MelodyFlix"}
+            mediaArtwork={poster}
+            mediaAlbum="MelodyFlix"
             currentTime={currentTime}
             onSeek={(sec) => setSeekTarget({ time: sec, nonce: seekNonceRef.current += 1 })}
           />
@@ -650,6 +678,10 @@ export default function Watch({ onSignIn }: Props) {
       {showClipModal && video && (
         <ClipModal
           videoId={video.id}
+          mediaTitle={video.title}
+          mediaArtist={channel?.name ?? video.channel_id ?? "MelodyFlix"}
+          mediaArtwork={poster}
+          mediaAlbum="MelodyFlix"
           videoTitle={video.title}
           currentTime={currentTime}
           videoDuration={Number(video.duration_seconds) || 0}

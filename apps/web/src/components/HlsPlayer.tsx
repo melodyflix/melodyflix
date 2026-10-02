@@ -18,6 +18,11 @@ interface Props {
   onEnded?: () => void;
   videoId?: string;
   subtitlesEnabled?: boolean;
+  // Media Session metadata (45.2)
+  mediaTitle?: string;
+  mediaArtist?: string;
+  mediaArtwork?: string;
+  mediaAlbum?: string;
 }
 
 type QualityLevel = { index: number; height: number; bitrate: number };
@@ -25,7 +30,7 @@ type QualityLevel = { index: number; height: number; bitrate: number };
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 const SLEEP_OPTIONS = [10, 20, 30, 60, 120];
 
-export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateChange, onEnded, videoId, subtitlesEnabled = true }: Props) {
+export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateChange, onEnded, videoId, subtitlesEnabled = true, mediaTitle, mediaArtist, mediaArtwork, mediaAlbum }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<any>(null);
   const [error, setError] = useState('');
@@ -386,6 +391,91 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
     : (currentLevelObj?.height ? `${currentLevelObj.height}p` : 'Auto');
 
   const abActive = aPoint !== null && bPoint !== null;
+
+  // ============ Media Session API (45.2 Background Audio) ============
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    const v = videoRef.current;
+    if (!v) return;
+    const ms = (navigator as any).mediaSession as MediaSession;
+
+    // Metadata
+    try {
+      const artwork: MediaImage[] = [];
+      if (mediaArtwork) {
+        artwork.push({ src: mediaArtwork, sizes: '512x512', type: 'image/jpeg' });
+        artwork.push({ src: mediaArtwork, sizes: '256x256', type: 'image/jpeg' });
+      } else if (poster) {
+        artwork.push({ src: poster, sizes: '512x512' });
+      }
+      ms.metadata = new (window as any).MediaMetadata({
+        title: mediaTitle ?? 'MelodyFlix',
+        artist: mediaArtist ?? 'MelodyFlix',
+        album: mediaAlbum ?? 'MelodyFlix',
+        artwork,
+      });
+    } catch {}
+
+    // Action handlers
+    const setHandler = (action: MediaSessionAction, fn: MediaSessionActionHandler) => {
+      try { ms.setActionHandler(action, fn); } catch {}
+    };
+
+    setHandler('play', () => { v.play().catch(() => {}); });
+    setHandler('pause', () => { v.pause(); });
+    setHandler('seekbackward', (d) => {
+      v.currentTime = Math.max(v.currentTime - (d?.seekOffset ?? 10), 0);
+    });
+    setHandler('seekforward', (d) => {
+      v.currentTime = Math.min(v.currentTime + (d?.seekOffset ?? 10), v.duration || 0);
+    });
+    setHandler('seekto', (d) => {
+      if (typeof d?.seekTime === 'number') v.currentTime = d.seekTime;
+    });
+    setHandler('stop', () => {
+      v.pause();
+      v.currentTime = 0;
+    });
+
+    // Update playback state + position
+    const onPlay = () => { try { ms.playbackState = 'playing'; } catch {} };
+    const onPause = () => { try { ms.playbackState = 'paused'; } catch {} };
+    const onEndedEv = () => { try { ms.playbackState = 'none'; } catch {} };
+    v.addEventListener('play', onPlay);
+    v.addEventListener('pause', onPause);
+    v.addEventListener('ended', onEndedEv);
+
+    // Periodic position state sync
+    const syncPos = () => {
+      try {
+        if (!v.duration || !isFinite(v.duration)) return;
+        if (typeof (ms as any).setPositionState === 'function') {
+          (ms as any).setPositionState({
+            duration: v.duration,
+            playbackRate: v.playbackRate,
+            position: Math.max(0, Math.min(v.currentTime, v.duration)),
+          });
+        }
+      } catch {}
+    };
+    const posInt = window.setInterval(syncPos, 2000);
+    syncPos();
+
+    return () => {
+      v.removeEventListener('play', onPlay);
+      v.removeEventListener('pause', onPause);
+      v.removeEventListener('ended', onEndedEv);
+      window.clearInterval(posInt);
+      try {
+        ms.setActionHandler('play', null);
+        ms.setActionHandler('pause', null);
+        ms.setActionHandler('seekbackward', null);
+        ms.setActionHandler('seekforward', null);
+        ms.setActionHandler('seekto', null);
+        ms.setActionHandler('stop', null);
+      } catch {}
+    };
+  }, [mediaTitle, mediaArtist, mediaArtwork, mediaAlbum, poster]);
 
   // ============ Gesture Controls ============
   function showGesture(fb: { type: 'seek-fwd' | 'seek-back' | 'volume' | 'brightness' | 'play' | 'pause'; value?: number }) {
