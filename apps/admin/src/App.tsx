@@ -12,9 +12,10 @@ import AdminSupport from './pages/AdminSupport';
 import EmailSettings from './pages/EmailSettings';
 import AdminEmail from './pages/AdminEmail';
 import VideoChapters from './pages/VideoChapters';
+import AdminCampaigns from './pages/AdminCampaigns';
 import { api, getToken, clearToken, type User } from './lib/api';
 
-type Page = 'dashboard' | 'channels' | 'videos' | 'chapters' | 'users' | 'reports' | 'ads' | 'payments' | 'support' | 'email' | 'settings';
+type Page = 'dashboard' | 'channels' | 'videos' | 'chapters' | 'users' | 'reports' | 'ads' | 'payments' | 'support' | 'email' | 'campaigns' | 'settings';
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState<boolean>(!!getToken());
@@ -49,6 +50,7 @@ export default function App() {
     { key: 'support', label: 'Support', icon: '🎫' },
     { key: 'email', label: 'Email', icon: '📧' },
     { key: 'email', label: 'Email', icon: '📧' },
+    { key: 'campaigns', label: 'Campaigns', icon: '📨' },
     { key: 'settings', label: 'Settings', icon: '⚙️' },
   ];
 
@@ -107,6 +109,7 @@ export default function App() {
           {page === 'support' && <AdminSupport />}
           {page === 'email' && <EmailSettings />}
           {page === 'email' && <AdminEmail />}
+          {page === 'campaigns' && <AdminCampaigns />}
           {page === 'settings' && <Settings />}
         </main>
       </div>

@@ -585,18 +585,107 @@ export async function getEmailLogs(limit = 100): Promise<{ logs: EmailLog[] }> {
   return request<{ logs: EmailLog[] }>(`/api/admin/email/logs?limit=${limit}`);
 }
 
-export interface SmtpSettings { id: number; host: string; port: number; secure: number; username: string; password: string; from_name: string; from_email: string; enabled: number; updated_at: string; }
-export interface EmailLog { id: string; user_id: string | null; to_email: string; subject: string; status: string; error: string | null; created_at: string; }
 
-export async function getSmtpSettings(): Promise<SmtpSettings | null> {
-  return request<SmtpSettings | null>('/api/admin/email/smtp');
+// ============ Email Campaigns (27.1) ============
+export type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled' | 'failed';
+export type AudienceType = 'all' | 'verified' | 'unverified' | 'subscribers' | 'inactive';
+
+export interface EmailCampaign {
+  id: string;
+  title: string;
+  subject: string;
+  body_html: string;
+  body_text: string | null;
+  audience: AudienceType;
+  status: CampaignStatus;
+  scheduled_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  total_recipients: number;
+  sent_count: number;
+  failed_count: number;
+  open_count: number;
+  click_count: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 }
-export async function saveSmtpSettings(input: any): Promise<SmtpSettings> {
-  return request<SmtpSettings>('/api/admin/email/smtp', { method: 'POST', body: JSON.stringify(input) });
+
+export interface AudienceInfo {
+  id: AudienceType;
+  label: string;
+  desc: string;
+  size: number;
 }
-export async function sendTestEmail(to: string): Promise<{ sent: boolean }> {
-  return request<{ sent: boolean }>('/api/admin/email/test', { method: 'POST', body: JSON.stringify({ to }) });
+
+export interface CampaignStats {
+  total: number;
+  sent: number;
+  failed: number;
+  pending: number;
+  open_count: number;
+  click_count: number;
+  open_rate: number;
+  click_rate: number;
 }
-export async function getEmailLogs(): Promise<{ logs: EmailLog[] }> {
-  return request<{ logs: EmailLog[] }>('/api/admin/email/logs');
+
+export interface CampaignRecipient {
+  id: string;
+  campaign_id: string;
+  user_id: string;
+  email: string;
+  status: string;
+  error: string | null;
+  sent_at: string | null;
+  opened_at: string | null;
+  clicked_at: string | null;
 }
+
+export interface CampaignInput {
+  title: string;
+  subject: string;
+  body_html: string;
+  body_text?: string | null;
+  audience?: AudienceType;
+}
+
+export async function listCampaigns(limit = 50): Promise<{ campaigns: EmailCampaign[] }> {
+  return request<{ campaigns: EmailCampaign[] }>(`/api/v1/auth/campaigns?limit=${limit}`);
+}
+
+export async function getCampaign(id: string): Promise<{ campaign: EmailCampaign; stats: CampaignStats }> {
+  return request<{ campaign: EmailCampaign; stats: CampaignStats }>(`/api/v1/auth/campaigns/${id}`);
+}
+
+export async function createCampaign(input: CampaignInput): Promise<{ campaign: EmailCampaign }> {
+  return request<{ campaign: EmailCampaign }>('/api/v1/auth/campaigns', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateCampaign(id: string, patch: Partial<CampaignInput> & { status?: CampaignStatus; scheduled_at?: string | null }): Promise<{ campaign: EmailCampaign }> {
+  return request<{ campaign: EmailCampaign }>(`/api/v1/auth/campaigns/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function deleteCampaign(id: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/auth/campaigns/${id}`, { method: 'DELETE' });
+}
+
+export async function sendCampaign(id: string): Promise<{ total: number; sent: number; failed: number }> {
+  return request<{ total: number; sent: number; failed: number }>(`/api/v1/auth/campaigns/${id}/send`, {
+    method: 'POST',
+  });
+}
+
+export async function listCampaignRecipients(id: string, limit = 200): Promise<{ recipients: CampaignRecipient[] }> {
+  return request<{ recipients: CampaignRecipient[] }>(`/api/v1/auth/campaigns/${id}/recipients?limit=${limit}`);
+}
+
+export async function listAudiences(): Promise<{ audiences: AudienceInfo[] }> {
+  return request<{ audiences: AudienceInfo[] }>('/api/v1/auth/campaigns/audiences');
+}
+
