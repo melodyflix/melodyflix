@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { listVideoSubtitles, type SubtitleTrack } from '../lib/api';
+import { listVideoSubtitles, type SubtitleTrack, listVideoAudioTracks, setAudioTrackPreference, type AudioTrack } from '../lib/api';
 import { useAudioEngine, type AudioEngineSettings } from './useAudioEngine';
 import AudioSettings from './AudioSettings';
 
@@ -94,6 +94,8 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
     } catch { return {}; }
   });
   const [showAudioPanel, setShowAudioPanel] = useState(false);
+  const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
+  const [activeAudioTrack, setActiveAudioTrack] = useState<string | null>(null);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -165,6 +167,17 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
     };
   }, [src]);
 
+  // Fetch audio tracks for this video
+  useEffect(() => {
+    if (!videoId) return;
+    listVideoAudioTracks(videoId)
+      .then((res) => {
+        setAudioTracks(res.tracks);
+        setActiveAudioTrack(res.preference ?? res.defaultTrack ?? null);
+      })
+      .catch(() => setAudioTracks([]));
+  }, [videoId]);
+
   // Persist audio settings
   useEffect(() => {
     try { localStorage.setItem('mf-audio-settings', JSON.stringify(audioSettings)); } catch {}
@@ -172,6 +185,13 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
 
   function updateAudioSettings(patch: Partial<AudioEngineSettings>) {
     setAudioSettings((prev) => ({ ...prev, ...patch }));
+  }
+
+  async function handleSelectAudioTrack(trackId: string) {
+    setActiveAudioTrack(trackId);
+    if (videoId) {
+      try { await setAudioTrackPreference(videoId, trackId); } catch {}
+    }
   }
 
   // Hook up Web Audio engine (builds graph lazily on first play)
@@ -641,6 +661,9 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
           settings={audioSettings}
           onChange={updateAudioSettings}
           onClose={() => setShowAudioPanel(false)}
+          audioTracks={audioTracks.map((t) => ({ id: t.id, label: t.label, lang: t.language }))}
+          activeAudioTrack={activeAudioTrack ?? undefined}
+          onSelectAudioTrack={handleSelectAudioTrack}
         />
       )}
 

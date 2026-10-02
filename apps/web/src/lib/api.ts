@@ -532,6 +532,58 @@ export async function getVideosByGenre(genre: string, limit = 60): Promise<{ vid
 
 
 
+
+// ============ Audio Track Selector (45.8) ============
+export interface AudioTrack {
+  id: string;
+  video_id: string;
+  language: string;
+  label: string;
+  kind: string;
+  is_default: number;
+  order_index: number;
+  created_at: string;
+}
+
+export interface AudioTrackResponse {
+  tracks: AudioTrack[];
+  preference: string | null;
+  defaultTrack: string | null;
+}
+
+export async function listVideoAudioTracks(videoId: string): Promise<AudioTrackResponse> {
+  return request<AudioTrackResponse>(`/api/v1/videos/${videoId}/audio-tracks`);
+}
+
+export async function addVideoAudioTrack(
+  videoId: string,
+  input: { language: string; label?: string; kind?: string; is_default?: boolean },
+): Promise<{ track: AudioTrack }> {
+  return request<{ track: AudioTrack }>(`/api/v1/videos/${videoId}/audio-tracks`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function setDefaultAudioTrack(trackId: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/api/v1/videos/audio-tracks/${trackId}/set-default`, {
+    method: 'POST',
+  });
+}
+
+export async function deleteAudioTrack(trackId: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/videos/audio-tracks/${trackId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function setAudioTrackPreference(videoId: string, trackId: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/api/v1/videos/${videoId}/audio-tracks/preference`, {
+    method: 'POST',
+    body: JSON.stringify({ track_id: trackId }),
+  });
+}
+
 // ============ Video Transcript (Section 35) ============
 export interface TranscriptCue {
   index: number;
