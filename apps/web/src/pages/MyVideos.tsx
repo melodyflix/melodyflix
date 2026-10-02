@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import TagEditor from '../components/TagEditor';
+import GenreEditor from '../components/GenreEditor';
+import CastCrewEditor from '../components/CastCrewEditor';
 import {
   listMyVideos, updateVideo, deleteVideo, getCachedUser,
   formatDuration, formatViews, timeAgo,
@@ -17,6 +20,7 @@ export default function MyVideos({ onSignIn }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState<Video | null>(null);
+  const [editTab, setEditTab] = useState<'basic' | 'tags' | 'genres' | 'credits'>('basic');
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
   const [editVis, setEditVis] = useState<'public' | 'unlisted' | 'private'>('public');
@@ -305,7 +309,39 @@ export default function MyVideos({ onSignIn }: Props) {
             onClick={(e) => e.stopPropagation()}
             style={{ maxWidth: 520 }}
           >
-            <h2 style={{ fontSize: 18, marginBottom: 20 }}>Edit video</h2>
+            <h2 style={{ fontSize: 18, marginBottom: 14 }}>Edit video</h2>
+
+            {/* Tab bar */}
+            <div style={{ display: 'flex', gap: 4, marginBottom: 18, borderBottom: '1px solid #e5e5e5', paddingBottom: 0 }}>
+              {([
+                { id: 'basic', label: '📝 Basic' },
+                { id: 'tags', label: '🏷️ Tags' },
+                { id: 'genres', label: '🎬 Genres' },
+                { id: 'credits', label: '🎭 Cast & Crew' },
+              ] as const).map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setEditTab(t.id)}
+                  style={{
+                    padding: '8px 14px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: editTab === t.id ? '2px solid #065fd4' : '2px solid transparent',
+                    color: editTab === t.id ? '#065fd4' : '#606060',
+                    fontWeight: editTab === t.id ? 600 : 400,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    marginBottom: -1,
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {editTab === 'basic' && (
             <form onSubmit={handleSaveEdit}>
               <div className="mf-form-group">
                 <label className="mf-label">Title</label>
@@ -359,6 +395,55 @@ export default function MyVideos({ onSignIn }: Props) {
                 </button>
               </div>
             </form>
+            )}
+
+            {editTab === 'tags' && editing && (
+              <div>
+                <TagEditor videoId={editing.id} onToast={(m) => alert(m)} />
+                <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+                  <button
+                    type="button"
+                    className="mf-btn-secondary"
+                    style={{ flex: 1 }}
+                    onClick={() => setEditing(null)}
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {editTab === 'genres' && editing && (
+              <div>
+                <GenreEditor videoId={editing.id} onToast={(m) => alert(m)} />
+                <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+                  <button
+                    type="button"
+                    className="mf-btn-secondary"
+                    style={{ flex: 1 }}
+                    onClick={() => setEditing(null)}
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {editTab === 'credits' && editing && (
+              <div>
+                <CastCrewEditor videoId={editing.id} onToast={(m) => alert(m)} />
+                <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+                  <button
+                    type="button"
+                    className="mf-btn-secondary"
+                    style={{ flex: 1 }}
+                    onClick={() => setEditing(null)}
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
