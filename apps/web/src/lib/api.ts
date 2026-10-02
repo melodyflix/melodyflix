@@ -528,6 +528,85 @@ export async function getVideosByGenre(genre: string, limit = 60): Promise<{ vid
   return request<{ videos: any[] }>(`/api/v1/videos/genres/${encodeURIComponent(genre)}/videos?limit=${limit}`);
 }
 
+
+// ============ Video Subtitles ============
+export interface SubtitleTrack {
+  id: string;
+  video_id: string;
+  language: string;
+  label: string;
+  format: 'srt' | 'vtt';
+  kind: 'subtitles' | 'captions';
+  is_default: number;
+  created_at: string;
+}
+
+export interface SubtitleTrackWithContent extends SubtitleTrack {
+  content: string;
+}
+
+export interface SubtitleUploadInput {
+  language: string;
+  label: string;
+  format: 'srt' | 'vtt';
+  kind?: 'subtitles' | 'captions';
+  content: string;
+  is_default?: boolean;
+}
+
+export const SUBTITLE_LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'bn', label: 'বাংলা (Bangla)' },
+  { code: 'hi', label: 'हिन्दी (Hindi)' },
+  { code: 'ar', label: 'العربية (Arabic)' },
+  { code: 'es', label: 'Español' },
+  { code: 'fr', label: 'Français' },
+  { code: 'pt', label: 'Português' },
+  { code: 'ru', label: 'Русский' },
+  { code: 'zh', label: '中文 (Chinese)' },
+  { code: 'ja', label: '日本語 (Japanese)' },
+  { code: 'ko', label: '한국어 (Korean)' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'it', label: 'Italiano' },
+  { code: 'ur', label: 'اردو (Urdu)' },
+  { code: 'ta', label: 'தமிழ் (Tamil)' },
+  { code: 'te', label: 'తెలుగు (Telugu)' },
+] as const;
+
+export async function listVideoSubtitles(videoId: string): Promise<{ subtitles: SubtitleTrack[] }> {
+  return request<{ subtitles: SubtitleTrack[] }>(`/api/v1/videos/${videoId}/subtitles`);
+}
+
+export async function uploadVideoSubtitle(
+  videoId: string,
+  input: SubtitleUploadInput,
+): Promise<{ track: SubtitleTrackWithContent }> {
+  return request<{ track: SubtitleTrackWithContent }>(`/api/v1/videos/${videoId}/subtitles`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getSubtitleRaw(trackId: string): Promise<{ track: SubtitleTrackWithContent }> {
+  return request<{ track: SubtitleTrackWithContent }>(`/api/v1/videos/subtitles/${trackId}/raw`);
+}
+
+export async function setDefaultSubtitle(trackId: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/api/v1/videos/subtitles/${trackId}/set-default`, {
+    method: 'POST',
+  });
+}
+
+export async function deleteSubtitleTrack(trackId: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/videos/subtitles/${trackId}`, {
+    method: 'DELETE',
+  });
+}
+
+export function subtitleVttUrl(videoId: string, kind: 'subtitles' | 'captions' = 'subtitles'): string {
+  return `/api/v1/videos/${videoId}/subtitles/default.vtt?kind=${kind}`;
+}
+
 // ============ Video Tags & Hashtags ============
 export interface VideoTag {
   id: string;
