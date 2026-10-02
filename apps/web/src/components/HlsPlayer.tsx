@@ -52,6 +52,30 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
   // Sleep timer
   const [sleepEndAt, setSleepEndAt] = useState<number | null>(null);
   const [sleepRemaining, setSleepRemaining] = useState<number | null>(null);
+  // Gesture controls state
+  const [gestureFeedback, setGestureFeedback] = useState<{
+    type: 'seek-fwd' | 'seek-back' | 'volume' | 'brightness' | 'play' | 'pause';
+    value?: number;
+    visible: boolean;
+  } | null>(null);
+  const gestureRef = useRef<{
+    startX: number;
+    startY: number;
+    startTime: number;
+    startVolume: number;
+    startBrightness: number;
+    side: 'left' | 'right' | null;
+    mode: 'none' | 'seek' | 'volume' | 'brightness';
+    lastTap: number;
+    initialTime: number;
+    moved: boolean;
+  }>({
+    startX: 0, startY: 0, startTime: 0,
+    startVolume: 1, startBrightness: 1,
+    side: null, mode: 'none',
+    lastTap: 0, initialTime: 0, moved: false,
+  });
+  const [brightness, setBrightness] = useState(1);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -330,16 +354,172 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
 
   const abActive = aPoint !== null && bPoint !== null;
 
+  // ============ Gesture Controls ============
+  function showGesture(fb: { type: 'seek-fwd' | 'seek-back' | 'volume' | 'brightness' | 'play' | 'pause'; value?: number }) {
+    setGestureFeedback({ ...fb, visible: true });
+    window.clearTimeout((showGesture as any)._t);
+    (showGesture as any)._t = window.setTimeout(() => {
+      setGestureFeedback((g) => g ? { ...g, visible: false } : null);
+    }, 600);
+  }
+
+  function onTouchStart(e: React.TouchEvent<HTMLDivElement>) {
+    const v = videoRef.current;
+    if (!v) return;
+    const t = e.touches[0];
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const relX = (t.clientX - rect.left) / rect.width;
+    const now = Date.now();
+
+    gestureRef.current.startX = t.clientX;
+    gestureRef.current.startY = t.clientY;
+    gestureRef.current.startTime = now;
+    gestureRef.current.startVolume = v.volume;
+    gestureRef.current.startBrightness = brightness;
+    gestureRef.current.initialTime = v.currentTime;
+    gestureRef.current.side = relX < 0.5 ? 'left' : 'right';
+    gestureRef.current.mode = 'none';
+    gestureRef.current.moved = false;
+
+    // Detect double-tap
+    const timeSinceLast = now - gestureRef.current.lastTap;
+    if (timeSinceLast < 300) {
+      // Double tap
+      const jump = 10;
+      if (relX < 0.5) {
+        v.currentTime = Math.max(v.currentTime - jump, 0);
+        showGesture({ type: 'seek-back', value: jump });
+      } else {
+        v.currentTime = Math.min(v.currentTime + jump, v.duration || 0);
+        showGesture({ type: 'seek-fwd', value: jump });
+      }
+      gestureRef.current.lastTap = 0; // Reset to avoid triple-tap
+      e.preventDefault();
+      return;
+    }
+    gestureRef.current.lastTap = now;
+  }
+
+  function onTouchMove(e: React.TouchEvent<HTMLDivElement>) {
+    const v = videoRef.current;
+    if (!v) return;
+    const t = e.touches[0];
+    const dx = t.clientX - gestureRef.current.startX;
+    const dy = t.clientY - gestureRef.current.startY;
+
+    // Determine mode on first significant movement
+    if (gestureRef.current.mode === 'none' && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+      if (Math.abs(dx) > Math.abs(dy)) {
+        gestureRef.current.mode = 'seek';
+      } else {
+        gestureRef.current.mode = gestureRef.current.side === 'left' ? 'brightness' : 'volume';
+      }
+      gestureRef.current.moved = true;
+    }
+
+    if (gestureRef.current.mode === 'seek') {
+      e.preventDefault();
+      const secondsPerPx = (v.duration || 60) / 400;
+      const delta = dx * secondsPerPx;
+      const target = Math.max(0, Math.min(v.duration || 0, gestureRef.current.initialTime + delta));
+      v.currentTime = target;
+      showGesture({ type: delta >= 0 ? 'seek-fwd' : 'seek-back', value: Math.abs(Math.round(delta)) });
+    } else if (gestureRef.current.mode === 'volume') {
+      e.preventDefault();
+      const delta = -dy / 200;
+      v.volume = Math.max(0, Math.min(1, gestureRef.current.startVolume + delta));
+      showGesture({ type: 'volume', value: Math.round(v.volume * 100) });
+    } else if (gestureRef.current.mode === 'brightness') {
+      e.preventDefault();
+      const delta = -dy / 200;
+      const newB = Math.max(0.2, Math.min(1, gestureRef.current.startBrightness + delta));
+      setBrightness(newB);
+      showGesture({ type: 'brightness', value: Math.round(newB * 100) });
+    }
+  }
+
+  function onTouchEnd(e: React.TouchEvent<HTMLDivElement>) {
+    const v = videoRef.current;
+    if (!v) return;
+    // Single tap (no movement, not double-tap) → toggle play/pause
+    if (!gestureRef.current.moved && gestureRef.current.mode === 'none') {
+      // Only trigger if lastTap was not recent enough for double-tap
+      const timeSinceStart = Date.now() - gestureRef.current.startTime;
+      if (timeSinceStart < 250) {
+        if (v.paused) {
+          v.play().catch(() => {});
+          showGesture({ type: 'play' });
+        } else {
+          v.pause();
+          showGesture({ type: 'pause' });
+        }
+      }
+    }
+    gestureRef.current.mode = 'none';
+    gestureRef.current.moved = false;
+  }
+
   return (
-    <div className="mf-player">
+    <div
+      className="mf-player"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      style={{ touchAction: 'pan-y' }}
+    >
       <video
         ref={videoRef}
         controls
         poster={poster}
         playsInline
         preload="metadata"
-        style={{ width: '100%', height: '100%', display: 'block' }}
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'block',
+          filter: brightness !== 1 ? `brightness(${brightness})` : undefined,
+        }}
       />
+
+      {/* Gesture feedback overlay */}
+      {gestureFeedback && gestureFeedback.visible && (
+        <div className="mf-gesture-feedback">
+          {gestureFeedback.type === 'seek-fwd' && (
+            <div className="mf-gesture-bubble">
+              <span style={{ fontSize: 22 }}>⏩</span>
+              <span>{gestureFeedback.value}s</span>
+            </div>
+          )}
+          {gestureFeedback.type === 'seek-back' && (
+            <div className="mf-gesture-bubble">
+              <span style={{ fontSize: 22 }}>⏪</span>
+              <span>{gestureFeedback.value}s</span>
+            </div>
+          )}
+          {gestureFeedback.type === 'volume' && (
+            <div className="mf-gesture-bubble">
+              <span style={{ fontSize: 22 }}>{gestureFeedback.value === 0 ? '🔇' : '🔊'}</span>
+              <span>{gestureFeedback.value}%</span>
+            </div>
+          )}
+          {gestureFeedback.type === 'brightness' && (
+            <div className="mf-gesture-bubble">
+              <span style={{ fontSize: 22 }}>☀️</span>
+              <span>{gestureFeedback.value}%</span>
+            </div>
+          )}
+          {gestureFeedback.type === 'play' && (
+            <div className="mf-gesture-bubble mf-gesture-center">
+              <span style={{ fontSize: 40 }}>▶️</span>
+            </div>
+          )}
+          {gestureFeedback.type === 'pause' && (
+            <div className="mf-gesture-bubble mf-gesture-center">
+              <span style={{ fontSize: 40 }}>⏸️</span>
+            </div>
+          )}
+        </div>
+      )}
       {error && <div className="mf-player-status">⚠️ {error}</div>}
 
       {/* Top-right controls */}
