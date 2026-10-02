@@ -18,6 +18,10 @@ import {
   checkAccess, setChannelAgeRating,
   postLiveTvChat, listLiveTvChat, deleteLiveTvChat, hideLiveTvChat,
   reportLiveTvChat, countRecentChat, getChatMessageChannelOwner,
+  scheduleRecording, getRecording, listRecordings, cancelRecording,
+  deleteRecording, getDueRecordings, getExpiredRecordings,
+  markRecordingStarted, markRecordingCompleted, markRecordingFailed,
+  setRecordingFilePath, recordingStats,
 } from '../services/livetv.service.js';
 
 const CreateSchema = z.object({
@@ -699,6 +703,142 @@ export async function liveTvRoutes(app: FastifyInstance) {
     if (owner.owner_id !== me) return reply.code(403).send({ success: false, error: 'Not your channel' });
     const ok = hideLiveTvChat(id);
     return reply.send({ success: true, data: { hidden: ok } });
+  });
+
+
+  // ---- Live TV Recording / DVR (40.4) ----
+
+  const ScheduleRecordingSchema = z.object({
+    channel_id: z.string().min(1),
+    title: z.string().max(200).optional(),
+    start_ts: z.string(),
+    stop_ts: z.string(),
+  });
+
+  // GET /live-tv/recordings — list user recordings (owner-scoped)
+  app.get('/live-tv/recordings', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const q = req.query as { status?: string; channel_id?: string; from?: string; to?: string; limit?: string };
+    const recordings = listRecordings({
+      user_id: me,
+      status: q.status as any,
+      channel_id: q.channel_id,
+      from: q.from,
+      to: q.to,
+      limit: q.limit ? parseInt(q.limit) : 100,
+    });
+    return reply.send({ success: true, data: { recordings, count: recordings.length } });
+  });
+
+  // GET /live-tv/recordings/stats — summary
+  app.get('/live-tv/recordings/stats', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    return reply.send({ success: true, data: recordingStats(me) });
+  });
+
+  // GET /live-tv/recordings/due — poller: which are due to start now?
+  // Simple shared-secret check via header to keep it internal-only
+  app.get('/live-tv/recordings/due', async (req, reply) => {
+    const secret = req.headers['x-internal-secret'];
+    const expected = process.env.MELODYFLIX_INTERNAL_SECRET ?? '';
+    if (expected && secret !== expected) {
+      return reply.code(403).send({ success: false, error: 'Forbidden' });
+    }
+    const now = (req.query as { at?: string }).at ?? new Date().toISOString();
+    return reply.send({
+      success: true,
+      data: { due: getDueRecordings(now), expired: getExpiredRecordings(now) },
+    });
+  });
+
+  // GET /live-tv/recordings/:id — single
+  app.get('/live-tv/recordings/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    const rec = getRecording(id);
+    if (!rec) return reply.code(404).send({ success: false, error: 'Recording not found' });
+    if (rec.user_id !== me) return reply.code(403).send({ success: false, error: 'Not your recording' });
+    return reply.send({ success: true, data: { recording: rec } });
+  });
+
+  // POST /live-tv/recordings — schedule
+  app.post('/live-tv/recordings', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const parsed = ScheduleRecordingSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    }
+    try {
+      const rec = scheduleRecording({ ...parsed.data, user_id: me });
+      return reply.code(201).send({ success: true, data: { recording: rec } });
+    } catch (e: any) {
+      return reply.code(400).send({ success: false, error: e?.message ?? 'Schedule failed' });
+    }
+  });
+
+  // POST /live-tv/recordings/:id/cancel
+  app.post('/live-tv/recordings/:id/cancel', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    try {
+      const ok = cancelRecording(id, me);
+      if (!ok) return reply.code(404).send({ success: false, error: 'Not found' });
+      return reply.send({ success: true, data: { cancelled: true } });
+    } catch (e: any) {
+      return reply.code(403).send({ success: false, error: e?.message ?? 'Forbidden' });
+    }
+  });
+
+  // DELETE /live-tv/recordings/:id
+  app.delete('/live-tv/recordings/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    try {
+      const ok = deleteRecording(id, me);
+      if (!ok) return reply.code(404).send({ success: false, error: 'Not found' });
+      return reply.send({ success: true, data: { deleted: true } });
+    } catch (e: any) {
+      return reply.code(403).send({ success: false, error: e?.message ?? 'Forbidden' });
+    }
+  });
+
+  // Internal endpoints for the worker/poller (protected by shared secret)
+  app.post('/live-tv/recordings/:id/started', async (req, reply) => {
+    const secret = req.headers['x-internal-secret'];
+    const expected = process.env.MELODYFLIX_INTERNAL_SECRET ?? '';
+    if (expected && secret !== expected) return reply.code(403).send({ success: false, error: 'Forbidden' });
+    const { id } = req.params as { id: string };
+    const body = req.body as { pid?: number };
+    if (!body?.pid) return reply.code(400).send({ success: false, error: 'pid required' });
+    markRecordingStarted(id, body.pid);
+    return reply.send({ success: true, data: { started: true } });
+  });
+
+  app.post('/live-tv/recordings/:id/completed', async (req, reply) => {
+    const secret = req.headers['x-internal-secret'];
+    const expected = process.env.MELODYFLIX_INTERNAL_SECRET ?? '';
+    if (expected && secret !== expected) return reply.code(403).send({ success: false, error: 'Forbidden' });
+    const { id } = req.params as { id: string };
+    const body = req.body as { file_path?: string; file_size_bytes?: number; duration_seconds?: number };
+    if (body?.file_path) setRecordingFilePath(id, body.file_path);
+    markRecordingCompleted(id, body?.file_size_bytes ?? 0, body?.duration_seconds ?? 0);
+    return reply.send({ success: true, data: { completed: true } });
+  });
+
+  app.post('/live-tv/recordings/:id/failed', async (req, reply) => {
+    const secret = req.headers['x-internal-secret'];
+    const expected = process.env.MELODYFLIX_INTERNAL_SECRET ?? '';
+    if (expected && secret !== expected) return reply.code(403).send({ success: false, error: 'Forbidden' });
+    const { id } = req.params as { id: string };
+    const body = req.body as { error?: string };
+    markRecordingFailed(id, body?.error ?? 'unknown');
+    return reply.send({ success: true, data: { failed: true } });
   });
 
 }

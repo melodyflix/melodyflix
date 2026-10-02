@@ -53,3 +53,7 @@ services/*/src/*.backup-*
 
 # Backup files
 *.bak-*
+
+# DVR recordings (video files — do not commit)
+data/recordings/
+*.mp4

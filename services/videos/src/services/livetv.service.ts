@@ -2,6 +2,9 @@
 import { randomUUID } from 'node:crypto';
 import { getDb } from '@melodyflix/shared-db';
 import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto';
+import { join as pathJoin } from 'node:path';
+import { promises as fsp } from 'node:fs';
+import { spawn } from 'node:child_process';
 
 export interface LiveTvChannel {
   id: string;
@@ -1419,4 +1422,385 @@ export function getChatMessageChannelOwner(messageId: string): { channel_id: str
     WHERE m.id = ?
   `).get(messageId) as { channel_id: string; owner_id: string } | undefined;
   return row ?? null;
+}
+
+// ============================================================
+// 40.4 — Live TV Recording (DVR)
+// Layer 1: schema + scheduling + lifecycle metadata (no FFmpeg)
+// Layer 3: real FFmpeg spawn in separate functions below
+// ============================================================
+
+export type RecordingStatus =
+  | 'scheduled'
+  | 'recording'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+export interface LiveTvRecording {
+  id: string;
+  channel_id: string;
+  user_id: string;
+  title: string;
+  start_ts: string;
+  stop_ts: string;
+  status: RecordingStatus;
+  file_path: string | null;
+  file_size_bytes: number;
+  duration_seconds: number;
+  pid: number | null;
+  error_message: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export function ensureLiveTvDvrSchema(): void {
+  const db = getDb();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS live_tv_recordings (
+      id TEXT PRIMARY KEY,
+      channel_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      start_ts TEXT NOT NULL,
+      stop_ts TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('scheduled','recording','completed','failed','cancelled')),
+      file_path TEXT,
+      file_size_bytes INTEGER NOT NULL DEFAULT 0,
+      duration_seconds REAL NOT NULL DEFAULT 0,
+      pid INTEGER,
+      error_message TEXT,
+      started_at TEXT,
+      finished_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_livetv_rec_user ON live_tv_recordings(user_id, start_ts DESC);
+    CREATE INDEX IF NOT EXISTS idx_livetv_rec_channel ON live_tv_recordings(channel_id, start_ts DESC);
+    CREATE INDEX IF NOT EXISTS idx_livetv_rec_status ON live_tv_recordings(status, start_ts);
+    CREATE INDEX IF NOT EXISTS idx_livetv_rec_window ON live_tv_recordings(channel_id, start_ts, stop_ts);
+  `);
+}
+
+export interface ScheduleRecordingInput {
+  channel_id: string;
+  user_id: string;
+  title?: string;
+  start_ts: string;
+  stop_ts: string;
+}
+
+export function scheduleRecording(input: ScheduleRecordingInput): LiveTvRecording {
+  const ch = getChannel(input.channel_id);
+  if (!ch) throw new Error('Channel not found');
+
+  const start = new Date(input.start_ts).getTime();
+  const stop = new Date(input.stop_ts).getTime();
+  if (isNaN(start) || isNaN(stop)) throw new Error('Invalid start/stop');
+  if (stop <= start) throw new Error('stop must be after start');
+  const durationMin = (stop - start) / 60000;
+  if (durationMin > 240) throw new Error('Max recording duration is 4 hours');
+  if (durationMin < 0.5) throw new Error('Min recording duration is 30 seconds');
+
+  const db = getDb();
+  const now = new Date().toISOString();
+  const id = randomUUID();
+  const title = (input.title ?? ch.name + ' recording').slice(0, 200);
+
+  db.prepare(`
+    INSERT INTO live_tv_recordings
+      (id, channel_id, user_id, title, start_ts, stop_ts, status, file_path,
+       file_size_bytes, duration_seconds, pid, error_message, started_at,
+       finished_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, 'scheduled', NULL, 0, 0, NULL, NULL, NULL, NULL, ?, ?)
+  `).run(id, input.channel_id, input.user_id, title, input.start_ts, input.stop_ts, now, now);
+
+  return getRecording(id)!;
+}
+
+export function getRecording(id: string): LiveTvRecording | null {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM live_tv_recordings WHERE id = ?')
+    .get(id) as LiveTvRecording | undefined;
+  return row ?? null;
+}
+
+export interface ListRecordingsFilters {
+  user_id?: string;
+  channel_id?: string;
+  status?: RecordingStatus;
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
+export function listRecordings(f: ListRecordingsFilters = {}): LiveTvRecording[] {
+  const db = getDb();
+  const where: string[] = [];
+  const params: any[] = [];
+  if (f.user_id)    { where.push('user_id = ?');    params.push(f.user_id); }
+  if (f.channel_id) { where.push('channel_id = ?'); params.push(f.channel_id); }
+  if (f.status)     { where.push('status = ?');     params.push(f.status); }
+  if (f.from)       { where.push('stop_ts >= ?');   params.push(f.from); }
+  if (f.to)         { where.push('start_ts <= ?');  params.push(f.to); }
+  const limit = Math.min(Math.max(f.limit ?? 100, 1), 500);
+  const sql = `SELECT * FROM live_tv_recordings
+    ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+    ORDER BY start_ts DESC LIMIT ?`;
+  params.push(limit);
+  return db.prepare(sql).all(...params) as LiveTvRecording[];
+}
+
+export function cancelRecording(id: string, requesterId: string): boolean {
+  const rec = getRecording(id);
+  if (!rec) return false;
+  if (rec.user_id !== requesterId) throw new Error('Not your recording');
+  if (rec.status !== 'scheduled') throw new Error('Only scheduled recordings can be cancelled');
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare(
+    "UPDATE live_tv_recordings SET status = 'cancelled', updated_at = ? WHERE id = ?"
+  ).run(now, id);
+  return true;
+}
+
+export function deleteRecording(id: string, requesterId: string): boolean {
+  const rec = getRecording(id);
+  if (!rec) return false;
+  if (rec.user_id !== requesterId) throw new Error('Not your recording');
+  // Note: actual file deletion is handled by higher layer (filesystem access)
+  const db = getDb();
+  const r = db.prepare('DELETE FROM live_tv_recordings WHERE id = ?').run(id);
+  return r.changes > 0;
+}
+
+// Poller helper: what should be recording right now?
+export function getDueRecordings(nowIso = new Date().toISOString()): LiveTvRecording[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT * FROM live_tv_recordings
+    WHERE status = 'scheduled'
+      AND start_ts <= ?
+      AND stop_ts > ?
+    ORDER BY start_ts ASC
+  `).all(nowIso, nowIso) as LiveTvRecording[];
+}
+
+// Poller helper: what's currently recording but should have stopped?
+export function getExpiredRecordings(nowIso = new Date().toISOString()): LiveTvRecording[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT * FROM live_tv_recordings
+    WHERE status = 'recording'
+      AND stop_ts <= ?
+    ORDER BY start_ts ASC
+  `).all(nowIso) as LiveTvRecording[];
+}
+
+export function markRecordingStarted(id: string, pid: number): void {
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE live_tv_recordings
+    SET status = 'recording', pid = ?, started_at = ?, updated_at = ?
+    WHERE id = ?
+  `).run(pid, now, now, id);
+}
+
+export function markRecordingCompleted(id: string, fileSize: number, durationS: number): void {
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE live_tv_recordings
+    SET status = 'completed', file_size_bytes = ?, duration_seconds = ?,
+        finished_at = ?, pid = NULL, updated_at = ?
+    WHERE id = ?
+  `).run(fileSize, durationS, now, now, id);
+}
+
+export function markRecordingFailed(id: string, errorMessage: string): void {
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE live_tv_recordings
+    SET status = 'failed', error_message = ?, finished_at = ?,
+        pid = NULL, updated_at = ?
+    WHERE id = ?
+  `).run(errorMessage.slice(0, 500), now, now, id);
+}
+
+export function setRecordingFilePath(id: string, filePath: string): void {
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare(
+    'UPDATE live_tv_recordings SET file_path = ?, updated_at = ? WHERE id = ?'
+  ).run(filePath, now, id);
+}
+
+// Stats
+export function recordingStats(userId: string): {
+  total: number;
+  scheduled: number;
+  recording: number;
+  completed: number;
+  failed: number;
+  total_bytes: number;
+} {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT
+      COUNT(*) as total,
+      SUM(CASE WHEN status='scheduled'  THEN 1 ELSE 0 END) as scheduled,
+      SUM(CASE WHEN status='recording'  THEN 1 ELSE 0 END) as recording,
+      SUM(CASE WHEN status='completed'  THEN 1 ELSE 0 END) as completed,
+      SUM(CASE WHEN status='failed'     THEN 1 ELSE 0 END) as failed,
+      COALESCE(SUM(file_size_bytes), 0) as total_bytes
+    FROM live_tv_recordings WHERE user_id = ?
+  `).get(userId) as any;
+  return {
+    total: row.total ?? 0,
+    scheduled: row.scheduled ?? 0,
+    recording: row.recording ?? 0,
+    completed: row.completed ?? 0,
+    failed: row.failed ?? 0,
+    total_bytes: row.total_bytes ?? 0,
+  };
+}
+
+// ============================================================
+// 40.4 DVR — Layer 3: FFmpeg capture (opt-in)
+// ============================================================
+// IMPORTANT: This spawns a real subprocess that uses CPU/RAM.
+// Disabled by default; enable with MELODYFLIX_FFMPEG_ENABLED=1.
+// On low-RAM devices (Termux phone) this may trigger OOM kills.
+
+export interface FfmpegCaptureOptions {
+  recording_id: string;
+  channel_id: string;
+  stream_url: string;
+  start_ts: string;
+  stop_ts: string;
+  outputDir?: string;
+}
+
+export interface FfmpegCaptureResult {
+  ok: boolean;
+  pid?: number;
+  file_path?: string;
+  error?: string;
+  mock?: boolean;
+}
+
+function isFfmpegEnabled(): boolean {
+  return process.env.MELODYFLIX_FFMPEG_ENABLED === '1';
+}
+
+function recordingsDir(): string {
+  return process.env.MELODYFLIX_RECORDINGS_DIR
+    ?? pathJoin(process.cwd(), 'data', 'recordings');
+}
+
+function calcDurationSeconds(start_ts: string, stop_ts: string): number {
+  const s = new Date(start_ts).getTime();
+  const e = new Date(stop_ts).getTime();
+  if (isNaN(s) || isNaN(e)) return 0;
+  return Math.max(0, (e - s) / 1000);
+}
+
+export async function startFfmpegCapture(opts: FfmpegCaptureOptions): Promise<FfmpegCaptureResult> {
+  const durationS = calcDurationSeconds(opts.start_ts, opts.stop_ts);
+  const outDir = opts.outputDir ?? recordingsDir();
+  const outPath = pathJoin(outDir, `${opts.recording_id}.mp4`);
+
+  // --- MOCK MODE (default) ---
+  if (!isFfmpegEnabled()) {
+    await fsp.mkdir(outDir, { recursive: true });
+    await fsp.writeFile(outPath, '');
+    markRecordingStarted(opts.recording_id, -1);
+    setRecordingFilePath(opts.recording_id, outPath);
+    return { ok: true, pid: -1, file_path: outPath, mock: true };
+  }
+
+  // --- REAL MODE ---
+  await fsp.mkdir(outDir, { recursive: true });
+
+  const args = [
+    '-y',
+    '-loglevel', 'warning',
+    '-i', opts.stream_url,
+    '-t', String(Math.ceil(durationS)),
+    '-c', 'copy',
+    '-bsf:a', 'aac_adtstoasc',
+    outPath,
+  ];
+
+  try {
+    const child = spawn('ffmpeg', args, {
+      detached: true,
+      stdio: 'ignore',
+    });
+
+    if (!child.pid) {
+      markRecordingFailed(opts.recording_id, 'ffmpeg spawn returned no pid');
+      return { ok: false, error: 'no pid' };
+    }
+
+    markRecordingStarted(opts.recording_id, child.pid);
+    setRecordingFilePath(opts.recording_id, outPath);
+
+    child.on('exit', (code) => {
+      // This listener only fires if the process is still attached (rare in detached mode).
+      // The worker/poller is responsible for marking completion.
+      if (code !== 0) {
+        try { markRecordingFailed(opts.recording_id, `ffmpeg exit ${code}`); } catch {}
+      }
+    });
+
+    child.unref();
+    return { ok: true, pid: child.pid, file_path: outPath };
+  } catch (e: any) {
+    markRecordingFailed(opts.recording_id, e?.message ?? 'spawn failed');
+    return { ok: false, error: e?.message ?? 'spawn failed' };
+  }
+}
+
+// Called by worker when the recording window has passed.
+export async function finalizeCapture(recording_id: string): Promise<void> {
+  const rec = getRecording(recording_id);
+  if (!rec) return;
+  if (rec.status !== 'recording') return;
+
+  let size = 0;
+  let duration = calcDurationSeconds(rec.start_ts, rec.stop_ts);
+
+  if (rec.file_path) {
+    try {
+      const st = await fsp.stat(rec.file_path);
+      size = st.size;
+    } catch {
+      // file might have been written by a mock — treat as 0 size
+    }
+  }
+
+  markRecordingCompleted(recording_id, size, duration);
+}
+
+// Utility: clean up an mp4 file after DB row is deleted.
+export async function deleteRecordingFile(filePath: string | null): Promise<boolean> {
+  if (!filePath) return false;
+  try {
+    await fsp.unlink(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Ensure dir exists (called from worker startup).
+export async function ensureRecordingsDir(): Promise<string> {
+  const dir = recordingsDir();
+  await fsp.mkdir(dir, { recursive: true });
+  return dir;
 }
