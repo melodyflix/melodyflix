@@ -689,3 +689,91 @@ export async function listAudiences(): Promise<{ audiences: AudienceInfo[] }> {
   return request<{ audiences: AudienceInfo[] }>('/api/v1/auth/campaigns/audiences');
 }
 
+// ============ Influencer Dashboard (27.3) ============
+export type InfluencerTier = 'bronze' | 'silver' | 'gold' | 'platinum';
+
+export interface Influencer {
+  user_id: string;
+  tier: InfluencerTier;
+  notes: string | null;
+  marked_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InfluencerMetrics {
+  user_id: string;
+  username: string | null;
+  email: string | null;
+  display_name: string | null;
+  tier: InfluencerTier;
+  channel_count: number;
+  subscriber_count: number;
+  video_count: number;
+  total_views: number;
+  total_likes: number;
+  total_comments: number;
+  referral_invited: number;
+  referral_completed: number;
+  referral_earned: number;
+  estimated_earnings: number;
+  engagement_rate: number;
+  created_at: string;
+}
+
+export interface InfluencerListItem extends InfluencerMetrics {
+  marked_at: string;
+  notes: string | null;
+}
+
+export interface CandidateCreator {
+  user_id: string;
+  username: string | null;
+  display_name: string | null;
+  subscriber_count: number;
+  video_count: number;
+  total_views: number;
+  suggested_tier: InfluencerTier;
+  is_influencer: boolean;
+}
+
+export interface TierInfo {
+  id: InfluencerTier;
+  label: string;
+  min_subs: number;
+}
+
+export async function listInfluencerTiers(): Promise<{ tiers: TierInfo[] }> {
+  return request<{ tiers: TierInfo[] }>('/api/v1/auth/admin/influencers/tiers');
+}
+
+export async function listInfluencers(limit = 100): Promise<{ influencers: InfluencerListItem[] }> {
+  return request<{ influencers: InfluencerListItem[] }>(`/api/v1/auth/admin/influencers?limit=${limit}`);
+}
+
+export async function listInfluencerCandidates(minSubs = 1000): Promise<{ candidates: CandidateCreator[] }> {
+  return request<{ candidates: CandidateCreator[] }>(`/api/v1/auth/admin/influencers/candidates?min=${minSubs}`);
+}
+
+export async function getInfluencerDetail(userId: string): Promise<{ influencer: Influencer | null; metrics: InfluencerMetrics }> {
+  return request<{ influencer: Influencer | null; metrics: InfluencerMetrics }>(`/api/v1/auth/admin/influencers/${userId}`);
+}
+
+export async function markInfluencer(userId: string, input: { tier?: InfluencerTier; notes?: string | null } = {}): Promise<{ influencer: Influencer }> {
+  return request<{ influencer: Influencer }>(`/api/v1/auth/admin/influencers/${userId}`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateInfluencerTier(userId: string, tier: InfluencerTier): Promise<{ influencer: Influencer }> {
+  return request<{ influencer: Influencer }>(`/api/v1/auth/admin/influencers/${userId}/tier`, {
+    method: 'PUT',
+    body: JSON.stringify({ tier }),
+  });
+}
+
+export async function unmarkInfluencer(userId: string): Promise<{ unmarked: boolean }> {
+  return request<{ unmarked: boolean }>(`/api/v1/auth/admin/influencers/${userId}`, { method: 'DELETE' });
+}
+

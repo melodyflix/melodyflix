@@ -14,6 +14,8 @@ import { campaignRoutes } from './routes/campaign.route.js';
 import { ensureCampaignSchema } from './services/campaign.service.js';
 import { referralRoutes } from './routes/referral.route.js';
 import { ensureReferralSchema } from './services/referral.service.js';
+import { influencerRoutes } from './routes/influencer.route.js';
+import { ensureInfluencerSchema } from './services/influencer.service.js';
 
 const config = loadConfig();
 const logger = createLogger('auth');
@@ -33,6 +35,7 @@ ensureTwoFASchema();
 ensureEmailSchema();
 ensureCampaignSchema();
 ensureReferralSchema();
+ensureInfluencerSchema();
 logger.info('auth + 2FA + email schema ensured');
 
 await app.register(authRoutes, { prefix: '/api/v1/auth' });
@@ -41,6 +44,7 @@ await app.register(adminRoutes, { prefix: '/api/v1/admin' });
 await app.register(publicUserRoutes, { prefix: '/api/v1/auth' });
 await app.register(campaignRoutes, { prefix: '/api/v1/auth' });
 await app.register(referralRoutes, { prefix: '/api/v1/auth' });
+await app.register(influencerRoutes, { prefix: '/api/v1/auth' });
 
 const PORT = 4001;
 const start = async () => {

@@ -13,9 +13,10 @@ import EmailSettings from './pages/EmailSettings';
 import AdminEmail from './pages/AdminEmail';
 import VideoChapters from './pages/VideoChapters';
 import AdminCampaigns from './pages/AdminCampaigns';
+import AdminInfluencers from './pages/AdminInfluencers';
 import { api, getToken, clearToken, type User } from './lib/api';
 
-type Page = 'dashboard' | 'channels' | 'videos' | 'chapters' | 'users' | 'reports' | 'ads' | 'payments' | 'support' | 'email' | 'campaigns' | 'settings';
+type Page = 'dashboard' | 'channels' | 'videos' | 'chapters' | 'users' | 'reports' | 'ads' | 'payments' | 'support' | 'email' | 'campaigns' | 'influencers' | 'settings';
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState<boolean>(!!getToken());
@@ -51,6 +52,7 @@ export default function App() {
     { key: 'email', label: 'Email', icon: '📧' },
     { key: 'email', label: 'Email', icon: '📧' },
     { key: 'campaigns', label: 'Campaigns', icon: '📨' },
+    { key: 'influencers', label: 'Influencers', icon: '⭐' },
     { key: 'settings', label: 'Settings', icon: '⚙️' },
   ];
 
@@ -110,6 +112,7 @@ export default function App() {
           {page === 'email' && <EmailSettings />}
           {page === 'email' && <AdminEmail />}
           {page === 'campaigns' && <AdminCampaigns />}
+          {page === 'influencers' && <AdminInfluencers />}
           {page === 'settings' && <Settings />}
         </main>
       </div>
