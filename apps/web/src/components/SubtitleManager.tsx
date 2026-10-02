@@ -4,6 +4,7 @@ import {
   setDefaultSubtitle, deleteSubtitleTrack,
   type SubtitleTrack,
 } from '../lib/api';
+import SubtitleEditor from './SubtitleEditor';
 
 interface Props {
   videoId: string;
@@ -18,6 +19,7 @@ export default function SubtitleManager({ videoId, onToast }: Props) {
   const [isDefault, setIsDefault] = useState(false);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
 
   async function load() {
     try {
@@ -114,6 +116,15 @@ export default function SubtitleManager({ videoId, onToast }: Props) {
                 <span className="mf-badge mf-badge-success" style={{ marginLeft: 8, fontSize: 10 }}>Default</span>
               )}
             </span>
+            <button
+              className="mf-btn-text"
+              onClick={() => setEditingTrackId(t.id === editingTrackId ? null : t.id)}
+              disabled={busy}
+              style={{ fontSize: 11, color: '#7c3aed' }}
+              title="Edit cues"
+            >
+              {editingTrackId === t.id ? 'Close editor' : '✏️ Edit cues'}
+            </button>
             {t.is_default !== 1 && (
               <button
                 className="mf-btn-text"
@@ -133,6 +144,15 @@ export default function SubtitleManager({ videoId, onToast }: Props) {
             >×</button>
           </div>
         ))}
+
+        {/* Inline cue editor for active track */}
+        {editingTrackId && tracks.find((t) => t.id === editingTrackId) && (
+          <SubtitleEditor
+            trackId={editingTrackId}
+            onClose={() => setEditingTrackId(null)}
+            onToast={onToast}
+          />
+        )}
         {tracks.length === 0 && (
           <div style={{ fontSize: 12, color: '#909090' }}>No subtitle tracks yet.</div>
         )}

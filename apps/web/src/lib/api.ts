@@ -529,6 +529,25 @@ export async function getVideosByGenre(genre: string, limit = 60): Promise<{ vid
 }
 
 
+
+// ============ Subtitle Editor (38.4) ============
+export interface SubtitleCue {
+  start: number;
+  end: number;
+  text: string;
+}
+
+export async function getSubtitleCues(trackId: string): Promise<{ cues: SubtitleCue[]; track: { id: string; language: string; label: string; kind: string; format: string } }> {
+  return request<{ cues: SubtitleCue[]; track: any }>(`/api/v1/videos/subtitles/${trackId}/cues`);
+}
+
+export async function updateSubtitleCues(trackId: string, cues: SubtitleCue[]): Promise<{ track: SubtitleTrackWithContent }> {
+  return request<{ track: SubtitleTrackWithContent }>(`/api/v1/videos/subtitles/${trackId}/cues`, {
+    method: 'PUT',
+    body: JSON.stringify({ cues }),
+  });
+}
+
 // ============ Video Subtitles ============
 export interface SubtitleTrack {
   id: string;

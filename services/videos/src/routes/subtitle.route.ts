@@ -6,6 +6,7 @@ import { getDb } from '@melodyflix/shared-db';
 import {
   listSubtitles, getSubtitle, uploadSubtitle, deleteSubtitle,
   setDefaultSubtitle, getSubtitleAsVtt, getDefaultSubtitle,
+  getSubtitleCues, updateSubtitleCues,
 } from '../services/subtitle.service.js';
 
 const UploadSchema = z.object({
@@ -15,6 +16,16 @@ const UploadSchema = z.object({
   kind: z.enum(['subtitles', 'captions']).optional(),
   content: z.string().min(1).max(500_000),
   is_default: z.boolean().optional(),
+});
+
+const CueSchema = z.object({
+  start: z.number().min(0),
+  end: z.number().min(0),
+  text: z.string().max(2000),
+});
+
+const CuesUpdateSchema = z.object({
+  cues: z.array(CueSchema).max(5000),
 });
 
 function checkVideoOwner(videoId: string, userId: string): boolean {
@@ -99,6 +110,40 @@ export async function subtitleRoutes(app: FastifyInstance) {
     }
     setDefaultSubtitle(trackId);
     return reply.send({ success: true, data: { ok: true } });
+  });
+
+  // GET /subtitles/:trackId/cues — for editor (owner)
+  app.get('/subtitles/:trackId/cues', { preHandler: [requireAuth] }, async (req, reply) => {
+    const { trackId } = req.params as { trackId: string };
+    const track = getSubtitle(trackId);
+    if (!track) return reply.code(404).send({ success: false, error: 'Not found' });
+    const userId = (req as any).user?.id ?? (req as any).user?.sub;
+    if (!checkVideoOwner(track.video_id, userId)) {
+      return reply.code(403).send({ success: false, error: 'Not your video' });
+    }
+    const cues = getSubtitleCues(trackId) ?? [];
+    return reply.send({ success: true, data: { cues, track: { id: track.id, language: track.language, label: track.label, kind: track.kind, format: track.format } } });
+  });
+
+  // PUT /subtitles/:trackId/cues — save edited cues (owner)
+  app.put('/subtitles/:trackId/cues', { preHandler: [requireAuth] }, async (req, reply) => {
+    const { trackId } = req.params as { trackId: string };
+    const track = getSubtitle(trackId);
+    if (!track) return reply.code(404).send({ success: false, error: 'Not found' });
+    const userId = (req as any).user?.id ?? (req as any).user?.sub;
+    if (!checkVideoOwner(track.video_id, userId)) {
+      return reply.code(403).send({ success: false, error: 'Not your video' });
+    }
+    const parsed = CuesUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid body', errors: parsed.error.issues });
+    }
+    try {
+      const updated = updateSubtitleCues(trackId, parsed.data.cues);
+      return reply.send({ success: true, data: { track: updated } });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
   });
 
   // DELETE /subtitles/:trackId

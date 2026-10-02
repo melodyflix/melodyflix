@@ -196,3 +196,43 @@ export function getSubtitleAsVtt(trackId: string): string | null {
   const cues = parseSubtitle(track.content, track.format);
   return cuesToVtt(cues);
 }
+
+// ---------- Subtitle Editor (38.4) ----------
+
+export function getSubtitleCues(trackId: string): SubtitleCue[] | null {
+  const track = getSubtitle(trackId);
+  if (!track) return null;
+  return parseSubtitle(track.content, track.format);
+}
+
+// Save edited cues back. Input cues are validated & normalized.
+export function updateSubtitleCues(trackId: string, cues: SubtitleCue[]): SubtitleTrack | null {
+  const track = getSubtitle(trackId);
+  if (!track) return null;
+  if (!Array.isArray(cues)) throw new Error('Cues must be an array');
+  if (cues.length > 5000) throw new Error('Too many cues (max 5000)');
+
+  const cleaned: SubtitleCue[] = [];
+  for (const c of cues) {
+    const start = Number(c.start);
+    const end = Number(c.end);
+    const text = String(c.text ?? '').trim();
+    if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+    if (end <= start) continue;
+    if (!text) continue;
+    cleaned.push({ start, end, text });
+  }
+  if (cleaned.length === 0) throw new Error('No valid cues to save');
+
+  // Sort by start time
+  cleaned.sort((a, b) => a.start - b.start);
+
+  // Always save as VTT to normalize
+  const vtt = cuesToVtt(cleaned);
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare('UPDATE video_subtitles SET content = ?, format = ?, created_at = ? WHERE id = ?')
+    .run(vtt, 'vtt', now, trackId);
+  return getSubtitle(trackId);
+}
+
