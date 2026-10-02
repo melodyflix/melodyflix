@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { listVideoSubtitles, type SubtitleTrack } from '../lib/api';
+import { useAudioEngine, type AudioEngineSettings } from './useAudioEngine';
+import AudioSettings from './AudioSettings';
 
 export interface PlayerState {
   currentTime: number;
@@ -80,6 +82,13 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
   });
   const [brightness, setBrightness] = useState(1);
   const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
+  const [audioSettings, setAudioSettings] = useState<AudioEngineSettings>(() => {
+    try {
+      const raw = localStorage.getItem('mf-audio-settings');
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  });
+  const [showAudioPanel, setShowAudioPanel] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -150,6 +159,18 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
       hlsRef.current = null;
     };
   }, [src]);
+
+  // Persist audio settings
+  useEffect(() => {
+    try { localStorage.setItem('mf-audio-settings', JSON.stringify(audioSettings)); } catch {}
+  }, [audioSettings]);
+
+  function updateAudioSettings(patch: Partial<AudioEngineSettings>) {
+    setAudioSettings((prev) => ({ ...prev, ...patch }));
+  }
+
+  // Hook up Web Audio engine (builds graph lazily on first play)
+  useAudioEngine(videoRef.current, audioSettings);
 
   // Fetch subtitle tracks for this video
   useEffect(() => {
@@ -490,6 +511,7 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
           width: '100%',
           height: '100%',
           display: 'block',
+          visibility: audioSettings.audioOnlyMode ? 'hidden' : 'visible',
           filter: brightness !== 1 ? `brightness(${brightness})` : undefined,
         }}
       >
@@ -504,6 +526,33 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
           />
         ))}
       </video>
+
+      {/* Audio-only mode overlay */}
+      {audioSettings.audioOnlyMode && (
+        <div className="mf-audio-only-overlay">
+          <div style={{ fontSize: 64 }}>🎵</div>
+          <div style={{ fontSize: 13, color: '#fff', marginTop: 8 }}>Audio-only mode</div>
+        </div>
+      )}
+
+      {/* Audio settings button (top-left) */}
+      <button
+        type="button"
+        className="mf-audio-toggle-btn"
+        onClick={() => setShowAudioPanel((v) => !v)}
+        title="Audio settings"
+      >
+        🎚️
+      </button>
+
+      {/* Audio settings panel */}
+      {showAudioPanel && (
+        <AudioSettings
+          settings={audioSettings}
+          onChange={updateAudioSettings}
+          onClose={() => setShowAudioPanel(false)}
+        />
+      )}
 
       {/* Gesture feedback overlay */}
       {gestureFeedback && gestureFeedback.visible && (
