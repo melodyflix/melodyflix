@@ -12,6 +12,8 @@ import { ensureTwoFASchema } from './services/twofa.service.js';
 import { ensureEmailSchema } from './services/email.service.js';
 import { campaignRoutes } from './routes/campaign.route.js';
 import { ensureCampaignSchema } from './services/campaign.service.js';
+import { referralRoutes } from './routes/referral.route.js';
+import { ensureReferralSchema } from './services/referral.service.js';
 
 const config = loadConfig();
 const logger = createLogger('auth');
@@ -30,6 +32,7 @@ ensureSchema();
 ensureTwoFASchema();
 ensureEmailSchema();
 ensureCampaignSchema();
+ensureReferralSchema();
 logger.info('auth + 2FA + email schema ensured');
 
 await app.register(authRoutes, { prefix: '/api/v1/auth' });
@@ -37,6 +40,7 @@ await app.register(twofaRoutes, { prefix: '/api/v1/auth' });
 await app.register(adminRoutes, { prefix: '/api/v1/admin' });
 await app.register(publicUserRoutes, { prefix: '/api/v1/auth' });
 await app.register(campaignRoutes, { prefix: '/api/v1/auth' });
+await app.register(referralRoutes, { prefix: '/api/v1/auth' });
 
 const PORT = 4001;
 const start = async () => {

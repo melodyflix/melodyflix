@@ -28,6 +28,7 @@ import LiveWatch from './pages/LiveWatch';
 import TwoFASettings from './pages/TwoFASettings';
 import Preferences from './pages/Preferences';
 import ClipView from './pages/ClipView';
+import Referrals from './pages/Referrals';
 import TagView from './pages/TagView';
 import GenreView from './pages/GenreView';
 import PersonView from './pages/PersonView';
@@ -105,6 +106,7 @@ function AppInner() {
         onLive={() => navigate('/live')}
         onSettings={() => navigate('/settings/security')}
         onPreferences={() => navigate('/settings/preferences')}
+        onReferrals={() => navigate('/referrals')}
         onPodcasts={() => navigate('/podcasts')}
         onSeries={() => navigate('/series')}
         onShorts={() => navigate('/shorts')}
@@ -121,6 +123,7 @@ function AppInner() {
         <Route path="/search" element={<Search />} />
         <Route path="/watch/:id" element={<Watch onSignIn={requireSignIn} />} />
         <Route path="/clip/:id" element={<ClipView onSignIn={requireSignIn} />} />
+        <Route path="/referrals" element={<Referrals onSignIn={requireSignIn} />} />
         <Route path="/tag/:tag" element={<TagView />} />
         <Route path="/genre/:genre" element={<GenreView />} />
         <Route path="/person/:name" element={<PersonView />} />

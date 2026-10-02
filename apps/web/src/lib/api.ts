@@ -536,6 +536,68 @@ export async function getVideosByGenre(genre: string, limit = 60): Promise<{ vid
 
 
 
+
+// ============ Referral Program (27.2) ============
+export interface ReferralCode {
+  user_id: string;
+  code: string;
+  created_at: string;
+}
+
+export interface Referral {
+  id: string;
+  referrer_user_id: string;
+  referred_user_id: string;
+  code: string;
+  status: 'pending' | 'completed' | 'rewarded' | 'rejected';
+  reward_amount: number;
+  referred_bonus: number;
+  created_at: string;
+  completed_at: string | null;
+  rewarded_at: string | null;
+  referred_email?: string;
+  referred_username?: string;
+}
+
+export interface ReferralStats {
+  code: string;
+  total_invited: number;
+  completed: number;
+  pending: number;
+  total_earned: number;
+}
+
+export interface CreditBalance {
+  balance: number;
+  lifetime_earned: number;
+}
+
+export interface ReferralMe {
+  stats: ReferralStats;
+  credits: CreditBalance;
+  reward_info: { referrer: number; referred: number };
+}
+
+export async function getReferralMe(): Promise<ReferralMe> {
+  return request<ReferralMe>('/api/v1/auth/referrals/me');
+}
+
+export async function listMyReferrals(limit = 100): Promise<{ referrals: Referral[] }> {
+  return request<{ referrals: Referral[] }>(`/api/v1/auth/referrals/me/list?limit=${limit}`);
+}
+
+export async function getMyCredits(): Promise<CreditBalance> {
+  return request<CreditBalance>('/api/v1/auth/referrals/credits');
+}
+
+export async function getReferralShareLink(): Promise<{ code: string; link: string }> {
+  return request<{ code: string; link: string }>('/api/v1/auth/referrals/share');
+}
+
+export async function regenerateReferralCode(): Promise<{ code: string }> {
+  return request<{ code: string }>('/api/v1/auth/referrals/code/regenerate', { method: 'POST' });
+}
+
 // ============ Promotional Banners (27.4) ============
 export interface Banner {
   id: string;

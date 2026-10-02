@@ -10,6 +10,7 @@ const SignupSchema = z.object({
   username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9_]+$/),
   password: z.string().min(8).max(128),
   displayName: z.string().min(1).max(100).optional(),
+  ref: z.string().min(4).max(20).optional(),
 });
 
 const LoginSchema = z.object({
@@ -24,7 +25,8 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
     }
     try {
-      const user = signup(parsed.data);
+      const signupInput = { ...parsed.data, referralCode: parsed.data.ref };
+      const user = signup(signupInput);
       // Fire-and-forget verification email
       sendVerificationEmailFor(user.id, user.email, user.display_name ?? user.username).catch(() => {});
       return reply.code(201).send({ success: true, data: user });

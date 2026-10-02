@@ -7,12 +7,14 @@ import { loadConfig } from '@melodyflix/shared-config';
 import { isTwoFAEnabled } from './twofa.service.js';
 import { createVerificationToken, sendEmail, getVerificationTemplate } from './email.service.js';
 import { publish, CHANNELS } from '@melodyflix/shared-events';
+import { applyReferral } from './referral.service.js';
 
 export interface SignupInput {
   email: string;
   username: string;
   password: string;
   displayName?: string;
+  referralCode?: string;
 }
 
 export interface LoginInput {
@@ -72,6 +74,12 @@ export function signup(input: SignupInput): SafeUser {
   );
 
   publish(CHANNELS.USER_CREATED, { userId: user.id, username: user.username, email: user.email }).catch(() => {});
+
+  // Referral (27.2) — best-effort, don't fail signup
+  if (input.referralCode) {
+    try { applyReferral(user.id, input.referralCode); } catch { /* ignore */ }
+  }
+
   return toSafeUser(user);
 }
 
