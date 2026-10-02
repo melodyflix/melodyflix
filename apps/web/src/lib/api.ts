@@ -540,6 +540,164 @@ export async function getVideosByGenre(genre: string, limit = 60): Promise<{ vid
 
 
 
+
+// ============ Distribution (31.1 - 31.4) ============
+export type PlatformId = 'youtube' | 'facebook' | 'instagram' | 'twitter' | 'tiktok' | 'linkedin' | 'telegram';
+export type JobStatus = 'pending' | 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled';
+
+export interface Platform {
+  id: PlatformId;
+  label: string;
+  icon: string;
+  supports_video: boolean;
+  max_duration_seconds: number | null;
+  max_file_size_mb: number | null;
+}
+
+export interface PlatformAccount {
+  id: string;
+  channel_id: string;
+  platform: PlatformId;
+  account_name: string | null;
+  is_connected: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DistributionJob {
+  id: string;
+  video_id: string;
+  channel_id: string;
+  platform: PlatformId;
+  status: JobStatus;
+  title: string | null;
+  description: string | null;
+  tags: string | null;
+  scheduled_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  external_url: string | null;
+  error: string | null;
+  retry_count: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AutoShareRule {
+  channel_id: string;
+  share_on_publish: number;
+  platforms: PlatformId[];
+  auto_message: string | null;
+  updated_at: string;
+}
+
+export interface SyndicationFeed {
+  id: string;
+  channel_id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  is_enabled: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getDistributionPlatforms(): Promise<{ platforms: Platform[] }> {
+  return request<{ platforms: Platform[] }>('/api/v1/videos/distribution/platforms');
+}
+
+export async function listPlatformAccounts(channelId: string): Promise<{ accounts: PlatformAccount[] }> {
+  return request<{ accounts: PlatformAccount[] }>(`/api/v1/videos/channels/${channelId}/platforms`);
+}
+
+export async function connectPlatform(channelId: string, platform: PlatformId, accountName: string, accessToken: string): Promise<{ account: PlatformAccount }> {
+  return request<{ account: PlatformAccount }>(`/api/v1/videos/channels/${channelId}/platforms`, {
+    method: 'POST',
+    body: JSON.stringify({ platform, account_name: accountName, access_token: accessToken }),
+  });
+}
+
+export async function disconnectPlatform(channelId: string, platform: PlatformId): Promise<{ removed: boolean }> {
+  return request<{ removed: boolean }>(`/api/v1/videos/channels/${channelId}/platforms/${platform}`, { method: 'DELETE' });
+}
+
+export async function listChannelJobs(channelId: string, limit = 100): Promise<{ jobs: DistributionJob[] }> {
+  return request<{ jobs: DistributionJob[] }>(`/api/v1/videos/channels/${channelId}/distribution/jobs?limit=${limit}`);
+}
+
+export async function listVideoJobs(videoId: string): Promise<{ jobs: DistributionJob[] }> {
+  return request<{ jobs: DistributionJob[] }>(`/api/v1/videos/videos/${videoId}/distribution/jobs`);
+}
+
+export async function createDistributionJob(channelId: string, input: {
+  video_id: string;
+  platform: PlatformId;
+  title?: string;
+  description?: string;
+  tags?: string[];
+  scheduled_at?: string | null;
+}): Promise<{ job: DistributionJob }> {
+  return request<{ job: DistributionJob }>(`/api/v1/videos/channels/${channelId}/distribution/jobs`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function publishJobNow(jobId: string): Promise<{ job: DistributionJob }> {
+  return request<{ job: DistributionJob }>(`/api/v1/videos/distribution/jobs/${jobId}/publish`, { method: 'POST' });
+}
+
+export async function cancelJob(jobId: string): Promise<{ job: DistributionJob }> {
+  return request<{ job: DistributionJob }>(`/api/v1/videos/distribution/jobs/${jobId}/cancel`, { method: 'POST' });
+}
+
+export async function deleteJob(jobId: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/videos/distribution/jobs/${jobId}`, { method: 'DELETE' });
+}
+
+export async function getAutoShare(channelId: string): Promise<{ rule: AutoShareRule }> {
+  return request<{ rule: AutoShareRule }>(`/api/v1/videos/channels/${channelId}/auto-share`);
+}
+
+export async function setAutoShare(channelId: string, patch: {
+  share_on_publish?: boolean;
+  platforms?: PlatformId[];
+  auto_message?: string | null;
+}): Promise<{ rule: AutoShareRule }> {
+  return request<{ rule: AutoShareRule }>(`/api/v1/videos/channels/${channelId}/auto-share`, {
+    method: 'PUT',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function triggerAutoShare(videoId: string): Promise<{ created: number }> {
+  return request<{ created: number }>(`/api/v1/videos/videos/${videoId}/auto-share`, { method: 'POST' });
+}
+
+export async function getChannelFeed(channelId: string): Promise<{ feed: SyndicationFeed | null }> {
+  return request<{ feed: SyndicationFeed | null }>(`/api/v1/videos/channels/${channelId}/feed`);
+}
+
+export async function createChannelFeed(channelId: string): Promise<{ feed: SyndicationFeed }> {
+  return request<{ feed: SyndicationFeed }>(`/api/v1/videos/channels/${channelId}/feed`, { method: 'POST' });
+}
+
+export async function updateChannelFeed(channelId: string, patch: { is_enabled?: boolean; description?: string | null }): Promise<{ feed: SyndicationFeed | null }> {
+  return request<{ feed: SyndicationFeed | null }>(`/api/v1/videos/channels/${channelId}/feed`, {
+    method: 'PUT',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function deleteChannelFeed(channelId: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/videos/channels/${channelId}/feed`, { method: 'DELETE' });
+}
+
+export function feedUrl(slug: string): string {
+  return `/api/v1/videos/feeds/${slug}.xml`;
+}
+
 // ============ Lower Thirds + Transitions (30.6, 30.7) ============
 export type LowerThirdPosition = 'left' | 'center' | 'right';
 export type LowerThirdStyle = 'minimal' | 'solid' | 'glass' | 'accent' | 'bar';
