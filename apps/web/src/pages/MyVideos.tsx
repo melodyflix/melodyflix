@@ -4,6 +4,7 @@ import TagEditor from '../components/TagEditor';
 import GenreEditor from '../components/GenreEditor';
 import CastCrewEditor from '../components/CastCrewEditor';
 import SubtitleManager from '../components/SubtitleManager';
+import VrEditor from '../components/VrEditor';
 import {
   listMyVideos, updateVideo, deleteVideo, getCachedUser,
   formatDuration, formatViews, timeAgo,
@@ -21,7 +22,7 @@ export default function MyVideos({ onSignIn }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState<Video | null>(null);
-  const [editTab, setEditTab] = useState<'basic' | 'tags' | 'genres' | 'credits' | 'subtitles'>('basic');
+  const [editTab, setEditTab] = useState<'basic' | 'tags' | 'genres' | 'credits' | 'subtitles' | 'vr'>('basic');
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
   const [editVis, setEditVis] = useState<'public' | 'unlisted' | 'private'>('public');
@@ -320,6 +321,7 @@ export default function MyVideos({ onSignIn }: Props) {
                 { id: 'genres', label: '🎬 Genres' },
                 { id: 'credits', label: '🎭 Cast & Crew' },
                 { id: 'subtitles', label: '💬 Subtitles' },
+                { id: 'vr', label: '🥽 VR / 360' },
               ] as const).map((t) => (
                 <button
                   key={t.id}
@@ -450,6 +452,22 @@ export default function MyVideos({ onSignIn }: Props) {
             {editTab === 'subtitles' && editing && (
               <div>
                 <SubtitleManager videoId={editing.id} onToast={(m) => alert(m)} />
+                <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+                  <button
+                    type="button"
+                    className="mf-btn-secondary"
+                    style={{ flex: 1 }}
+                    onClick={() => setEditing(null)}
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {editTab === 'vr' && editing && (
+              <div>
+                <VrEditor videoId={editing.id} onToast={(m) => alert(m)} />
                 <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
                   <button
                     type="button"

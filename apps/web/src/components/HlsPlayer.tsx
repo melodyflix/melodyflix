@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { listVideoSubtitles, type SubtitleTrack, listVideoAudioTracks, setAudioTrackPreference, type AudioTrack } from '../lib/api';
+import { getVideoVr, type VrMetadata } from '../lib/api';
+import { lazy, Suspense } from 'react';
+const VrPlayer = lazy(() => import('./VrPlayer'));
 import { useAudioEngine, type AudioEngineSettings } from './useAudioEngine';
 import AudioSettings from './AudioSettings';
 
@@ -96,6 +99,8 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
   const [showAudioPanel, setShowAudioPanel] = useState(false);
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
   const [activeAudioTrack, setActiveAudioTrack] = useState<string | null>(null);
+  const [vrMeta, setVrMeta] = useState<VrMetadata | null>(null);
+  const [vrMode, setVrMode] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -196,6 +201,14 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
 
   // Hook up Web Audio engine (builds graph lazily on first play)
   useAudioEngine(videoRef.current, audioSettings);
+
+  // Fetch VR metadata for this video
+  useEffect(() => {
+    if (!videoId) return;
+    getVideoVr(videoId)
+      .then((res) => setVrMeta(res.vr))
+      .catch(() => setVrMeta(null));
+  }, [videoId]);
 
   // Fetch subtitle tracks for this video
   useEffect(() => {
@@ -636,6 +649,37 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
           />
         ))}
       </video>
+
+      {/* VR mode — replaces normal video view with 360 canvas */}
+      {vrMode && vrMeta && vrMeta.projection !== 'none' && (
+        <Suspense fallback={
+          <div style={{
+            position: 'absolute', inset: 0, background: '#000', zIndex: 50,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontSize: 14, fontFamily: 'inherit',
+          }}>
+            🥽 Loading VR viewer...
+          </div>
+        }>
+          <VrPlayer
+            videoEl={videoRef.current}
+            vr={vrMeta}
+            onExit={() => setVrMode(false)}
+          />
+        </Suspense>
+      )}
+
+      {/* VR button (only if this video has VR metadata) */}
+      {vrMeta && vrMeta.projection !== 'none' && !vrMode && (
+        <button
+          type="button"
+          className="mf-vr-toggle-btn"
+          onClick={() => setVrMode(true)}
+          title="Enter 360° VR mode"
+        >
+          🥽
+        </button>
+      )}
 
       {/* Audio-only mode overlay */}
       {audioSettings.audioOnlyMode && (

@@ -533,6 +533,56 @@ export async function getVideosByGenre(genre: string, limit = 60): Promise<{ vid
 
 
 
+
+// ============ VR / 360 (3.6) ============
+export type VrProjection = 'none' | 'equirectangular' | 'cubemap';
+export type VrStereo = 'mono' | 'sbs' | 'ou';
+
+export interface VrMetadata {
+  video_id: string;
+  projection: VrProjection;
+  stereo: VrStereo;
+  fov: number;
+  initial_yaw: number;
+  initial_pitch: number;
+  has_spatial_audio: number;
+  updated_at: string;
+}
+
+export const VR_PROJECTIONS: { id: VrProjection; label: string }[] = [
+  { id: 'none', label: 'Standard (2D)' },
+  { id: 'equirectangular', label: '360° Equirectangular' },
+  { id: 'cubemap', label: '360° Cubemap' },
+];
+
+export const VR_STEREOS: { id: VrStereo; label: string }[] = [
+  { id: 'mono', label: 'Monoscopic (2D)' },
+  { id: 'sbs', label: 'Side-by-Side (VR)' },
+  { id: 'ou', label: 'Over-Under (VR)' },
+];
+
+export async function getVideoVr(videoId: string): Promise<{ vr: VrMetadata }> {
+  return request<{ vr: VrMetadata }>(`/api/v1/videos/${videoId}/vr`);
+}
+
+export async function updateVideoVr(
+  videoId: string,
+  input: Partial<Pick<VrMetadata, 'projection' | 'stereo' | 'fov' | 'initial_yaw' | 'initial_pitch'>> & { has_spatial_audio?: boolean },
+): Promise<{ vr: VrMetadata }> {
+  return request<{ vr: VrMetadata }>(`/api/v1/videos/${videoId}/vr`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function clearVideoVr(videoId: string): Promise<{ vr: VrMetadata }> {
+  return request<{ vr: VrMetadata }>(`/api/v1/videos/${videoId}/vr`, { method: 'DELETE' });
+}
+
+export async function listVrVideos(limit = 40): Promise<{ videos: any[] }> {
+  return request<{ videos: any[] }>(`/api/v1/videos/vr/videos?limit=${limit}`);
+}
+
 // ============ Audio Track Selector (45.8) ============
 export interface AudioTrack {
   id: string;
