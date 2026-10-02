@@ -142,3 +142,131 @@ export function syncHashtagsFromText(videoId: string, text: string | null | unde
   }
   return saved;
 }
+
+// ---------- 46.1 AI-Powered Auto-Tagging (heuristic NLP) ----------
+
+// Common English + Bangla stopwords. Extendable.
+const STOPWORDS = new Set<string>([
+  // English
+  'a','an','the','and','or','but','if','then','else','when','while','for','to','of','in','on','at','by','with','from','as','is','are','was','were','be','been','being','am','do','does','did','have','has','had','will','would','could','should','may','might','must','can','this','that','these','those','it','its','he','she','they','them','their','his','her','you','your','yours','i','me','my','we','us','our','not','no','yes','so','than','too','very','just','only','also','into','out','up','down','over','under','about','after','before','more','most','some','any','all','each','every','other','another','such','same','own','new','old','good','bad','one','two','three','get','got','make','made','use','used','using','video','videos','watch','channel','official','full','hd','new','tutorial','how','what','why','which','who','whom','where','when','official','please','subscribe','like','share','comment','comments','song','songs','music',
+  // Bangla (common)
+  'এবং','বা','কিন্তু','যদি','তাহলে','যখন','যেহেতু','জন্য','থেকে','দ্বারা','সাথে','হলো','হয়','হয়েছে','ছিল','ছিলেন','আমি','আমার','আমরা','তুমি','তোমার','সে','তার','তারা','এই','সেই','ওই','কি','কী','কেন','কোথায়','কিভাবে','কত','একটি','একটা','দুই','তিন','ভিডিও','চ্যানেল','নতুন','ভালো','খারাপ','দেখুন','সাবস্ক্রাইব','করুন','করেছি','করেছেন','আছে','নেই','সব','কিছু','অনেক','খুব','শুধু','আরো','আবার','মধ্যে','উপর','নিচে','পরে','আগে','সঙ্গে','মত','হিসাবে','হতে',
+]);
+
+function isStopword(w: string): boolean {
+  return STOPWORDS.has(w) || w.length < 3;
+}
+
+// Tokenize: keep Unicode letters/digits (supports Bangla), lowercase
+function tokenize(text: string): string[] {
+  return (text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []) as string[];
+}
+
+export interface AutoTagSuggestion {
+  tag: string;
+  score: number;
+  source: 'title' | 'body' | 'phrase';
+}
+
+// Extract ranked keyword candidates from title + description
+export function suggestAutoTags(
+  title: string | null | undefined,
+  description: string | null | undefined,
+  max = 10,
+): AutoTagSuggestion[] {
+  const t = (title || '').trim();
+  const d = (description || '').trim();
+
+  const titleTokens = tokenize(t);
+  const bodyTokens = tokenize(d);
+
+  const scores = new Map<string, number>();
+  const bump = (word: string, weight: number) => {
+    if (isStopword(word)) return;
+    scores.set(word, (scores.get(word) ?? 0) + weight);
+  };
+
+  // Title tokens: heavy weight
+  for (const w of titleTokens) bump(w, 3);
+
+  // Body tokens: light weight
+  for (const w of bodyTokens) bump(w, 1);
+
+  // Bigram phrases from title (only if both words non-stopword)
+  const phrases: AutoTagSuggestion[] = [];
+  for (let i = 0; i < titleTokens.length - 1; i++) {
+    const a = titleTokens[i];
+    const b = titleTokens[i + 1];
+    if (isStopword(a) || isStopword(b)) continue;
+    const phrase = `${a} ${b}`;
+    phrases.push({ tag: phrase, score: 4, source: 'phrase' });
+  }
+
+  // Unigram candidates
+  const unigrams: AutoTagSuggestion[] = [];
+  for (const [word, score] of scores.entries()) {
+    // Skip if the word is already inside any top phrase
+    const isInsidePhrase = phrases.some((p) => p.tag.includes(word));
+    if (isInsidePhrase && phrases.length < max / 2) continue;
+    unigrams.push({
+      tag: word,
+      score,
+      source: titleTokens.includes(word) ? 'title' : 'body',
+    });
+  }
+
+  unigrams.sort((a, b) => b.score - a.score);
+  phrases.sort((a, b) => b.score - a.score);
+
+  // Merge: top phrases first, then unigrams
+  const out: AutoTagSuggestion[] = [];
+  const seen = new Set<string>();
+  const take = (arr: AutoTagSuggestion[]) => {
+    for (const s of arr) {
+      if (out.length >= max) break;
+      if (seen.has(s.tag)) continue;
+      seen.add(s.tag);
+      out.push(s);
+    }
+  };
+  take(phrases);
+  take(unigrams);
+
+  return out;
+}
+
+// Run auto-tagging for a video and save with source='auto'
+export function autoTagVideo(
+  videoId: string,
+  title: string | null | undefined,
+  description: string | null | undefined,
+  max = 10,
+): VideoTag[] {
+  const suggestions = suggestAutoTags(title, description, max);
+  const saved: VideoTag[] = [];
+  for (const s of suggestions) {
+    try {
+      saved.push(addTag(videoId, s.tag, 'auto'));
+    } catch { /* skip */ }
+  }
+  return saved;
+}
+
+// Clear only auto tags for a video (so we can regenerate)
+export function clearAutoTags(videoId: string): number {
+  const db = getDb();
+  const res = db.prepare("DELETE FROM video_tags WHERE video_id = ? AND source = 'auto'").run(videoId);
+  return res.changes ?? 0;
+}
+
+// Re-run auto-tagging: clears previous auto tags, adds fresh
+export function regenerateAutoTags(
+  videoId: string,
+  title: string | null | undefined,
+  description: string | null | undefined,
+  max = 10,
+): VideoTag[] {
+  clearAutoTags(videoId);
+  return autoTagVideo(videoId, title, description, max);
+}
+

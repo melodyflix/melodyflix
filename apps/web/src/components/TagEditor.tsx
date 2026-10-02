@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
   listVideoTags, addVideoTag, removeVideoTag, syncHashtags, suggestTags,
-  type VideoTag, type TagWithCount,
+  suggestAutoTags, applyAutoTags, clearAutoTags,
+  type VideoTag, type TagWithCount, type AutoTagSuggestion,
 } from '../lib/api';
 
 interface Props {
@@ -13,6 +14,8 @@ export default function TagEditor({ videoId, onToast }: Props) {
   const [tags, setTags] = useState<VideoTag[]>([]);
   const [input, setInput] = useState('');
   const [suggestions, setSuggestions] = useState<TagWithCount[]>([]);
+  const [aiSuggestions, setAiSuggestions] = useState<AutoTagSuggestion[]>([]);
+  const [aiBusy, setAiBusy] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function load() {
@@ -74,6 +77,48 @@ export default function TagEditor({ videoId, onToast }: Props) {
     }
   }
 
+  async function handleAutoSuggest() {
+    setAiBusy(true);
+    try {
+      const res = await suggestAutoTags(videoId, 10);
+      setAiSuggestions(res.suggestions);
+      if (res.suggestions.length === 0) {
+        onToast?.('No auto-tag candidates found');
+      }
+    } catch (err) {
+      onToast?.((err as Error).message || 'Auto-tag failed');
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  async function handleApplyAuto() {
+    setAiBusy(true);
+    try {
+      const res = await applyAutoTags(videoId);
+      onToast?.(`🤖 ${res.added.length} auto tag(s) applied`);
+      setAiSuggestions([]);
+      await load();
+    } catch (err) {
+      onToast?.((err as Error).message || 'Apply failed');
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  async function handleClearAuto() {
+    setAiBusy(true);
+    try {
+      const res = await clearAutoTags(videoId);
+      onToast?.(`Removed ${res.removed} auto tag(s)`);
+      await load();
+    } catch (err) {
+      onToast?.((err as Error).message || 'Clear failed');
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
   return (
     <div style={{ marginTop: 12 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
@@ -93,7 +138,74 @@ export default function TagEditor({ videoId, onToast }: Props) {
         )}
       </div>
 
-      <div style={{ position: 'relative' }}>
+      {/* AI Auto-Tag section */}
+      <div style={{
+        marginTop: 12,
+        padding: '10px 12px',
+        background: '#f0f4ff',
+        border: '1px solid #c7d2fe',
+        borderRadius: 8,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#3730a3' }}>
+            🤖 AI Auto-Tag
+          </span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              type="button"
+              className="mf-btn-text"
+              onClick={handleAutoSuggest}
+              disabled={aiBusy}
+              style={{ fontSize: 12, color: '#4338ca' }}
+              title="Preview candidate tags"
+            >
+              {aiBusy ? 'Working...' : '🔍 Preview'}
+            </button>
+            <button
+              type="button"
+              className="mf-btn-text mf-btn-text-primary"
+              onClick={handleApplyAuto}
+              disabled={aiBusy}
+              style={{ fontSize: 12 }}
+              title="Save auto-generated tags"
+            >
+              ⚡ Apply
+            </button>
+            <button
+              type="button"
+              className="mf-btn-text"
+              onClick={handleClearAuto}
+              disabled={aiBusy}
+              style={{ fontSize: 12, color: '#dc2626' }}
+              title="Remove all auto-generated tags"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
+        {aiSuggestions.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {aiSuggestions.map((sg) => (
+              <span
+                key={sg.tag}
+                className="mf-tag-chip"
+                style={{
+                  background: sg.source === 'title' ? '#e0e7ff' : '#f3f4f6',
+                  color: sg.source === 'title' ? '#3730a3' : '#4b5563',
+                  fontSize: 12,
+                }}
+                title={`score ${sg.score} · from ${sg.source}`}
+              >
+                {sg.tag}
+                <span style={{ fontSize: 10, opacity: 0.6, marginLeft: 4 }}>{sg.score}</span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ position: 'relative', marginTop: 12 }}>
         <div style={{ display: 'flex', gap: 8 }}>
           <input
             className="mf-input"

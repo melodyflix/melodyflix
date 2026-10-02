@@ -6,6 +6,7 @@ import { getDb } from '@melodyflix/shared-db';
 import {
   addTag, removeTag, listTagsForVideo, replaceManualTags,
   listVideoIdsByTag, topTags, suggestTags, syncHashtagsFromText,
+  suggestAutoTags, regenerateAutoTags, clearAutoTags,
 } from '../services/tag.service.js';
 
 const AddSchema = z.object({
@@ -127,5 +128,46 @@ export async function tagRoutes(app: FastifyInstance) {
       `FROM videos WHERE id IN (${placeholders})`
     ).all(...ids);
     return reply.send({ success: true, data: { videos } });
+  });
+
+  // GET /:videoId/tags/auto-suggest — preview auto-tag candidates (no save)
+  app.get('/:videoId/tags/auto-suggest', async (req, reply) => {
+    const { videoId } = req.params as { videoId: string };
+    const q = req.query as { max?: string };
+    const max = Math.min(Math.max(parseInt(q.max ?? '10') || 10, 1), 20);
+    const db = getDb();
+    const video = db.prepare('SELECT title, description FROM videos WHERE id = ?')
+      .get(videoId) as { title: string | null; description: string | null } | undefined;
+    if (!video) return reply.code(404).send({ success: false, error: 'Video not found' });
+    const suggestions = suggestAutoTags(video.title, video.description, max);
+    return reply.send({ success: true, data: { suggestions } });
+  });
+
+  // POST /:videoId/tags/auto-apply — run auto-tagging and save
+  app.post('/:videoId/tags/auto-apply', { preHandler: [requireAuth] }, async (req, reply) => {
+    const { videoId } = req.params as { videoId: string };
+    const userId = (req as any).user?.id ?? (req as any).user?.sub;
+    if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    if (!checkVideoOwner(videoId, userId)) {
+      return reply.code(403).send({ success: false, error: 'Not your video' });
+    }
+    const db = getDb();
+    const video = db.prepare('SELECT title, description FROM videos WHERE id = ?')
+      .get(videoId) as { title: string | null; description: string | null } | undefined;
+    if (!video) return reply.code(404).send({ success: false, error: 'Video not found' });
+    const added = regenerateAutoTags(videoId, video.title, video.description, 10);
+    return reply.send({ success: true, data: { added } });
+  });
+
+  // DELETE /:videoId/tags/auto — clear auto tags only
+  app.delete('/:videoId/tags/auto', { preHandler: [requireAuth] }, async (req, reply) => {
+    const { videoId } = req.params as { videoId: string };
+    const userId = (req as any).user?.id ?? (req as any).user?.sub;
+    if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    if (!checkVideoOwner(videoId, userId)) {
+      return reply.code(403).send({ success: false, error: 'Not your video' });
+    }
+    const removed = clearAutoTags(videoId);
+    return reply.send({ success: true, data: { removed } });
   });
 }

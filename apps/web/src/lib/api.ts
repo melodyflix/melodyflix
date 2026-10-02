@@ -347,6 +347,32 @@ export async function toggleCreatorHeart(commentId: string): Promise<{ ok: boole
 
 
 
+
+// ============ AI Auto-Tagging (46.1) ============
+export interface AutoTagSuggestion {
+  tag: string;
+  score: number;
+  source: 'title' | 'body' | 'phrase';
+}
+
+export async function suggestAutoTags(videoId: string, max = 10): Promise<{ suggestions: AutoTagSuggestion[] }> {
+  return request<{ suggestions: AutoTagSuggestion[] }>(
+    `/api/v1/videos/${videoId}/tags/auto-suggest?max=${max}`,
+  );
+}
+
+export async function applyAutoTags(videoId: string): Promise<{ added: VideoTag[] }> {
+  return request<{ added: VideoTag[] }>(`/api/v1/videos/${videoId}/tags/auto-apply`, {
+    method: 'POST',
+  });
+}
+
+export async function clearAutoTags(videoId: string): Promise<{ removed: number }> {
+  return request<{ removed: number }>(`/api/v1/videos/${videoId}/tags/auto`, {
+    method: 'DELETE',
+  });
+}
+
 // ============ Video Cast & Crew ============
 export const CREW_ROLES = [
   { id: 'actor', label: 'Actor', emoji: '🎭', isCast: true },
