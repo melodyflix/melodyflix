@@ -534,6 +534,78 @@ export async function getVideosByGenre(genre: string, limit = 60): Promise<{ vid
 
 
 
+
+// ============ Promotional Banners (27.4) ============
+export interface Banner {
+  id: string;
+  title: string;
+  message: string | null;
+  cta_label: string | null;
+  cta_url: string | null;
+  bg_color: string;
+  text_color: string;
+  placement: 'top' | 'bottom' | 'home' | 'watch';
+  is_active: number;
+  priority: number;
+  starts_at: string | null;
+  ends_at: string | null;
+  dismissible: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BannerInput {
+  title: string;
+  message?: string | null;
+  cta_label?: string | null;
+  cta_url?: string | null;
+  bg_color?: string;
+  text_color?: string;
+  placement?: 'top' | 'bottom' | 'home' | 'watch';
+  is_active?: boolean;
+  priority?: number;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  dismissible?: boolean;
+}
+
+export async function getActiveBanners(placement?: string): Promise<{ banners: Banner[] }> {
+  const qs = placement ? `?placement=${encodeURIComponent(placement)}` : '';
+  return request<{ banners: Banner[] }>(`/api/v1/videos/banners${qs}`);
+}
+
+export async function dismissBanner(id: string): Promise<{ dismissed: boolean }> {
+  return request<{ dismissed: boolean }>(`/api/v1/videos/banners/${id}/dismiss`, { method: 'POST' });
+}
+
+// Admin
+export async function adminListBanners(): Promise<{ banners: Banner[] }> {
+  return request<{ banners: Banner[] }>('/api/v1/videos/admin/banners');
+}
+
+export async function adminCreateBanner(input: BannerInput): Promise<{ banner: Banner }> {
+  return request<{ banner: Banner }>('/api/v1/videos/admin/banners', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function adminUpdateBanner(id: string, patch: Partial<BannerInput>): Promise<{ banner: Banner }> {
+  return request<{ banner: Banner }>(`/api/v1/videos/admin/banners/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function adminDeleteBanner(id: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/videos/admin/banners/${id}`, { method: 'DELETE' });
+}
+
+export async function adminClearBannerDismissals(id: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/api/v1/videos/admin/banners/${id}/clear-dismissals`, { method: 'POST' });
+}
+
 // ============ VR / 360 (3.6) ============
 export type VrProjection = 'none' | 'equirectangular' | 'cubemap';
 export type VrStereo = 'mono' | 'sbs' | 'ou';

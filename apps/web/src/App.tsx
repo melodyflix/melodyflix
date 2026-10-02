@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import TopBar from './components/TopBar';
+import PromoBannerDisplay from './components/PromoBannerDisplay';
 import LoginModal from './components/LoginModal';
 import MiniPlayer from './components/MiniPlayer';
 import InstallPrompt from './components/InstallPrompt';
@@ -111,6 +112,7 @@ function AppInner() {
         onAnalytics={() => navigate('/analytics')}
         onHelp={() => navigate('/help')}
       />
+      <PromoBannerDisplay placement="top" />
 
       <VerifyEmailBanner />
 
