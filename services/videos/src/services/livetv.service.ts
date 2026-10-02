@@ -1,6 +1,7 @@
 // melodyflix videos - Live TV Broadcasting (Section 40: 40.1, 40.6, 40.15, 40.16)
 import { randomUUID } from 'node:crypto';
 import { getDb } from '@melodyflix/shared-db';
+import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto';
 
 export interface LiveTvChannel {
   id: string;
@@ -973,4 +974,300 @@ export function setFavoriteOrder(userId: string, channelIds: string[]): void {
     db.exec('ROLLBACK');
     throw e;
   }
+}
+
+// ============================================================
+// 40.12 — Channel Parental Control
+// ============================================================
+
+export interface ParentalSettings {
+  user_id: string;
+  pin_hash: string;
+  salt: string;
+  max_age_rating: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BlockedChannel {
+  user_id: string;
+  channel_id: string;
+  created_at: string;
+}
+
+export interface UnlockSession {
+  user_id: string;
+  unlocked_until: string;
+}
+
+export function ensureLiveTvParentalSchema(): void {
+  const db = getDb();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS live_tv_parental (
+      user_id TEXT PRIMARY KEY,
+      pin_hash TEXT NOT NULL,
+      salt TEXT NOT NULL,
+      max_age_rating INTEGER NOT NULL DEFAULT 18,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS live_tv_blocked_channels (
+      user_id TEXT NOT NULL,
+      channel_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, channel_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_livetv_blocked_channel ON live_tv_blocked_channels(channel_id);
+
+    CREATE TABLE IF NOT EXISTS live_tv_unlock_sessions (
+      user_id TEXT PRIMARY KEY,
+      unlocked_until TEXT NOT NULL
+    );
+
+    -- age_rating column on live_tv_channels (idempotent)
+  `);
+
+  // Idempotent column add
+  try { db.exec('ALTER TABLE live_tv_channels ADD COLUMN age_rating INTEGER NOT NULL DEFAULT 0'); } catch {}
+}
+
+// ---- PIN helpers ----
+
+function hashPin(pin: string, salt: string): string {
+  return scryptSync(pin, salt, 64).toString('hex');
+}
+
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'));
+  } catch {
+    return false;
+  }
+}
+
+export function setPin(userId: string, pin: string, maxAgeRating = 18): ParentalSettings {
+  if (!/^\d{4,6}$/.test(pin)) throw new Error('PIN must be 4–6 digits');
+  const db = getDb();
+  const now = new Date().toISOString();
+  const salt = randomBytes(16).toString('hex');
+  const pin_hash = hashPin(pin, salt);
+
+  db.prepare(`
+    INSERT INTO live_tv_parental (user_id, pin_hash, salt, max_age_rating, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET
+      pin_hash = excluded.pin_hash,
+      salt = excluded.salt,
+      max_age_rating = excluded.max_age_rating,
+      updated_at = excluded.updated_at
+  `).run(userId, pin_hash, salt, maxAgeRating, now, now);
+
+  return getParentalSettings(userId)!;
+}
+
+export function getParentalSettings(userId: string): ParentalSettings | null {
+  const db = getDb();
+  const row = db.prepare(
+    'SELECT * FROM live_tv_parental WHERE user_id = ?'
+  ).get(userId) as ParentalSettings | undefined;
+  return row ?? null;
+}
+
+export function hasPin(userId: string): boolean {
+  return !!getParentalSettings(userId);
+}
+
+export function removePin(userId: string, currentPin: string): boolean {
+  const settings = getParentalSettings(userId);
+  if (!settings) return false;
+  const hash = hashPin(currentPin, settings.salt);
+  if (!safeEqual(hash, settings.pin_hash)) return false;
+  const db = getDb();
+  db.prepare('DELETE FROM live_tv_parental WHERE user_id = ?').run(userId);
+  db.prepare('DELETE FROM live_tv_unlock_sessions WHERE user_id = ?').run(userId);
+  return true;
+}
+
+export function changePin(userId: string, currentPin: string, newPin: string): boolean {
+  const settings = getParentalSettings(userId);
+  if (!settings) return false;
+  const hash = hashPin(currentPin, settings.salt);
+  if (!safeEqual(hash, settings.pin_hash)) return false;
+  setPin(userId, newPin, settings.max_age_rating);
+  return true;
+}
+
+export function updateMaxAgeRating(userId: string, maxAgeRating: number): ParentalSettings | null {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const r = db.prepare(
+    'UPDATE live_tv_parental SET max_age_rating = ?, updated_at = ? WHERE user_id = ?'
+  ).run(Math.max(0, Math.min(21, maxAgeRating)), now, userId);
+  if (r.changes === 0) return null;
+  return getParentalSettings(userId);
+}
+
+// ---- Unlock sessions ----
+
+export const UNLOCK_DURATION_MS = 60 * 60 * 1000; // 1 hour
+
+export function verifyPin(userId: string, pin: string): boolean {
+  const settings = getParentalSettings(userId);
+  if (!settings) return false;
+  const hash = hashPin(pin, settings.salt);
+  return safeEqual(hash, settings.pin_hash);
+}
+
+export function unlockSession(userId: string, pin: string): { unlocked_until: string } | null {
+  if (!verifyPin(userId, pin)) return null;
+  const db = getDb();
+  const until = new Date(Date.now() + UNLOCK_DURATION_MS).toISOString();
+  db.prepare(`
+    INSERT INTO live_tv_unlock_sessions (user_id, unlocked_until)
+    VALUES (?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET unlocked_until = excluded.unlocked_until
+  `).run(userId, until);
+  return { unlocked_until: until };
+}
+
+export function isUnlocked(userId: string): boolean {
+  const db = getDb();
+  const row = db.prepare(
+    'SELECT unlocked_until FROM live_tv_unlock_sessions WHERE user_id = ?'
+  ).get(userId) as UnlockSession | undefined;
+  if (!row) return false;
+  return new Date(row.unlocked_until).getTime() > Date.now();
+}
+
+export function lockSession(userId: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM live_tv_unlock_sessions WHERE user_id = ?').run(userId);
+}
+
+// ---- Blocked channels ----
+
+export function blockChannel(userId: string, channelId: string): BlockedChannel {
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO live_tv_blocked_channels (user_id, channel_id, created_at)
+    VALUES (?, ?, ?)
+    ON CONFLICT(user_id, channel_id) DO NOTHING
+  `).run(userId, channelId, now);
+  return db.prepare(
+    'SELECT * FROM live_tv_blocked_channels WHERE user_id = ? AND channel_id = ?'
+  ).get(userId, channelId) as BlockedChannel;
+}
+
+export function unblockChannel(userId: string, channelId: string): boolean {
+  const db = getDb();
+  const r = db.prepare(
+    'DELETE FROM live_tv_blocked_channels WHERE user_id = ? AND channel_id = ?'
+  ).run(userId, channelId);
+  return r.changes > 0;
+}
+
+export function listBlockedChannels(userId: string): { channel_id: string; channel: LiveTvChannel | null; created_at: string }[] {
+  const db = getDb();
+  const rows = db.prepare(
+    'SELECT * FROM live_tv_blocked_channels WHERE user_id = ? ORDER BY created_at DESC'
+  ).all(userId) as BlockedChannel[];
+  return rows.map(r => ({ channel_id: r.channel_id, channel: getChannel(r.channel_id), created_at: r.created_at }));
+}
+
+export function isChannelBlocked(userId: string, channelId: string): boolean {
+  const db = getDb();
+  const row = db.prepare(
+    'SELECT 1 FROM live_tv_blocked_channels WHERE user_id = ? AND channel_id = ? LIMIT 1'
+  ).get(userId, channelId);
+  return !!row;
+}
+
+// ---- Access control ----
+
+export interface AccessCheck {
+  allowed: boolean;
+  reason: 'ok' | 'blocked' | 'age' | 'unlocked';
+  channel_age_rating: number;
+  max_age_rating: number;
+  requires_pin: boolean;
+}
+
+export function checkAccess(userId: string | null, channelId: string): AccessCheck {
+  const ch = getChannel(channelId);
+  if (!ch) throw new Error('Channel not found');
+
+  const ageRating = (ch as any).age_rating ?? 0;
+
+  // No user or no PIN set → no parental gate
+  if (!userId || !hasPin(userId)) {
+    return {
+      allowed: true,
+      reason: 'ok',
+      channel_age_rating: ageRating,
+      max_age_rating: 21,
+      requires_pin: false,
+    };
+  }
+
+  // Explicitly blocked channel
+  if (isChannelBlocked(userId, channelId)) {
+    if (isUnlocked(userId)) {
+      return {
+        allowed: true,
+        reason: 'unlocked',
+        channel_age_rating: ageRating,
+        max_age_rating: getParentalSettings(userId)!.max_age_rating,
+        requires_pin: false,
+      };
+    }
+    return {
+      allowed: false,
+      reason: 'blocked',
+      channel_age_rating: ageRating,
+      max_age_rating: getParentalSettings(userId)!.max_age_rating,
+      requires_pin: true,
+    };
+  }
+
+  // Age gate
+  const settings = getParentalSettings(userId)!;
+  if (ageRating > settings.max_age_rating) {
+    if (isUnlocked(userId)) {
+      return {
+        allowed: true,
+        reason: 'unlocked',
+        channel_age_rating: ageRating,
+        max_age_rating: settings.max_age_rating,
+        requires_pin: false,
+      };
+    }
+    return {
+      allowed: false,
+      reason: 'age',
+      channel_age_rating: ageRating,
+      max_age_rating: settings.max_age_rating,
+      requires_pin: true,
+    };
+  }
+
+  return {
+    allowed: true,
+    reason: 'ok',
+    channel_age_rating: ageRating,
+    max_age_rating: settings.max_age_rating,
+    requires_pin: false,
+  };
+}
+
+export function setChannelAgeRating(channelId: string, ageRating: number): LiveTvChannel | null {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const r = db.prepare(
+    'UPDATE live_tv_channels SET age_rating = ?, updated_at = ? WHERE id = ?'
+  ).run(Math.max(0, Math.min(21, ageRating)), now, channelId);
+  if (r.changes === 0) return null;
+  return getChannel(channelId);
 }

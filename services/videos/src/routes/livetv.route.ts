@@ -12,6 +12,10 @@ import {
   ensureLiveTvStateSchema, switchChannel, getWatchState,
   updatePosition, listRecentChannels, clearWatchState,
   addFavorite, removeFavorite, toggleFavorite, listFavorites, isFavorite, setFavoriteOrder,
+  setPin, getParentalSettings, hasPin, removePin, changePin, updateMaxAgeRating,
+  verifyPin, unlockSession, isUnlocked, lockSession,
+  blockChannel, unblockChannel, listBlockedChannels, isChannelBlocked,
+  checkAccess, setChannelAgeRating,
 } from '../services/livetv.service.js';
 
 const CreateSchema = z.object({
@@ -428,6 +432,187 @@ export async function liveTvRoutes(app: FastifyInstance) {
     }
     setFavoriteOrder(me, parsed.data.channel_ids);
     return reply.send({ success: true, data: { updated: true } });
+  });
+
+
+  // ---- Parental Control (40.12) ----
+
+  const SetPinSchema = z.object({
+    pin: z.string().regex(/^\d{4,6}$/),
+    max_age_rating: z.number().int().min(0).max(21).optional(),
+  });
+
+  const ChangePinSchema = z.object({
+    current_pin: z.string().regex(/^\d{4,6}$/),
+    new_pin: z.string().regex(/^\d{4,6}$/),
+  });
+
+  const VerifyPinSchema = z.object({ pin: z.string().regex(/^\d{4,6}$/) });
+  const MaxAgeSchema = z.object({ max_age_rating: z.number().int().min(0).max(21) });
+
+  // GET /live-tv/parental — settings (no hash/salt)
+  app.get('/live-tv/parental', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const settings = getParentalSettings(me);
+    const unlocked = isUnlocked(me);
+    return reply.send({
+      success: true,
+      data: {
+        has_pin: !!settings,
+        max_age_rating: settings?.max_age_rating ?? 21,
+        unlocked,
+        updated_at: settings?.updated_at ?? null,
+      },
+    });
+  });
+
+  // POST /live-tv/parental/pin — set PIN (first time)
+  app.post('/live-tv/parental/pin', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    if (hasPin(me)) {
+      return reply.code(409).send({ success: false, error: 'PIN already set — use change endpoint' });
+    }
+    const parsed = SetPinSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    try {
+      const settings = setPin(me, parsed.data.pin, parsed.data.max_age_rating ?? 18);
+      return reply.send({
+        success: true,
+        data: { has_pin: true, max_age_rating: settings.max_age_rating },
+      });
+    } catch (e: any) {
+      return reply.code(400).send({ success: false, error: e?.message ?? 'Set PIN failed' });
+    }
+  });
+
+  // POST /live-tv/parental/pin/change — change PIN
+  app.post('/live-tv/parental/pin/change', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const parsed = ChangePinSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    const ok = changePin(me, parsed.data.current_pin, parsed.data.new_pin);
+    if (!ok) return reply.code(403).send({ success: false, error: 'Current PIN incorrect' });
+    return reply.send({ success: true, data: { changed: true } });
+  });
+
+  // DELETE /live-tv/parental/pin — remove PIN (requires current)
+  app.delete('/live-tv/parental/pin', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const parsed = VerifyPinSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    const ok = removePin(me, parsed.data.pin);
+    if (!ok) return reply.code(403).send({ success: false, error: 'Incorrect PIN' });
+    return reply.send({ success: true, data: { removed: true } });
+  });
+
+  // PATCH /live-tv/parental/max-age — update max age rating
+  app.patch('/live-tv/parental/max-age', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const parsed = MaxAgeSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    const settings = updateMaxAgeRating(me, parsed.data.max_age_rating);
+    if (!settings) return reply.code(404).send({ success: false, error: 'No PIN set' });
+    return reply.send({ success: true, data: { max_age_rating: settings.max_age_rating } });
+  });
+
+  // POST /live-tv/parental/unlock — verify PIN → 1h session
+  app.post('/live-tv/parental/unlock', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const parsed = VerifyPinSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    const result = unlockSession(me, parsed.data.pin);
+    if (!result) return reply.code(403).send({ success: false, error: 'Incorrect PIN' });
+    return reply.send({ success: true, data: result });
+  });
+
+  // POST /live-tv/parental/lock — end unlock session
+  app.post('/live-tv/parental/lock', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    lockSession(me);
+    return reply.send({ success: true, data: { locked: true } });
+  });
+
+  // POST /live-tv/parental/verify — check PIN (no session grant)
+  app.post('/live-tv/parental/verify', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const parsed = VerifyPinSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    return reply.send({ success: true, data: { valid: verifyPin(me, parsed.data.pin) } });
+  });
+
+  // ---- Blocked channels ----
+
+  // GET /live-tv/parental/blocked — list
+  app.get('/live-tv/parental/blocked', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const blocked = listBlockedChannels(me);
+    return reply.send({ success: true, data: { blocked, count: blocked.length } });
+  });
+
+  // POST /live-tv/parental/blocked/:channelId — block
+  app.post('/live-tv/parental/blocked/:channelId', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { channelId } = req.params as { channelId: string };
+    blockChannel(me, channelId);
+    return reply.send({ success: true, data: { blocked: true } });
+  });
+
+  // DELETE /live-tv/parental/blocked/:channelId — unblock
+  app.delete('/live-tv/parental/blocked/:channelId', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { channelId } = req.params as { channelId: string };
+    const removed = unblockChannel(me, channelId);
+    return reply.send({ success: true, data: { unblocked: removed } });
+  });
+
+  // GET /live-tv/parental/blocked/:channelId — status
+  app.get('/live-tv/parental/blocked/:channelId', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { channelId } = req.params as { channelId: string };
+    return reply.send({ success: true, data: { blocked: isChannelBlocked(me, channelId) } });
+  });
+
+  // ---- Access check (public, but uses optional auth) ----
+
+  // GET /live-tv/channels/:id/access — check if user can view
+  app.get('/live-tv/channels/:id/access', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const me = userId(req as any);
+    try {
+      const result = checkAccess(me, id);
+      return reply.send({ success: true, data: result });
+    } catch (e: any) {
+      if (e?.message === 'Channel not found') {
+        return reply.code(404).send({ success: false, error: 'Channel not found' });
+      }
+      throw e;
+    }
+  });
+
+  // PATCH /live-tv/channels/:id/age-rating — set age rating (owner only)
+  app.patch('/live-tv/channels/:id/age-rating', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    const ch = getChannel(id);
+    if (!ch) return reply.code(404).send({ success: false, error: 'Channel not found' });
+    if (ch.owner_id !== me) return reply.code(403).send({ success: false, error: 'Not your channel' });
+    const parsed = MaxAgeSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    const updated = setChannelAgeRating(id, parsed.data.max_age_rating);
+    return reply.send({ success: true, data: { channel: updated } });
   });
 
 }

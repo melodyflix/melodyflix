@@ -3597,3 +3597,121 @@ export async function setLiveTvFavoriteOrder(
     body: JSON.stringify({ channel_ids: channelIds }),
   });
 }
+
+// ---- Parental Control (40.12) ----
+
+export interface LiveTvParentalSettings {
+  has_pin: boolean;
+  max_age_rating: number;
+  unlocked: boolean;
+  updated_at: string | null;
+}
+
+export interface LiveTvBlockedChannel {
+  channel_id: string;
+  channel: LiveTvChannel | null;
+  created_at: string;
+}
+
+export interface LiveTvAccessCheck {
+  allowed: boolean;
+  reason: 'ok' | 'blocked' | 'age' | 'unlocked';
+  channel_age_rating: number;
+  max_age_rating: number;
+  requires_pin: boolean;
+}
+
+export async function getLiveTvParental(): Promise<LiveTvParentalSettings> {
+  return request('/api/v1/videos/live-tv/parental');
+}
+
+export async function setLiveTvPin(
+  pin: string,
+  maxAgeRating?: number
+): Promise<{ has_pin: boolean; max_age_rating: number }> {
+  return request('/api/v1/videos/live-tv/parental/pin', {
+    method: 'POST',
+    body: JSON.stringify({ pin, max_age_rating: maxAgeRating }),
+  });
+}
+
+export async function changeLiveTvPin(
+  currentPin: string,
+  newPin: string
+): Promise<{ changed: boolean }> {
+  return request('/api/v1/videos/live-tv/parental/pin/change', {
+    method: 'POST',
+    body: JSON.stringify({ current_pin: currentPin, new_pin: newPin }),
+  });
+}
+
+export async function removeLiveTvPin(pin: string): Promise<{ removed: boolean }> {
+  return request('/api/v1/videos/live-tv/parental/pin', {
+    method: 'DELETE',
+    body: JSON.stringify({ pin }),
+  });
+}
+
+export async function updateLiveTvMaxAge(
+  maxAgeRating: number
+): Promise<{ max_age_rating: number }> {
+  return request('/api/v1/videos/live-tv/parental/max-age', {
+    method: 'PATCH',
+    body: JSON.stringify({ max_age_rating: maxAgeRating }),
+  });
+}
+
+export async function unlockLiveTvParental(
+  pin: string
+): Promise<{ unlocked_until: string }> {
+  return request('/api/v1/videos/live-tv/parental/unlock', {
+    method: 'POST',
+    body: JSON.stringify({ pin }),
+  });
+}
+
+export async function lockLiveTvParental(): Promise<{ locked: boolean }> {
+  return request('/api/v1/videos/live-tv/parental/lock', { method: 'POST' });
+}
+
+export async function verifyLiveTvPin(pin: string): Promise<{ valid: boolean }> {
+  return request('/api/v1/videos/live-tv/parental/verify', {
+    method: 'POST',
+    body: JSON.stringify({ pin }),
+  });
+}
+
+export async function listLiveTvBlocked(): Promise<{
+  blocked: LiveTvBlockedChannel[];
+  count: number;
+}> {
+  return request('/api/v1/videos/live-tv/parental/blocked');
+}
+
+export async function blockLiveTvChannel(
+  channelId: string
+): Promise<{ blocked: boolean }> {
+  return request(`/api/v1/videos/live-tv/parental/blocked/${channelId}`, { method: 'POST' });
+}
+
+export async function unblockLiveTvChannel(
+  channelId: string
+): Promise<{ unblocked: boolean }> {
+  return request(`/api/v1/videos/live-tv/parental/blocked/${channelId}`, { method: 'DELETE' });
+}
+
+export async function getLiveTvChannelAccess(
+  channelId: string
+): Promise<LiveTvAccessCheck> {
+  return request(`/api/v1/videos/live-tv/channels/${channelId}/access`);
+}
+
+export async function setLiveTvChannelAgeRating(
+  channelId: string,
+  ageRating: number
+): Promise<{ channel: LiveTvChannel }> {
+  return request(`/api/v1/videos/live-tv/channels/${channelId}/age-rating`, {
+    method: 'PATCH',
+    body: JSON.stringify({ max_age_rating: ageRating }),
+  });
+}

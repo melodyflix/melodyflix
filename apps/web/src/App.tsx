@@ -27,6 +27,7 @@ import LiveList from './pages/LiveList';
 import LiveWatch from './pages/LiveWatch';
 import LiveTV from './pages/LiveTV';
 import LiveTVWatch from './pages/LiveTVWatch';
+import ParentalSettings from './pages/ParentalSettings';
 import TwoFASettings from './pages/TwoFASettings';
 import Preferences from './pages/Preferences';
 import ClipView from './pages/ClipView';
@@ -153,6 +154,7 @@ function AppInner() {
         <Route path="/live/:id" element={<LiveWatch onSignIn={requireSignIn} />} />
             <Route path="/live-tv" element={<LiveTV onSignIn={requireSignIn} />} />
             <Route path="/live-tv/:id" element={<LiveTVWatch onSignIn={requireSignIn} />} />
+            <Route path="/parental" element={<ParentalSettings onSignIn={requireSignIn} />} />
         <Route path="/settings/security" element={<TwoFASettings user={user} onSignIn={requireSignIn} />} />
         <Route path="/settings/preferences" element={<Preferences onSignIn={requireSignIn} />} />
         <Route path="/go-live" element={<GoLive user={user} onSignIn={() => setShowLogin(true)} />} />
