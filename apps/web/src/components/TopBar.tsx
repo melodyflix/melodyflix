@@ -28,11 +28,12 @@ interface Props {
   onHelp: () => void;
   onPreferences: () => void;
   onReferrals: () => void;
+  onStudio: () => void;
 }
 
 export default function TopBar({
   user, onLogoClick, onSearch, onSignIn, onSignOut, onMyChannel, onUpload,
-  onWatchLater, onSubscriptions, onHistory, onPlaylists, onMyVideos, onGoLive, onLive, onSettings, onPreferences, onReferrals, onPodcasts, onSeries, onShorts, onMemberships, onAnalytics, onHelp,
+  onWatchLater, onSubscriptions, onHistory, onPlaylists, onMyVideos, onGoLive, onLive, onSettings, onPreferences, onReferrals, onStudio, onPodcasts, onSeries, onShorts, onMemberships, onAnalytics, onHelp,
 }: Props) {
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -225,6 +226,12 @@ export default function TopBar({
                   style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14, borderTop: '1px solid #f0f0f0' }}
                 >
                   🎁 Invite Friends
+                </div>
+                <div
+                  onClick={() => { setMenuOpen(false); onStudio(); }}
+                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
+                >
+                  🎬 Creator Studio
                 </div>
                 <div
                   onClick={() => { setMenuOpen(false); onPreferences(); }}

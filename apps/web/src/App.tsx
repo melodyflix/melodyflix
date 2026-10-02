@@ -29,6 +29,7 @@ import TwoFASettings from './pages/TwoFASettings';
 import Preferences from './pages/Preferences';
 import ClipView from './pages/ClipView';
 import Referrals from './pages/Referrals';
+import CreatorStudio from './pages/CreatorStudio';
 import TagView from './pages/TagView';
 import GenreView from './pages/GenreView';
 import PersonView from './pages/PersonView';
@@ -107,6 +108,7 @@ function AppInner() {
         onSettings={() => navigate('/settings/security')}
         onPreferences={() => navigate('/settings/preferences')}
         onReferrals={() => navigate('/referrals')}
+        onStudio={() => navigate('/studio')}
         onPodcasts={() => navigate('/podcasts')}
         onSeries={() => navigate('/series')}
         onShorts={() => navigate('/shorts')}
@@ -140,6 +142,7 @@ function AppInner() {
         <Route path="/buy-messages" element={<BuyMessages onSignIn={requireSignIn} />} />
         <Route path="/my-memberships" element={<MyMemberships onSignIn={requireSignIn} />} />
         <Route path="/analytics" element={<Analytics user={user} onSignIn={requireSignIn} />} />
+        <Route path="/studio" element={<CreatorStudio onSignIn={requireSignIn} />} />
         <Route path="/help" element={<HelpCenter onSignIn={requireSignIn} />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/shorts/:id" element={<ShortsFeed onSignIn={requireSignIn} />} />

@@ -2657,6 +2657,203 @@ export async function cancelMembership(channelId: string): Promise<{ cancelled: 
 }
 
 
+
+// ============ Creator Studio (9.1 - 9.11) ============
+export interface StudioSummary {
+  channel_id: string;
+  subscriber_count: number;
+  total_views: number;
+  total_videos: number;
+  total_watch_time_seconds: number;
+  avg_views_per_video: number;
+  latest_video: { id: string; title: string; created_at: string; view_count: number } | null;
+  top_video: { id: string; title: string; view_count: number } | null;
+  next_milestone: { type: string; threshold: number; current: number; remaining: number } | null;
+  total_insights: number;
+  unacknowledged_milestones: number;
+}
+export async function getStudioSummary(channelId: string): Promise<StudioSummary> {
+  return request<StudioSummary>(`/api/v1/videos/studio/channels/${channelId}/summary`);
+}
+
+export interface ChannelMilestone {
+  id: string;
+  channel_id: string;
+  milestone_type: string;
+  threshold: number;
+  achieved_at: string | null;
+  notified: number;
+  created_at: string;
+}
+export interface MilestoneCheckResult {
+  achieved: ChannelMilestone[];
+  all: ChannelMilestone[];
+  current: { subscribers: number; views: number; videos: number };
+}
+export async function getMilestones(channelId: string): Promise<MilestoneCheckResult> {
+  return request<MilestoneCheckResult>(`/api/v1/videos/studio/channels/${channelId}/milestones`);
+}
+export async function markMilestoneNotified(id: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/api/v1/videos/studio/milestones/${id}/notify`, { method: 'POST' });
+}
+
+export interface GrowthInsight {
+  id: string;
+  category: 'warning' | 'opportunity' | 'success' | 'tip';
+  title: string;
+  description: string;
+  action_label: string | null;
+  action_url: string | null;
+  priority: number;
+}
+export async function getGrowthInsights(channelId: string): Promise<{ insights: GrowthInsight[] }> {
+  return request<{ insights: GrowthInsight[] }>(`/api/v1/videos/studio/channels/${channelId}/insights`);
+}
+
+export interface EndScreenElement {
+  id: string;
+  type: 'video' | 'playlist' | 'channel' | 'subscribe' | 'link';
+  x: number; y: number; width: number; height: number;
+  label: string;
+  target_id: string | null;
+  thumbnail_url: string | null;
+}
+export interface VideoEndScreen {
+  video_id: string;
+  channel_id: string;
+  elements: EndScreenElement[];
+  start_seconds: number;
+  duration_seconds: number;
+  updated_at: string;
+}
+export interface EndScreenTemplate {
+  id: string;
+  label: string;
+  elements: Omit<EndScreenElement, 'id'>[];
+}
+export async function getEndScreenTemplates(): Promise<{ templates: EndScreenTemplate[] }> {
+  return request<{ templates: EndScreenTemplate[] }>('/api/v1/videos/studio/end-screen-templates');
+}
+export async function getEndScreen(videoId: string): Promise<{ end_screen: VideoEndScreen | null }> {
+  return request<{ end_screen: VideoEndScreen | null }>(`/api/v1/videos/studio/videos/${videoId}/end-screen`);
+}
+export async function setEndScreen(videoId: string, input: {
+  elements: Omit<EndScreenElement, 'id'>[];
+  start_seconds?: number;
+  duration_seconds?: number;
+}): Promise<{ end_screen: VideoEndScreen }> {
+  return request<{ end_screen: VideoEndScreen }>(`/api/v1/videos/studio/videos/${videoId}/end-screen`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+export async function deleteEndScreen(videoId: string): Promise<{ removed: boolean }> {
+  return request<{ removed: boolean }>(`/api/v1/videos/studio/videos/${videoId}/end-screen`, { method: 'DELETE' });
+}
+
+export interface CompetitorSnapshot {
+  id: string;
+  channel_id: string;
+  competitor_channel_id: string;
+  competitor_name: string | null;
+  subscriber_snapshot: number;
+  video_count_snapshot: number;
+  last_snapshot_at: string | null;
+  created_at: string;
+}
+export interface CompetitorAnalysis {
+  competitor_channel_id: string;
+  competitor_name: string | null;
+  subscriber_count: number;
+  video_count: number;
+  avg_views_per_video: number;
+  total_views: number;
+  upload_frequency_days: number | null;
+  recent_uploads: { id: string; title: string; view_count: number; created_at: string }[];
+  vs_own: {
+    subscriber_diff: number;
+    video_count_diff: number;
+    avg_views_diff: number;
+  } | null;
+}
+export async function listCompetitors(channelId: string): Promise<{ competitors: CompetitorSnapshot[] }> {
+  return request<{ competitors: CompetitorSnapshot[] }>(`/api/v1/videos/studio/channels/${channelId}/competitors`);
+}
+export async function trackCompetitor(channelId: string, competitorChannelId: string): Promise<{ competitor: CompetitorSnapshot }> {
+  return request<{ competitor: CompetitorSnapshot }>(`/api/v1/videos/studio/channels/${channelId}/competitors`, {
+    method: 'POST',
+    body: JSON.stringify({ competitor_channel_id: competitorChannelId }),
+  });
+}
+export async function untrackCompetitor(channelId: string, competitorChannelId: string): Promise<{ removed: boolean }> {
+  return request<{ removed: boolean }>(`/api/v1/videos/studio/channels/${channelId}/competitors/${competitorChannelId}`, { method: 'DELETE' });
+}
+export async function getCompetitorAnalysis(channelId: string, competitorChannelId: string): Promise<CompetitorAnalysis> {
+  return request<CompetitorAnalysis>(`/api/v1/videos/studio/channels/${channelId}/competitors/${competitorChannelId}/analysis`);
+}
+
+export interface ABTestVariant {
+  id: string;
+  test_id: string;
+  label: string;
+  content: string;
+  impressions: number;
+  clicks: number;
+  watch_seconds: number;
+  created_at: string;
+}
+export interface ABTest {
+  id: string;
+  channel_id: string;
+  video_id: string;
+  test_type: 'thumbnail' | 'title';
+  status: 'running' | 'completed' | 'cancelled';
+  winner_variant_id: string | null;
+  starts_at: string;
+  ends_at: string | null;
+  min_impressions: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  variants: ABTestVariant[];
+}
+export interface ABVariantScore {
+  variant_id: string;
+  label: string;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  avg_watch_seconds: number;
+  score: number;
+  is_significant: boolean;
+}
+export async function listABTests(channelId: string, limit = 50): Promise<{ tests: ABTest[] }> {
+  return request<{ tests: ABTest[] }>(`/api/v1/videos/studio/channels/${channelId}/ab-tests?limit=${limit}`);
+}
+export async function createABTest(channelId: string, input: {
+  video_id: string;
+  test_type: 'thumbnail' | 'title';
+  variants: { label: string; content: string }[];
+  min_impressions?: number;
+}): Promise<{ test: ABTest }> {
+  return request<{ test: ABTest }>(`/api/v1/videos/studio/channels/${channelId}/ab-tests`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+export async function getABTestDetail(id: string): Promise<{ test: ABTest; scores: ABVariantScore[]; winner: ABVariantScore | null; is_ready: boolean }> {
+  return request<{ test: ABTest; scores: ABVariantScore[]; winner: ABVariantScore | null; is_ready: boolean }>(`/api/v1/videos/studio/ab-tests/${id}`);
+}
+export async function completeABTest(id: string, force = false): Promise<{ test: ABTest }> {
+  return request<{ test: ABTest }>(`/api/v1/videos/studio/ab-tests/${id}/complete`, {
+    method: 'POST',
+    body: JSON.stringify({ force }),
+  });
+}
+export async function cancelABTest(id: string): Promise<{ test: ABTest }> {
+  return request<{ test: ABTest }>(`/api/v1/videos/studio/ab-tests/${id}/cancel`, { method: 'POST' });
+}
+
 // ============ Advanced Analytics (26.2 - 26.18) ============
 export type AnalyticsEventType = 'view_start' | 'view_end' | 'progress' | 'pause' | 'resume' | 'seek'
   | 'click' | 'scroll' | 'quality_change' | 'fullscreen' | 'ad_impression' | 'ad_click'
