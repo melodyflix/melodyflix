@@ -51,8 +51,6 @@ export function ensureSchema(): void {
     );
     CREATE INDEX IF NOT EXISTS idx_video_ratings_video ON video_ratings(video_id);
     -- Add rating aggregate columns (idempotent)
-    try { db.exec('ALTER TABLE videos ADD COLUMN rating_avg REAL NOT NULL DEFAULT 0'); } catch {}
-    try { db.exec('ALTER TABLE videos ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0'); } catch {}
 
     CREATE TABLE IF NOT EXISTS video_views (
       id TEXT PRIMARY KEY,
@@ -63,6 +61,10 @@ export function ensureSchema(): void {
     );
     CREATE INDEX IF NOT EXISTS idx_video_views_video ON video_views(video_id);
   `);
+  // Add rating aggregate columns (idempotent migrations)
+  try { db.exec('ALTER TABLE videos ADD COLUMN rating_avg REAL NOT NULL DEFAULT 0'); } catch {}
+  try { db.exec('ALTER TABLE videos ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0'); } catch {}
+
 }
 
 export function createVideo(

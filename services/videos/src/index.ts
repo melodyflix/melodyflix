@@ -36,6 +36,7 @@ import { adCampaignRoutes } from './routes/adcampaign.route.js';
 import { advancedAnalyticsRoutes } from './routes/advancedanalytics.route.js';
 import { creatorStudioRoutes } from './routes/creatorstudio.route.js';
 import { preferencesRoutes } from './routes/preferences.route.js';
+import { liveTvRoutes } from './routes/livetv.route.js';
 import { ensureSchema } from './services/video.service.js';
 import { ensureCommentSchema, ensureHistorySchema, ensurePlaylistSchema } from './services/comment.service.js';
 import { ensureSeriesSchema } from './services/series.service.js';
@@ -59,6 +60,7 @@ import { ensureIntroOutroSchema } from './services/introoutro.service.js';
 import { ensureOverlaysSchema, ensureTransitionSchema } from './services/overlays.service.js';
 import { ensureDistributionSchema } from './services/distribution.service.js';
 import { ensureAdCampaignSchema } from './services/adcampaign.service.js';
+import { ensureLiveTvSchema } from './services/livetv.service.js';
 import { ensureAdvancedAnalyticsSchema } from './services/advancedanalytics.service.js';
 import { ensureCreatorStudioSchema } from './services/creatorstudio.service.js';
 import { ensurePreferencesSchema } from './services/preferences.service.js';
@@ -121,6 +123,7 @@ ensureChatLimitsSchema();
 ensureMembershipSchema();
 ensureSupportSchema();
 ensurePushSchema();
+ensureLiveTvSchema();
 logger.info('videos storage and schema ensured');
 
 // Specific routes first (before wildcards)
@@ -152,6 +155,7 @@ await app.register(adCampaignRoutes, { prefix: '/api/v1/videos' });
 await app.register(advancedAnalyticsRoutes, { prefix: '/api/v1/videos' });
 await app.register(creatorStudioRoutes, { prefix: '/api/v1/videos' });
 await app.register(preferencesRoutes, { prefix: '/api/v1/videos' });
+await app.register(liveTvRoutes, { prefix: '/api/v1/videos' });
 await app.register(musicRoutes, { prefix: '/api/v1/videos/music' });
 await app.register(adminReportRoutes, { prefix: '/api/v1/videos/admin' });
 
