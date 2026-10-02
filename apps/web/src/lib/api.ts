@@ -531,6 +531,61 @@ export async function getVideosByGenre(genre: string, limit = 60): Promise<{ vid
 
 
 
+
+// ============ Video Transcript (Section 35) ============
+export interface TranscriptCue {
+  index: number;
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface Transcript {
+  video_id: string;
+  language: string;
+  label: string;
+  source: 'subtitle' | 'chapters' | 'placeholder';
+  cues: TranscriptCue[];
+  plain_text: string;
+  word_count: number;
+  duration: number;
+}
+
+export interface TranscriptSearchHit {
+  index: number;
+  start: number;
+  end: number;
+  text: string;
+  snippet: string;
+}
+
+export async function getVideoTranscript(videoId: string, lang?: string): Promise<{ transcript: Transcript }> {
+  const qs = lang ? `?lang=${encodeURIComponent(lang)}` : '';
+  return request<{ transcript: Transcript }>(`/api/v1/videos/${videoId}/transcript${qs}`);
+}
+
+export async function getTranscriptLanguages(videoId: string): Promise<{ languages: { language: string; label: string }[] }> {
+  return request<{ languages: { language: string; label: string }[] }>(`/api/v1/videos/${videoId}/transcript/languages`);
+}
+
+export async function searchVideoTranscript(
+  videoId: string,
+  query: string,
+  lang?: string,
+): Promise<{ hits: TranscriptSearchHit[]; total: number; language: string; label: string }> {
+  const params = new URLSearchParams({ q: query });
+  if (lang) params.set('lang', lang);
+  return request<{ hits: TranscriptSearchHit[]; total: number; language: string; label: string }>(
+    `/api/v1/videos/${videoId}/transcript/search?${params.toString()}`,
+  );
+}
+
+export function transcriptDownloadUrl(videoId: string, format: 'txt' | 'srt' | 'vtt' = 'txt', lang?: string): string {
+  const params = new URLSearchParams({ format });
+  if (lang) params.set('lang', lang);
+  return `/api/v1/videos/${videoId}/transcript/download?${params.toString()}`;
+}
+
 // ============ Subtitle Auto-Generation (38.2) ============
 export interface AutoGenCuesResult {
   cues: SubtitleCue[];

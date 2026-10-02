@@ -30,6 +30,7 @@ import ClipModal from '../components/ClipModal';
 import TagChips from '../components/TagChips';
 import GenreChips from '../components/GenreChips';
 import CastCrewList from '../components/CastCrewList';
+import TranscriptPanel from '../components/TranscriptPanel';
 import { usePlayer } from '../components/PlayerContext';
 
 type Reaction = 'like' | 'dislike' | null;
@@ -73,6 +74,7 @@ export default function Watch({ onSignIn }: Props) {
   const [showQueue, setShowQueue] = useState(false);
   const [autoplayNext, setAutoplayNext] = useState(true);
   const [showClipModal, setShowClipModal] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
   const [resumeAt, setResumeAt] = useState<number>(0);
   const [resumedFrom, setResumedFrom] = useState<number>(0);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -529,6 +531,18 @@ export default function Watch({ onSignIn }: Props) {
                 ✂️ Clip
               </button>
 
+              <button
+                className="mf-sub-btn"
+                style={{
+                  background: showTranscript ? '#e8f0fe' : '#f2f2f2',
+                  color: showTranscript ? '#065fd4' : '#0f0f0f',
+                }}
+                onClick={() => setShowTranscript((v) => !v)}
+                title="Toggle transcript"
+              >
+                📝 Transcript
+              </button>
+
               <VideoPoll
                 videoId={video.id}
                 videoOwnerId={video.owner_id}
@@ -616,6 +630,21 @@ export default function Watch({ onSignIn }: Props) {
           onClose={() => setShowPlaylistModal(false)}
           onToast={showToast}
         />
+      )}
+
+      {showTranscript && video && (
+        <div className="mf-transcript-overlay">
+          <TranscriptPanel
+            videoId={video.id}
+            currentTime={currentTime}
+            onSeek={(sec) => setSeekTarget({ time: sec, nonce: seekNonceRef.current += 1 })}
+          />
+          <button
+            className="mf-transcript-close"
+            onClick={() => setShowTranscript(false)}
+            title="Close transcript"
+          >✕</button>
+        </div>
       )}
 
       {showClipModal && video && (
