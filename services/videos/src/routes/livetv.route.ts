@@ -9,6 +9,8 @@ import {
   parseXmltv, importXmltv,
   getEpgForChannel, getNowPlaying, getUpNext,
   getSchedule, getScheduleForChannel,
+  ensureLiveTvStateSchema, switchChannel, getWatchState,
+  updatePosition, listRecentChannels, clearWatchState,
 } from '../services/livetv.service.js';
 
 const CreateSchema = z.object({
@@ -280,6 +282,75 @@ export async function liveTvRoutes(app: FastifyInstance) {
     const result = getScheduleForChannel(channelId, { from: q.from, to: q.to });
     if (!result) return reply.code(404).send({ success: false, error: 'Channel not found' });
     return reply.send({ success: true, data: result });
+  });
+
+
+  // ---- Channel Switching / Watch State (40.3) ----
+
+  const SwitchBodySchema = z.object({
+    device: z.string().max(80).nullable().optional(),
+    resume: z.boolean().optional(),
+  });
+
+  const PositionBodySchema = z.object({
+    position_seconds: z.number().min(0).max(3600 * 24),
+  });
+
+  // POST /live-tv/switch/:channelId — switch to a channel, save state
+  app.post('/live-tv/switch/:channelId', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { channelId } = req.params as { channelId: string };
+    const body = SwitchBodySchema.safeParse(req.body ?? {});
+    if (!body.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid body', issues: body.error.issues });
+    }
+    try {
+      const result = switchChannel(me, channelId, body.data);
+      return reply.send({ success: true, data: result });
+    } catch (e: any) {
+      if (e?.message === 'Channel not found') {
+        return reply.code(404).send({ success: false, error: 'Channel not found' });
+      }
+      throw e;
+    }
+  });
+
+  // GET /live-tv/state — current watch state + channel
+  app.get('/live-tv/state', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const state = getWatchState(me);
+    return reply.send({ success: true, data: { state } });
+  });
+
+  // PATCH /live-tv/state/position — heartbeat to update position_seconds
+  app.patch('/live-tv/state/position', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const body = PositionBodySchema.safeParse(req.body);
+    if (!body.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid body', issues: body.error.issues });
+    }
+    updatePosition(me, body.data.position_seconds);
+    return reply.send({ success: true, data: { updated: true } });
+  });
+
+  // DELETE /live-tv/state — stop watching (clear current state, keep recents)
+  app.delete('/live-tv/state', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    clearWatchState(me);
+    return reply.send({ success: true, data: { cleared: true } });
+  });
+
+  // GET /live-tv/recent?limit=N — recently watched channels
+  app.get('/live-tv/recent', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const q = req.query as { limit?: string };
+    const recent = listRecentChannels(me, q.limit ? parseInt(q.limit) : 10);
+    return reply.send({ success: true, data: { recent, count: recent.length } });
   });
 
 }

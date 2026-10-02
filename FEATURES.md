@@ -472,7 +472,7 @@ Legend:
 ## 40. Live TV Broadcasting
 - [x] 40.1 Live TV Channels
 - [x] 40.2 Electronic Program Guide (EPG)
-- [ ] 40.3 Channel Switching
+- [x] 40.3 Channel Switching
 - [ ] 40.4 Live TV Recording (DVR)
 - [ ] 40.5 Time-Shift TV
 - [x] 40.6 Multi-Channel Support

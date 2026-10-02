@@ -723,3 +723,149 @@ export function getScheduleForChannel(channelId: string, opts: {
   const entries = getEpgForChannel(key, opts.from, opts.to);
   return { channel: ch, entries };
 }
+
+// ============================================================
+// 40.3 — Channel Switching (state save/restore)
+// ============================================================
+
+export interface LiveTvWatchState {
+  user_id: string;
+  channel_id: string;
+  position_seconds: number;
+  device: string | null;
+  updated_at: string;
+}
+
+export function ensureLiveTvStateSchema(): void {
+  const db = getDb();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS live_tv_watch_state (
+      user_id TEXT PRIMARY KEY,
+      channel_id TEXT NOT NULL,
+      position_seconds REAL NOT NULL DEFAULT 0,
+      device TEXT,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_livetv_state_channel ON live_tv_watch_state(channel_id);
+
+    CREATE TABLE IF NOT EXISTS live_tv_recent (
+      user_id TEXT NOT NULL,
+      channel_id TEXT NOT NULL,
+      last_watched_at TEXT NOT NULL,
+      watch_count INTEGER NOT NULL DEFAULT 1,
+      PRIMARY KEY (user_id, channel_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_livetv_recent_user ON live_tv_recent(user_id, last_watched_at DESC);
+  `);
+}
+
+export interface SwitchResult {
+  channel: LiveTvChannel;
+  resumed_at_seconds: number;
+  previous_channel_id: string | null;
+}
+
+export function switchChannel(
+  userId: string,
+  channelId: string,
+  opts: { device?: string; resume?: boolean } = {}
+): SwitchResult {
+  const ch = getChannel(channelId);
+  if (!ch) throw new Error('Channel not found');
+
+  const db = getDb();
+  const now = new Date().toISOString();
+
+  // Save previous state (for audit / "back to previous" feature)
+  const prev = db.prepare(
+    'SELECT channel_id FROM live_tv_watch_state WHERE user_id = ?'
+  ).get(userId) as { channel_id: string } | undefined;
+
+  // Resume position from the existing watch state ONLY IF same channel
+  let resumeAt = 0;
+  if (opts.resume && prev?.channel_id === channelId) {
+    const state = db.prepare(
+      'SELECT position_seconds FROM live_tv_watch_state WHERE user_id = ?'
+    ).get(userId) as { position_seconds: number } | undefined;
+    if (state) resumeAt = state.position_seconds;
+  }
+
+  db.exec('BEGIN');
+  try {
+    // Upsert current state
+    db.prepare(`
+      INSERT INTO live_tv_watch_state (user_id, channel_id, position_seconds, device, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET
+        channel_id = excluded.channel_id,
+        position_seconds = excluded.position_seconds,
+        device = excluded.device,
+        updated_at = excluded.updated_at
+    `).run(userId, channelId, resumeAt, opts.device ?? null, now);
+
+    // Upsert recents
+    db.prepare(`
+      INSERT INTO live_tv_recent (user_id, channel_id, last_watched_at, watch_count)
+      VALUES (?, ?, ?, 1)
+      ON CONFLICT(user_id, channel_id) DO UPDATE SET
+        last_watched_at = excluded.last_watched_at,
+        watch_count = live_tv_recent.watch_count + 1
+    `).run(userId, channelId, now);
+
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+
+  return {
+    channel: ch,
+    resumed_at_seconds: resumeAt,
+    previous_channel_id: prev?.channel_id ?? null,
+  };
+}
+
+export function getWatchState(userId: string): (LiveTvWatchState & { channel: LiveTvChannel | null }) | null {
+  const db = getDb();
+  const row = db.prepare(
+    'SELECT * FROM live_tv_watch_state WHERE user_id = ?'
+  ).get(userId) as LiveTvWatchState | undefined;
+  if (!row) return null;
+  return { ...row, channel: getChannel(row.channel_id) };
+}
+
+export function updatePosition(userId: string, positionSeconds: number): void {
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE live_tv_watch_state
+    SET position_seconds = ?, updated_at = ?
+    WHERE user_id = ?
+  `).run(Math.max(0, positionSeconds), now, userId);
+}
+
+export interface RecentChannel {
+  channel_id: string;
+  last_watched_at: string;
+  watch_count: number;
+  channel: LiveTvChannel | null;
+}
+
+export function listRecentChannels(userId: string, limit = 10): RecentChannel[] {
+  const db = getDb();
+  const n = Math.min(Math.max(limit, 1), 50);
+  const rows = db.prepare(
+    'SELECT channel_id, last_watched_at, watch_count FROM live_tv_recent WHERE user_id = ? ORDER BY last_watched_at DESC LIMIT ?'
+  ).all(userId, n) as { channel_id: string; last_watched_at: string; watch_count: number }[];
+  return rows.map(r => ({
+    channel_id: r.channel_id,
+    last_watched_at: r.last_watched_at,
+    watch_count: r.watch_count,
+    channel: getChannel(r.channel_id),
+  }));
+}
+
+export function clearWatchState(userId: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM live_tv_watch_state WHERE user_id = ?').run(userId);
+}
