@@ -6,6 +6,8 @@ import {
   type User, type AnalyticsData,
 } from '../lib/api';
 import { LineChart, BarChart, StatCard } from '../components/charts/Charts';
+import AdvancedAnalytics from '../components/AdvancedAnalytics';
+import { api } from '../lib/api';
 
 interface Props {
   user: User | null;
@@ -28,6 +30,25 @@ export default function Analytics({ user, onSignIn }: Props) {
   const navigate = useNavigate();
   const me = getCachedUser();
   const [days, setDays] = useState(30);
+  const [channelId, setChannelId] = useState<string>('');
+  const [channelVideos, setChannelVideos] = useState<{ id: string; title: string; duration?: number }[]>([]);
+
+  useEffect(() => {
+    if (!me) return;
+    api.getMyChannel()
+      .then((c) => {
+        if (c?.id) setChannelId(c.id);
+      })
+      .catch(() => {});
+    api.getMyVideos?.()
+      .then((res: any) => {
+        const list = res?.videos ?? res ?? [];
+        if (Array.isArray(list)) {
+          setChannelVideos(list.map((v: any) => ({ id: v.id, title: v.title ?? 'Untitled', duration: v.duration_seconds ?? 600 })));
+        }
+      })
+      .catch(() => {});
+  }, [me?.id]);
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -282,6 +303,13 @@ export default function Analytics({ user, onSignIn }: Props) {
           </div>
         )}
       </div>
+      {channelId && (
+        <AdvancedAnalytics
+          channelId={channelId}
+          videos={channelVideos}
+          onToast={(m) => alert(m)}
+        />
+      )}
     </div>
   );
 }

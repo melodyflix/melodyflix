@@ -2656,6 +2656,203 @@ export async function cancelMembership(channelId: string): Promise<{ cancelled: 
   return request<{ cancelled: boolean }>(`/api/v1/videos/memberships/cancel/${channelId}`, { method: 'DELETE' });
 }
 
+
+// ============ Advanced Analytics (26.2 - 26.18) ============
+export type AnalyticsEventType = 'view_start' | 'view_end' | 'progress' | 'pause' | 'resume' | 'seek'
+  | 'click' | 'scroll' | 'quality_change' | 'fullscreen' | 'ad_impression' | 'ad_click'
+  | 'share' | 'like' | 'subscribe' | 'comment';
+
+export interface AnalyticsTrackInput {
+  event_type: AnalyticsEventType;
+  channel_id?: string | null;
+  video_id?: string | null;
+  session_id?: string | null;
+  data?: any;
+  country?: string | null;
+  language?: string | null;
+  device_type?: string | null;
+  browser?: string | null;
+  os?: string | null;
+  referrer?: string | null;
+  utm_source?: string | null;
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
+}
+
+export async function trackAnalyticsEvent(input: AnalyticsTrackInput): Promise<{ id: string }> {
+  return request<{ id: string }>('/api/v1/videos/analytics/track', { method: 'POST', body: JSON.stringify(input) });
+}
+
+export interface DemographicSlice { key: string; label: string; count: number; percent: number; }
+export interface DemographicsResult {
+  by_country: DemographicSlice[];
+  by_language: DemographicSlice[];
+  by_device: DemographicSlice[];
+  by_browser: DemographicSlice[];
+  by_os: DemographicSlice[];
+  by_age_group: DemographicSlice[];
+  by_gender: DemographicSlice[];
+  by_referrer: DemographicSlice[];
+  total_events: number;
+  unique_viewers: number;
+}
+export async function getDemographics(channelId: string, days = 30): Promise<DemographicsResult> {
+  return request<DemographicsResult>(`/api/v1/videos/analytics/channels/${channelId}/demographics?days=${days}`);
+}
+
+export interface TrafficSource { source: string; visits: number; percent: number; utm_medium: string | null; }
+export interface TrafficReport {
+  sources: TrafficSource[];
+  by_utm_campaign: { campaign: string; visits: number }[];
+  by_utm_medium: { medium: string; visits: number }[];
+  by_utm_source: { source: string; visits: number }[];
+}
+export async function getTrafficSources(channelId: string, days = 30): Promise<TrafficReport> {
+  return request<TrafficReport>(`/api/v1/videos/analytics/channels/${channelId}/traffic?days=${days}`);
+}
+
+export interface RevenuePoint { day: string; revenue: number; views: number; rpm: number; }
+export interface RevenueReport {
+  total_revenue: number; total_views: number; rpm: number;
+  by_day: RevenuePoint[];
+  by_source: { source: string; revenue: number }[];
+  by_country: { country: string; revenue: number }[];
+}
+export async function getRevenueReport(channelId: string, days = 30): Promise<RevenueReport> {
+  return request<RevenueReport>(`/api/v1/videos/analytics/channels/${channelId}/revenue?days=${days}`);
+}
+
+export interface ForecastPoint { day: string; predicted_views: number; predicted_revenue: number; }
+export interface PredictiveAnalytics {
+  next_7_days: ForecastPoint[];
+  next_30_days_summary: { predicted_views: number; predicted_revenue: number };
+  trend: 'growing' | 'declining' | 'stable';
+  growth_rate: number;
+  confidence: number;
+}
+export async function getPredictiveAnalytics(channelId: string): Promise<PredictiveAnalytics> {
+  return request<PredictiveAnalytics>(`/api/v1/videos/analytics/channels/${channelId}/predictive`);
+}
+
+export interface ChurnAnalysis {
+  total_subscribers: number; churned_30d: number; churn_rate_30d: number;
+  retention_rate_30d: number; new_30d: number; net_growth_30d: number;
+  monthly_series: { month: string; churned: number; new: number; net: number }[];
+}
+export async function getChurnRate(channelId: string): Promise<ChurnAnalysis> {
+  return request<ChurnAnalysis>(`/api/v1/videos/analytics/channels/${channelId}/churn`);
+}
+
+export interface LtvResult {
+  avg_ltv: number; total_ltv: number; cohort_count: number;
+  by_cohort: { cohort_month: string; users: number; avg_ltv: number; total_ltv: number }[];
+  arpu: number; avg_lifetime_months: number;
+}
+export async function getLifetimeValue(channelId: string): Promise<LtvResult> {
+  return request<LtvResult>(`/api/v1/videos/analytics/channels/${channelId}/ltv`);
+}
+
+export interface CohortRow { cohort_month: string; users: number; periods: number[]; }
+export interface CohortAnalysis { cohorts: CohortRow[]; avg_retention: number[]; }
+export async function getCohortAnalysis(channelId: string): Promise<CohortAnalysis> {
+  return request<CohortAnalysis>(`/api/v1/videos/analytics/channels/${channelId}/cohort`);
+}
+
+export interface FunnelStep { step: string; label: string; count: number; drop_from_prev: number; conversion_from_start: number; }
+export interface FunnelAnalysis { steps: FunnelStep[]; total_sessions: number; conversion_rate: number; }
+export async function getFunnelAnalysis(channelId: string, days = 30): Promise<FunnelAnalysis> {
+  return request<FunnelAnalysis>(`/api/v1/videos/analytics/channels/${channelId}/funnel?days=${days}`);
+}
+
+export interface CompletionRateReport {
+  overall_completion_rate: number;
+  by_video: { video_id: string; title: string | null; starts: number; completions: number; rate: number }[];
+  by_day: { day: string; starts: number; completions: number; rate: number }[];
+}
+export async function getCompletionRate(channelId: string, days = 30): Promise<CompletionRateReport> {
+  return request<CompletionRateReport>(`/api/v1/videos/analytics/channels/${channelId}/completion?days=${days}`);
+}
+
+export interface RewatchReport {
+  total_rewatches: number; rewatch_rate: number;
+  top_rewatched: { video_id: string; title: string | null; rewatches: number; unique_viewers: number }[];
+}
+export async function getRewatchAnalytics(channelId: string, days = 30): Promise<RewatchReport> {
+  return request<RewatchReport>(`/api/v1/videos/analytics/channels/${channelId}/rewatch?days=${days}`);
+}
+
+export interface DropOffBucket { percent_bucket: string; drops: number; percent_of_total: number; }
+export interface DropOffReport { buckets: DropOffBucket[]; avg_watch_percent: number; worst_drop_bucket: string | null; }
+export async function getDropOffPoints(channelId: string, days = 30): Promise<DropOffReport> {
+  return request<DropOffReport>(`/api/v1/videos/analytics/channels/${channelId}/dropoff?days=${days}`);
+}
+
+export interface ClickTrackingReport {
+  total_clicks: number;
+  by_target: { target: string; clicks: number; percent: number }[];
+  by_video: { video_id: string; clicks: number }[];
+  recent: { id: string; user_id: string | null; session_id: string | null; event_data: any; created_at: string }[];
+}
+export async function getClickTracking(channelId: string, days = 30): Promise<ClickTrackingReport> {
+  return request<ClickTrackingReport>(`/api/v1/videos/analytics/channels/${channelId}/clicks?days=${days}`);
+}
+
+export interface ScrollDepthBucket { depth_bucket: string; sessions: number; percent: number; }
+export interface ScrollDepthReport { total_sessions: number; avg_max_depth: number; buckets: ScrollDepthBucket[]; reached_bottom_rate: number; }
+export async function getScrollDepth(channelId: string, days = 30): Promise<ScrollDepthReport> {
+  return request<ScrollDepthReport>(`/api/v1/videos/analytics/channels/${channelId}/scroll?days=${days}`);
+}
+
+export interface SessionSummary {
+  session_id: string; user_id: string | null;
+  started_at: string; ended_at: string;
+  event_count: number; videos_watched: number;
+}
+export async function listRecentSessions(channelId: string, days = 7, limit = 50): Promise<{ sessions: SessionSummary[] }> {
+  return request<{ sessions: SessionSummary[] }>(`/api/v1/videos/analytics/channels/${channelId}/sessions?days=${days}&limit=${limit}`);
+}
+
+export interface SessionTimeline {
+  session_id: string; user_id: string | null;
+  started_at: string; ended_at: string; duration_seconds: number;
+  events: { id: string; event_type: string; event_data: any; video_id: string | null; created_at: string }[];
+  videos_watched: number; total_watch_seconds: number;
+}
+export async function getSessionTimeline(sessionId: string): Promise<SessionTimeline> {
+  return request<SessionTimeline>(`/api/v1/videos/analytics/sessions/${sessionId}/timeline`);
+}
+
+export interface HeatmapCell { bucket_start_seconds: number; bucket_end_seconds: number; views: number; clicks: number; avg_intensity: number; }
+export interface HeatmapReport {
+  cells: HeatmapCell[];
+  bucket_size_seconds: number;
+  total_video_seconds: number;
+  peak_bucket_start: number;
+  peak_intensity: number;
+}
+export async function getHeatmap(channelId: string, videoId: string, duration: number, bucket = 15, days = 30): Promise<HeatmapReport> {
+  return request<HeatmapReport>(`/api/v1/videos/analytics/channels/${channelId}/heatmap/${videoId}?duration=${duration}&bucket=${bucket}&days=${days}`);
+}
+
+export type AnalyticsExportReport =
+  | 'overview' | 'demographics' | 'traffic' | 'revenue'
+  | 'completion' | 'rewatch' | 'dropoff' | 'click' | 'scroll'
+  | 'cohort' | 'funnel' | 'churn' | 'ltv' | 'predictive';
+
+export function analyticsExportUrl(channelId: string, report: AnalyticsExportReport, format: 'csv' | 'json' = 'csv', days = 30): string {
+  return `/api/v1/videos/analytics/channels/${channelId}/export?report=${report}&format=${format}&days=${days}`;
+}
+
+export async function updateAnalyticsProfile(patch: {
+  birth_year?: number;
+  gender?: 'male' | 'female' | 'other' | 'prefer_not';
+  country?: string;
+  language?: string;
+  interests?: string[];
+}): Promise<any> {
+  return request<any>('/api/v1/videos/analytics/profile', { method: 'PUT', body: JSON.stringify(patch) });
+}
+
 // ============ Creator Analytics ============
 export interface AnalyticsOverview {
   total_videos: number;
