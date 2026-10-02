@@ -26,6 +26,7 @@ import WatchQueue from '../components/WatchQueue';
 import StarRating from '../components/StarRating';
 import VideoPoll from '../components/VideoPoll';
 import VideoQuiz from '../components/VideoQuiz';
+import ClipModal from '../components/ClipModal';
 import { usePlayer } from '../components/PlayerContext';
 
 type Reaction = 'like' | 'dislike' | null;
@@ -68,6 +69,7 @@ export default function Watch({ onSignIn }: Props) {
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const [autoplayNext, setAutoplayNext] = useState(true);
+  const [showClipModal, setShowClipModal] = useState(false);
   const [resumeAt, setResumeAt] = useState<number>(0);
   const [resumedFrom, setResumedFrom] = useState<number>(0);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -514,6 +516,15 @@ export default function Watch({ onSignIn }: Props) {
                 />
               </div>
 
+              <button
+                className="mf-sub-btn"
+                style={{ background: '#f2f2f2', color: '#0f0f0f' }}
+                onClick={() => me ? setShowClipModal(true) : onSignIn()}
+                title="Create a clip"
+              >
+                ✂️ Clip
+              </button>
+
               <VideoPoll
                 videoId={video.id}
                 videoOwnerId={video.owner_id}
@@ -595,6 +606,21 @@ export default function Watch({ onSignIn }: Props) {
         <SaveToPlaylistModal
           videoId={video.id}
           onClose={() => setShowPlaylistModal(false)}
+          onToast={showToast}
+        />
+      )}
+
+      {showClipModal && video && (
+        <ClipModal
+          videoId={video.id}
+          videoTitle={video.title}
+          currentTime={currentTime}
+          videoDuration={Number(video.duration_seconds) || 0}
+          onClose={() => setShowClipModal(false)}
+          onCreated={(clipId) => {
+            setShowClipModal(false);
+            navigate(`/clip/${clipId}`);
+          }}
           onToast={showToast}
         />
       )}

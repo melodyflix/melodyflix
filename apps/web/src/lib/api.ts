@@ -343,6 +343,56 @@ export async function toggleCreatorHeart(commentId: string): Promise<{ ok: boole
 
 
 
+
+// ============ Video Clips ============
+export interface Clip {
+  id: string;
+  video_id: string;
+  creator_user_id: string;
+  title: string;
+  start_seconds: number;
+  end_seconds: number;
+  duration_seconds: number;
+  view_count: number;
+  created_at: string;
+  video_title?: string | null;
+  video_thumbnail_url?: string | null;
+  video_owner_id?: string | null;
+  channel_id?: string | null;
+}
+
+export async function listVideoClips(videoId: string): Promise<{ clips: Clip[] }> {
+  return request<{ clips: Clip[] }>(`/api/v1/videos/${videoId}/clips`);
+}
+
+export async function createVideoClip(
+  videoId: string,
+  title: string,
+  startSeconds: number,
+  endSeconds: number,
+): Promise<{ clip: Clip }> {
+  return request<{ clip: Clip }>(`/api/v1/videos/${videoId}/clips`, {
+    method: 'POST',
+    body: JSON.stringify({ title, start_seconds: startSeconds, end_seconds: endSeconds }),
+  });
+}
+
+export async function getClip(clipId: string): Promise<{ clip: Clip }> {
+  return request<{ clip: Clip }>(`/api/v1/videos/clips/${clipId}`);
+}
+
+export async function incrementClipView(clipId: string): Promise<{ counted: boolean }> {
+  return request<{ counted: boolean }>(`/api/v1/videos/clips/${clipId}/view`, { method: 'POST' });
+}
+
+export async function listMyClips(): Promise<{ clips: Clip[] }> {
+  return request<{ clips: Clip[] }>('/api/v1/videos/clips/mine');
+}
+
+export async function deleteClip(clipId: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/videos/clips/${clipId}`, { method: 'DELETE' });
+}
+
 // ============ Video Quiz ============
 export interface QuizOption {
   id: string;
