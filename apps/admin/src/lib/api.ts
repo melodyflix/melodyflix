@@ -777,3 +777,189 @@ export async function unmarkInfluencer(userId: string): Promise<{ unmarked: bool
   return request<{ unmarked: boolean }>(`/api/v1/auth/admin/influencers/${userId}`, { method: 'DELETE' });
 }
 
+// ============ Ad Campaigns (51.x) ============
+export type AdFormat = 'banner' | 'overlay' | 'pre-roll' | 'mid-roll' | 'post-roll' | 'native' | 'sponsored-card';
+export type AdStatus = 'draft' | 'pending_review' | 'approved' | 'rejected' | 'active' | 'paused' | 'completed' | 'archived';
+export type TargetingGender = 'any' | 'male' | 'female' | 'other';
+
+export interface AdCampaign {
+  id: string;
+  name: string;
+  advertiser: string;
+  format: AdFormat;
+  creative_url: string;
+  click_url: string;
+  thumbnail_url: string | null;
+  cta_text: string | null;
+  target_countries: string;
+  target_languages: string;
+  target_age_min: number;
+  target_age_max: number;
+  target_gender: TargetingGender;
+  target_interests: string;
+  target_categories: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  freq_cap_per_user: number;
+  freq_cap_window_hours: number;
+  freq_cap_per_session: number;
+  is_skippable: number;
+  skip_after_seconds: number;
+  duration_seconds: number;
+  pod_id: string | null;
+  requires_consent: number;
+  consent_scope: string;
+  budget_total: number;
+  budget_spent: number;
+  cpm: number;
+  cpc: number;
+  status: AdStatus;
+  review_notes: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  impression_count: number;
+  click_count: number;
+  view_count: number;
+  completion_count: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdPod {
+  id: string;
+  name: string;
+  max_ads: number;
+  max_duration_seconds: number;
+  ad_break_type: string;
+  created_at: string;
+}
+
+export interface CampaignAnalytics {
+  campaign_id: string;
+  impressions: number;
+  clicks: number;
+  views: number;
+  completions: number;
+  ctr: number;
+  view_rate: number;
+  completion_rate: number;
+  revenue: number;
+  budget_remaining: number;
+  avg_cpm_effective: number;
+}
+
+export interface DailySeriesPoint {
+  day: string;
+  impressions: number;
+  clicks: number;
+  revenue: number;
+}
+
+export interface BillingSummary {
+  campaign_id: string;
+  name: string;
+  advertiser: string;
+  budget_total: number;
+  budget_spent: number;
+  impressions: number;
+  clicks: number;
+  total_revenue: number;
+  cpm_effective: number;
+  cpc_effective: number;
+}
+
+export interface BillingLedgerEntry {
+  id: string;
+  campaign_id: string;
+  entry_type: string;
+  amount: number;
+  note: string | null;
+  created_at: string;
+}
+
+export async function listAdFormats(): Promise<{ formats: { id: AdFormat; label: string; description: string }[] }> {
+  return request<{ formats: any[] }>('/api/v1/videos/admin/ads/formats');
+}
+
+export async function listAdPods(): Promise<{ pods: AdPod[] }> {
+  return request<{ pods: AdPod[] }>('/api/v1/videos/admin/ads/pods');
+}
+
+export async function createAdPod(input: { name: string; max_ads?: number; max_duration_seconds?: number; ad_break_type?: string }): Promise<{ pod: AdPod }> {
+  return request<{ pod: AdPod }>('/api/v1/videos/admin/ads/pods', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteAdPod(id: string): Promise<{ removed: boolean }> {
+  return request<{ removed: boolean }>(`/api/v1/videos/admin/ads/pods/${id}`, { method: 'DELETE' });
+}
+
+export async function listAdCampaigns(filters: { status?: AdStatus; format?: AdFormat; advertiser?: string; limit?: number } = {}): Promise<{ campaigns: AdCampaign[] }> {
+  const qs = new URLSearchParams();
+  if (filters.status) qs.set('status', filters.status);
+  if (filters.format) qs.set('format', filters.format);
+  if (filters.advertiser) qs.set('advertiser', filters.advertiser);
+  if (filters.limit) qs.set('limit', String(filters.limit));
+  const q = qs.toString();
+  return request<{ campaigns: AdCampaign[] }>(`/api/v1/videos/admin/ads/campaigns${q ? '?' + q : ''}`);
+}
+
+export async function getAdCampaign(id: string): Promise<{ campaign: AdCampaign; analytics: CampaignAnalytics }> {
+  return request<{ campaign: AdCampaign; analytics: CampaignAnalytics }>(`/api/v1/videos/admin/ads/campaigns/${id}`);
+}
+
+export async function createAdCampaign(input: Partial<AdCampaign> & { name: string; advertiser: string; format: AdFormat; creative_url: string; click_url: string }): Promise<{ campaign: AdCampaign }> {
+  return request<{ campaign: AdCampaign }>('/api/v1/videos/admin/ads/campaigns', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateAdCampaign(id: string, patch: Partial<AdCampaign>): Promise<{ campaign: AdCampaign }> {
+  return request<{ campaign: AdCampaign }>(`/api/v1/videos/admin/ads/campaigns/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function deleteAdCampaign(id: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/videos/admin/ads/campaigns/${id}`, { method: 'DELETE' });
+}
+
+export async function submitAdCampaign(id: string): Promise<{ campaign: AdCampaign }> {
+  return request<{ campaign: AdCampaign }>(`/api/v1/videos/admin/ads/campaigns/${id}/submit`, { method: 'POST' });
+}
+
+export async function approveAdCampaign(id: string): Promise<{ campaign: AdCampaign }> {
+  return request<{ campaign: AdCampaign }>(`/api/v1/videos/admin/ads/campaigns/${id}/approve`, { method: 'POST' });
+}
+
+export async function rejectAdCampaign(id: string, notes?: string): Promise<{ campaign: AdCampaign }> {
+  return request<{ campaign: AdCampaign }>(`/api/v1/videos/admin/ads/campaigns/${id}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ notes }),
+  });
+}
+
+export async function setAdCampaignStatus(id: string, status: AdStatus): Promise<{ campaign: AdCampaign }> {
+  return request<{ campaign: AdCampaign }>(`/api/v1/videos/admin/ads/campaigns/${id}/status`, {
+    method: 'POST',
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function getAdCampaignAnalytics(id: string): Promise<{ analytics: CampaignAnalytics; daily: DailySeriesPoint[]; ledger: BillingLedgerEntry[] }> {
+  return request<{ analytics: CampaignAnalytics; daily: DailySeriesPoint[]; ledger: BillingLedgerEntry[] }>(`/api/v1/videos/admin/ads/campaigns/${id}/analytics`);
+}
+
+export async function getAdBillingReport(filters: { status?: AdStatus; advertiser?: string } = {}): Promise<{ report: BillingSummary[] }> {
+  const qs = new URLSearchParams();
+  if (filters.status) qs.set('status', filters.status);
+  if (filters.advertiser) qs.set('advertiser', filters.advertiser);
+  const q = qs.toString();
+  return request<{ report: BillingSummary[] }>(`/api/v1/videos/admin/ads/billing${q ? '?' + q : ''}`);
+}
+

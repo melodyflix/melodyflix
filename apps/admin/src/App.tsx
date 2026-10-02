@@ -14,9 +14,10 @@ import AdminEmail from './pages/AdminEmail';
 import VideoChapters from './pages/VideoChapters';
 import AdminCampaigns from './pages/AdminCampaigns';
 import AdminInfluencers from './pages/AdminInfluencers';
+import AdminAdCampaigns from './pages/AdminAdCampaigns';
 import { api, getToken, clearToken, type User } from './lib/api';
 
-type Page = 'dashboard' | 'channels' | 'videos' | 'chapters' | 'users' | 'reports' | 'ads' | 'payments' | 'support' | 'email' | 'campaigns' | 'influencers' | 'settings';
+type Page = 'dashboard' | 'channels' | 'videos' | 'chapters' | 'users' | 'reports' | 'ads' | 'ad-campaigns' | 'payments' | 'support' | 'email' | 'campaigns' | 'influencers' | 'settings';
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState<boolean>(!!getToken());
@@ -46,6 +47,7 @@ export default function App() {
     { key: 'chapters', label: 'Chapters', icon: '📑' },
     { key: 'users', label: 'Users', icon: '👥' },
     { key: 'ads', label: 'Ads', icon: '💰' },
+    { key: 'ad-campaigns', label: 'Ad Campaigns', icon: '📢' },
     { key: 'payments', label: 'Payments', icon: '💳' },
     { key: 'reports', label: 'Reports', icon: '🚩' },
     { key: 'support', label: 'Support', icon: '🎫' },
@@ -106,6 +108,7 @@ export default function App() {
         {page === 'chapters' && <VideoChapters />}
           {page === 'users' && <Users />}
           {page === 'ads' && <AdNetworks />}
+          {page === 'ad-campaigns' && <AdminAdCampaigns />}
           {page === 'payments' && <AdminPayments />}
           {page === 'reports' && <Reports />}
           {page === 'support' && <AdminSupport />}
