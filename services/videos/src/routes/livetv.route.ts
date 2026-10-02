@@ -5,6 +5,10 @@ import { requireAuth } from '@melodyflix/shared-auth';
 import {
   listChannels, getChannel, createChannel, updateChannel, deleteChannel,
   listCategories, countByOwner, checkStreamHealth, getLatestHealth, listHealthHistory,
+  parseM3U, importM3U,
+  parseXmltv, importXmltv,
+  getEpgForChannel, getNowPlaying, getUpNext,
+  getSchedule, getScheduleForChannel,
 } from '../services/livetv.service.js';
 
 const CreateSchema = z.object({
@@ -143,4 +147,139 @@ export async function liveTvRoutes(app: FastifyInstance) {
     const history = listHealthHistory(id, q.limit ? parseInt(q.limit) : 20);
     return reply.send({ success: true, data: { history } });
   });
+
+  // ---- M3U/M3U8 Import (40.13) ----
+
+  const ImportSchema = z.object({
+    playlist: z.string().min(1).max(2_000_000),
+    replace_existing: z.boolean().optional(),
+    skip_duplicates_by_url: z.boolean().optional(),
+    default_category: z.string().max(80).nullable().optional(),
+    is_public: z.boolean().optional(),
+  });
+
+  // POST /live-tv/import/m3u/preview — parse only, no DB write
+  app.post('/live-tv/import/m3u/preview', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const parsed = ImportSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    }
+    const channels = parseM3U(parsed.data.playlist);
+    return reply.send({ success: true, data: { count: channels.length, channels } });
+  });
+
+  // POST /live-tv/import/m3u — parse + insert
+  app.post('/live-tv/import/m3u', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const parsed = ImportSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    }
+    const result = importM3U(me, parsed.data.playlist, {
+      replace_existing: parsed.data.replace_existing,
+      skip_duplicates_by_url: parsed.data.skip_duplicates_by_url !== false,
+      default_category: parsed.data.default_category,
+      is_public: parsed.data.is_public,
+    });
+    return reply.send({ success: true, data: result });
+  });
+
+
+  // ---- XMLTV EPG Import (40.14) ----
+
+  const XmltvImportSchema = z.object({
+    xml: z.string().min(1).max(50_000_000),
+    replace_programs: z.boolean().optional(),
+  });
+
+  // POST /live-tv/import/xmltv/preview — parse only, no DB write
+  app.post('/live-tv/import/xmltv/preview', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const parsed = XmltvImportSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    }
+    const result = parseXmltv(parsed.data.xml);
+    return reply.send({
+      success: true,
+      data: {
+        channels_count: result.channels.length,
+        programs_count: result.programs.length,
+        channels: result.channels,
+        programs: result.programs.slice(0, 50),
+      },
+    });
+  });
+
+  // POST /live-tv/import/xmltv — parse + upsert channels + insert programs
+  app.post('/live-tv/import/xmltv', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const parsed = XmltvImportSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    }
+    const result = importXmltv(parsed.data.xml, {
+      replace_programs: parsed.data.replace_programs,
+    });
+    return reply.send({ success: true, data: result });
+  });
+
+  // ---- EPG Query (40.2) ----
+
+  // GET /live-tv/epg/:channelId?from=ISO&to=ISO — EPG timeline
+  app.get('/live-tv/epg/:channelId', async (req, reply) => {
+    const { channelId } = req.params as { channelId: string };
+    const q = req.query as { from?: string; to?: string };
+    const entries = getEpgForChannel(channelId, q.from, q.to);
+    return reply.send({ success: true, data: { entries, count: entries.length } });
+  });
+
+  // GET /live-tv/epg/:channelId/now — currently airing program
+  app.get('/live-tv/epg/:channelId/now', async (req, reply) => {
+    const { channelId } = req.params as { channelId: string };
+    const q = req.query as { at?: string };
+    const entry = getNowPlaying(channelId, q.at);
+    return reply.send({ success: true, data: { entry } });
+  });
+
+  // GET /live-tv/epg/:channelId/up-next?limit=N — upcoming programs
+  app.get('/live-tv/epg/:channelId/up-next', async (req, reply) => {
+    const { channelId } = req.params as { channelId: string };
+    const q = req.query as { limit?: string; at?: string };
+    const limit = q.limit ? parseInt(q.limit) : 5;
+    const entries = getUpNext(channelId, q.at, limit);
+    return reply.send({ success: true, data: { entries } });
+  });
+
+
+  // ---- TV Schedule (40.7) ----
+
+  // GET /live-tv/schedule — aggregate now+up_next across channels
+  app.get('/live-tv/schedule', async (req, reply) => {
+    const q = req.query as Record<string, string | undefined>;
+    const me = userId(req as any);
+    const result = getSchedule({
+      at: q.at,
+      owner_id: q.mine === 'true' ? (me ?? undefined) : q.owner_id,
+      category: q.category,
+      limit_channels: q.limit_channels ? parseInt(q.limit_channels) : undefined,
+      up_next_limit: q.up_next_limit ? parseInt(q.up_next_limit) : undefined,
+    });
+    return reply.send({ success: true, data: result });
+  });
+
+  // GET /live-tv/schedule/:channelId — single channel timeline
+  app.get('/live-tv/schedule/:channelId', async (req, reply) => {
+    const { channelId } = req.params as { channelId: string };
+    const q = req.query as { from?: string; to?: string };
+    const result = getScheduleForChannel(channelId, { from: q.from, to: q.to });
+    if (!result) return reply.code(404).send({ success: false, error: 'Channel not found' });
+    return reply.send({ success: true, data: result });
+  });
+
 }
