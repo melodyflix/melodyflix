@@ -3715,3 +3715,61 @@ export async function setLiveTvChannelAgeRating(
     body: JSON.stringify({ max_age_rating: ageRating }),
   });
 }
+
+// ---- Live TV Chat (40.9) ----
+
+export interface LiveTvChatMessage {
+  id: string;
+  channel_id: string;
+  user_id: string;
+  content: string;
+  is_hidden: number;
+  created_at: string;
+}
+
+export async function listLiveTvChat(
+  channelId: string,
+  opts: { limit?: number; since?: string } = {}
+): Promise<{ chat: LiveTvChatMessage[]; count: number; recent_per_minute: number }> {
+  const params = new URLSearchParams();
+  if (opts.limit) params.set('limit', String(opts.limit));
+  if (opts.since) params.set('since', opts.since);
+  const qs = params.toString();
+  return request(`/api/v1/videos/live-tv/chat/${channelId}${qs ? '?' + qs : ''}`);
+}
+
+export async function postLiveTvChat(
+  channelId: string,
+  content: string
+): Promise<{ message: LiveTvChatMessage }> {
+  return request(`/api/v1/videos/live-tv/chat/${channelId}`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
+}
+
+export async function deleteLiveTvChatMessage(
+  messageId: string
+): Promise<{ removed: boolean }> {
+  return request(`/api/v1/videos/live-tv/chat/messages/${messageId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function reportLiveTvChatMessage(
+  messageId: string,
+  reason?: string
+): Promise<{ reported: boolean }> {
+  return request(`/api/v1/videos/live-tv/chat/messages/${messageId}/report`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function hideLiveTvChatMessage(
+  messageId: string
+): Promise<{ hidden: boolean }> {
+  return request(`/api/v1/videos/live-tv/chat/messages/${messageId}/hide`, {
+    method: 'POST',
+  });
+}

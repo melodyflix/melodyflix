@@ -478,7 +478,7 @@ Legend:
 - [x] 40.6 Multi-Channel Support
 - [x] 40.7 TV Schedule
 - [ ] 40.8 Catch-Up TV
-- [ ] 40.9 Live TV Chat
+- [x] 40.9 Live TV Chat
 - [x] 40.10 Picture-in-Picture
 - [x] 40.11 Channel Favorites
 - [x] 40.12 Channel Parental Control

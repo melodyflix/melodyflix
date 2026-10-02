@@ -8,6 +8,7 @@ import {
   getLiveTvEpg, getLiveTvNowPlaying, getLiveTvUpNext,
   LiveTvEpgEntry,
   switchLiveTvChannel, clearLiveTvState, updateLiveTvPosition,
+  listLiveTvChat, postLiveTvChat, LiveTvChatMessage,
 } from '../lib/api';
 import { usePictureInPicture } from '../hooks/usePictureInPicture';
 
@@ -29,6 +30,11 @@ export default function LiveTVWatch({ onSignIn: _onSignIn }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [switching, setSwitching] = useState(false);
+  const [chat, setChat] = useState<LiveTvChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatSending, setChatSending] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const pip = usePictureInPicture(videoRef);
 
@@ -61,6 +67,46 @@ export default function LiveTVWatch({ onSignIn: _onSignIn }: Props) {
     })();
     return () => { cancelled = true; };
   }, [id]);
+
+  // Chat polling (3s interval)
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    const fetchChat = async () => {
+      try {
+        const r = await listLiveTvChat(id, { limit: 60 });
+        if (!cancelled) {
+          setChat(r.chat);
+          setChatError(null);
+        }
+      } catch (e: any) {
+        if (!cancelled) setChatError(e?.message ?? 'Chat load failed');
+      }
+    };
+    fetchChat();
+    const t = setInterval(fetchChat, 3000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [id]);
+
+  // Auto-scroll chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [chat.length]);
+
+  const sendChat = async () => {
+    if (!id || !chatInput.trim() || chatSending) return;
+    setChatSending(true);
+    setChatError(null);
+    try {
+      const r = await postLiveTvChat(id, chatInput.trim());
+      setChatInput('');
+      setChat((prev) => [...prev, r.message].slice(-100));
+    } catch (e: any) {
+      setChatError(e?.message ?? 'Send failed');
+    } finally {
+      setChatSending(false);
+    }
+  };
 
   // Attach HLS (or native) to the video element
   useEffect(() => {
@@ -215,7 +261,8 @@ export default function LiveTVWatch({ onSignIn: _onSignIn }: Props) {
           </div>
         </div>
 
-        {/* Right: EPG sidebar */}
+        {/* Right: EPG + Chat */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <aside style={{ border: '1px solid #eee', borderRadius: 12, padding: 16, background: '#fafafa' }}>
           <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, marginBottom: 12 }}>📅 Schedule</h2>
 
@@ -260,6 +307,54 @@ export default function LiveTVWatch({ onSignIn: _onSignIn }: Props) {
             </>
           )}
         </aside>
+
+        {/* Chat panel */}
+        <aside style={{ border: '1px solid #eee', borderRadius: 12, background: '#fafafa', display: 'flex', flexDirection: 'column', maxHeight: 420 }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid #eee', fontWeight: 600, fontSize: 14 }}>
+            💬 Live chat
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: 12, minHeight: 180, maxHeight: 280 }}>
+            {chat.length === 0 && (
+              <p style={{ fontSize: 12, color: '#888', textAlign: 'center', margin: 20 }}>No messages yet. Say hi!</p>
+            )}
+            {chat.map((m) => (
+              <div key={m.id} style={{ marginBottom: 10, fontSize: 13, lineHeight: 1.4 }}>
+                <span style={{ fontWeight: 600, fontSize: 11, color: '#666', marginRight: 6 }}>
+                  {m.user_id.slice(0, 8)}
+                </span>
+                <span>{m.content}</span>
+              </div>
+            ))}
+            <div ref={chatEndRef} />
+          </div>
+          <div style={{ padding: 8, borderTop: '1px solid #eee', display: 'flex', gap: 6 }}>
+            <input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } }}
+              placeholder="Type a message…"
+              maxLength={500}
+              disabled={chatSending}
+              style={{ flex: 1, padding: '8px 10px', border: '1px solid #ddd', borderRadius: 6, fontSize: 13 }}
+            />
+            <button
+              onClick={sendChat}
+              disabled={chatSending || !chatInput.trim()}
+              style={{
+                padding: '8px 14px', border: 'none', borderRadius: 6,
+                background: chatSending ? '#ccc' : '#0a7',
+                color: '#fff', fontSize: 13, fontWeight: 500,
+                cursor: chatSending ? 'wait' : 'pointer',
+              }}
+            >Send</button>
+          </div>
+          {chatError && (
+            <div style={{ padding: '6px 12px', fontSize: 11, color: 'crimson', background: '#fff0f0' }}>
+              {chatError}
+            </div>
+          )}
+        </aside>
+        </div>
       </div>
     </div>
   );

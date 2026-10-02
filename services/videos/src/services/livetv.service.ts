@@ -1271,3 +1271,152 @@ export function setChannelAgeRating(channelId: string, ageRating: number): LiveT
   if (r.changes === 0) return null;
   return getChannel(channelId);
 }
+
+// ============================================================
+// 40.9 — Live TV Chat (polling-based, channel-scoped)
+// ============================================================
+
+export interface LiveTvChatMessage {
+  id: string;
+  channel_id: string;
+  user_id: string;
+  content: string;
+  is_hidden: number;
+  created_at: string;
+}
+
+export function ensureLiveTvChatSchema(): void {
+  const db = getDb();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS livetv_chat_messages (
+      id TEXT PRIMARY KEY,
+      channel_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      content TEXT NOT NULL,
+      is_hidden INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_livetv_chat_channel_time
+      ON livetv_chat_messages(channel_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_livetv_chat_user_time
+      ON livetv_chat_messages(user_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS livetv_chat_reports (
+      id TEXT PRIMARY KEY,
+      message_id TEXT NOT NULL,
+      reporter_id TEXT NOT NULL,
+      reason TEXT,
+      created_at TEXT NOT NULL,
+      UNIQUE (message_id, reporter_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_livetv_chat_reports_msg
+      ON livetv_chat_reports(message_id);
+  `);
+}
+
+const MAX_CHAT_LEN = 500;
+const RATE_WINDOW_MS = 3000; // 1 message per 3s per user per channel
+
+export interface PostChatResult {
+  message: LiveTvChatMessage;
+  rate_limited?: false;
+}
+
+export function postLiveTvChat(
+  channelId: string,
+  userId: string,
+  content: string
+): LiveTvChatMessage {
+  const trimmed = (content ?? '').trim();
+  if (!trimmed) throw new Error('Empty message');
+  if (trimmed.length > MAX_CHAT_LEN) throw new Error('Message too long (max ' + MAX_CHAT_LEN + ')');
+
+  const ch = getChannel(channelId);
+  if (!ch) throw new Error('Channel not found');
+
+  const db = getDb();
+
+  // Rate limit: check last message by this user on this channel
+  const since = new Date(Date.now() - RATE_WINDOW_MS).toISOString();
+  const recent = db.prepare(
+    'SELECT 1 FROM livetv_chat_messages WHERE channel_id = ? AND user_id = ? AND created_at > ? LIMIT 1'
+  ).get(channelId, userId, since);
+  if (recent) throw new Error('Rate limited — wait a few seconds');
+
+  const now = new Date().toISOString();
+  const id = randomUUID();
+  db.prepare(`
+    INSERT INTO livetv_chat_messages (id, channel_id, user_id, content, is_hidden, created_at)
+    VALUES (?, ?, ?, ?, 0, ?)
+  `).run(id, channelId, userId, trimmed, now);
+
+  return db.prepare(
+    'SELECT * FROM livetv_chat_messages WHERE id = ?'
+  ).get(id) as LiveTvChatMessage;
+}
+
+export function listLiveTvChat(
+  channelId: string,
+  opts: { limit?: number; since?: string; include_hidden?: boolean } = {}
+): LiveTvChatMessage[] {
+  const db = getDb();
+  const where: string[] = ['channel_id = ?'];
+  const params: any[] = [channelId];
+  if (!opts.include_hidden) where.push('is_hidden = 0');
+  if (opts.since) { where.push('created_at > ?'); params.push(opts.since); }
+  const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500);
+  params.push(limit);
+  return db.prepare(
+    `SELECT * FROM livetv_chat_messages WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT ?`
+  ).all(...params).reverse() as LiveTvChatMessage[];
+}
+
+export function deleteLiveTvChat(messageId: string, requesterId: string): boolean {
+  const db = getDb();
+  const msg = db.prepare(
+    'SELECT user_id FROM livetv_chat_messages WHERE id = ?'
+  ).get(messageId) as { user_id: string } | undefined;
+  if (!msg) return false;
+  if (msg.user_id !== requesterId) throw new Error('Not your message');
+  const r = db.prepare('DELETE FROM livetv_chat_messages WHERE id = ?').run(messageId);
+  return r.changes > 0;
+}
+
+export function hideLiveTvChat(messageId: string): boolean {
+  const db = getDb();
+  const r = db.prepare(
+    'UPDATE livetv_chat_messages SET is_hidden = 1 WHERE id = ?'
+  ).run(messageId);
+  return r.changes > 0;
+}
+
+export function reportLiveTvChat(messageId: string, reporterId: string, reason?: string): void {
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO livetv_chat_reports (id, message_id, reporter_id, reason, created_at)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(message_id, reporter_id) DO NOTHING
+  `).run(randomUUID(), messageId, reporterId, reason ?? null, now);
+}
+
+export function countRecentChat(channelId: string, windowMs = 60_000): number {
+  const db = getDb();
+  const since = new Date(Date.now() - windowMs).toISOString();
+  const r = db.prepare(
+    'SELECT COUNT(*) as n FROM livetv_chat_messages WHERE channel_id = ? AND created_at > ? AND is_hidden = 0'
+  ).get(channelId, since) as { n: number };
+  return r.n;
+}
+
+// Helper for moderation: get channel ownership by chat message id
+export function getChatMessageChannelOwner(messageId: string): { channel_id: string; owner_id: string } | null {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT m.channel_id as channel_id, c.owner_id as owner_id
+    FROM livetv_chat_messages m
+    JOIN live_tv_channels c ON c.id = m.channel_id
+    WHERE m.id = ?
+  `).get(messageId) as { channel_id: string; owner_id: string } | undefined;
+  return row ?? null;
+}

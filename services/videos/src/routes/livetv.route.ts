@@ -16,6 +16,8 @@ import {
   verifyPin, unlockSession, isUnlocked, lockSession,
   blockChannel, unblockChannel, listBlockedChannels, isChannelBlocked,
   checkAccess, setChannelAgeRating,
+  postLiveTvChat, listLiveTvChat, deleteLiveTvChat, hideLiveTvChat,
+  reportLiveTvChat, countRecentChat, getChatMessageChannelOwner,
 } from '../services/livetv.service.js';
 
 const CreateSchema = z.object({
@@ -613,6 +615,90 @@ export async function liveTvRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
     const updated = setChannelAgeRating(id, parsed.data.max_age_rating);
     return reply.send({ success: true, data: { channel: updated } });
+  });
+
+
+  // ---- Live TV Chat (40.9) ----
+
+  const ChatPostSchema = z.object({
+    content: z.string().min(1).max(500),
+  });
+
+  const ChatReportSchema = z.object({
+    reason: z.string().max(200).optional(),
+  });
+
+  // GET /live-tv/chat/:channelId — poll for recent messages
+  app.get('/live-tv/chat/:channelId', async (req, reply) => {
+    const { channelId } = req.params as { channelId: string };
+    const q = req.query as { limit?: string; since?: string };
+    const limit = q.limit ? parseInt(q.limit) : 100;
+    const chat = listLiveTvChat(channelId, { limit, since: q.since });
+    const recentCount = countRecentChat(channelId, 60_000);
+    return reply.send({
+      success: true,
+      data: { chat, count: chat.length, recent_per_minute: recentCount },
+    });
+  });
+
+  // POST /live-tv/chat/:channelId — send a message
+  app.post('/live-tv/chat/:channelId', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { channelId } = req.params as { channelId: string };
+    const parsed = ChatPostSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    }
+    try {
+      const message = postLiveTvChat(channelId, me, parsed.data.content);
+      return reply.code(201).send({ success: true, data: { message } });
+    } catch (e: any) {
+      const msg = e?.message ?? 'Send failed';
+      if (msg === 'Channel not found') return reply.code(404).send({ success: false, error: msg });
+      if (msg === 'Rate limited — wait a few seconds') return reply.code(429).send({ success: false, error: msg });
+      if (msg.startsWith('Message too long')) return reply.code(400).send({ success: false, error: msg });
+      if (msg === 'Empty message') return reply.code(400).send({ success: false, error: msg });
+      return reply.code(500).send({ success: false, error: msg });
+    }
+  });
+
+  // DELETE /live-tv/chat/messages/:id — delete own message
+  app.delete('/live-tv/chat/messages/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    try {
+      const removed = deleteLiveTvChat(id, me);
+      return reply.send({ success: true, data: { removed } });
+    } catch (e: any) {
+      return reply.code(403).send({ success: false, error: e?.message ?? 'Forbidden' });
+    }
+  });
+
+  // POST /live-tv/chat/messages/:id/report — flag a message
+  app.post('/live-tv/chat/messages/:id/report', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    const parsed = ChatReportSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    }
+    reportLiveTvChat(id, me, parsed.data.reason);
+    return reply.send({ success: true, data: { reported: true } });
+  });
+
+  // POST /live-tv/chat/messages/:id/hide — hide message (channel owner only)
+  app.post('/live-tv/chat/messages/:id/hide', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    const owner = getChatMessageChannelOwner(id);
+    if (!owner) return reply.code(404).send({ success: false, error: 'Message not found' });
+    if (owner.owner_id !== me) return reply.code(403).send({ success: false, error: 'Not your channel' });
+    const ok = hideLiveTvChat(id);
+    return reply.send({ success: true, data: { hidden: ok } });
   });
 
 }
