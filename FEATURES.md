@@ -100,12 +100,12 @@ Legend:
 - [x] 8.8 Multi-Language Auto Audio Dubbing
 - [x] 8.9 Voice Cloning for Dubbing
 - [x] 8.10 Real-Time Audio Translation
-- [ ] 8.11 Auto Content Filtering
-- [ ] 8.12 Inappropriate Content Detection
-- [ ] 8.13 Spam Comment Filter
-- [ ] 8.14 Fake Account Detection
-- [ ] 8.15 Hallucination Detection
-- [ ] 8.16 Prompt Safety Filter
+- [x] 8.11 Auto Content Filtering
+- [x] 8.12 Inappropriate Content Detection
+- [x] 8.13 Spam Comment Filter
+- [x] 8.14 Fake Account Detection
+- [x] 8.15 Hallucination Detection
+- [x] 8.16 Prompt Safety Filter
 
 ## 9. Creator Tools
 - [x] 9.1 Creator Studio
