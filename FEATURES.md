@@ -57,7 +57,7 @@ Legend:
 - [x] 5.3 Category
 - [x] 5.4 Trending
 - [x] 5.5 AI Recommendation
-- [ ] 5.6 Voice Search
+- [x] 5.6 Voice Search
 - [x] 5.7 Object/Face Search
 - [x] 5.8 Typo-Tolerant Search
 - [x] 5.9 Search Suggestions
