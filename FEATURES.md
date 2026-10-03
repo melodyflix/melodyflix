@@ -125,8 +125,8 @@ Legend:
 - [x] 10.2 Membership
 - [x] 10.3 Donation
 - [x] 10.4 Super Chat
-- [ ] 10.5 Pay-per-View
-- [ ] 10.6 Rent/Buy
+- [x] 10.5 Pay-per-View
+- [x] 10.6 Rent/Buy
 - [ ] 10.7 Merchandise Store
 - [ ] 10.8 Affiliate
 - [x] 10.9 Coupon/Promo
