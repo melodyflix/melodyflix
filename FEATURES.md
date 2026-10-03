@@ -19,7 +19,7 @@ Legend:
 - [ ] 1.3 Social Login
 - [x] 1.4 Two-Factor Authentication (2FA)
 - [x] 1.5 Guest Mode
-- [ ] 1.6 Multiple Profiles
+- [x] 1.6 Multiple Profiles
 
 ## 2. Channel
 - [x] 2.1 Profile
