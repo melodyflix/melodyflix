@@ -6,9 +6,11 @@ import { createLogger } from '@melodyflix/shared-logger';
 import { liveRoutes } from './routes/live.route.js';
 import { superChatRoutes } from './routes/superchat.route.js';
 import { moderationRoutes } from './routes/moderation.route.js';
+import { multicamRoutes } from './routes/multicam.route.js';
 import { ensureSchema, cleanupStaleStreams } from './services/live.service.js';
 import { ensureSuperChatSchema } from './services/superchat.service.js';
 import { ensureModerationSchema } from './services/moderation.service.js';
+import { ensureMulticamSchema } from './services/multicam.service.js';
 import { ensureHlsStorage, stopAllPipelines } from './services/pipeline.service.js';
 import { handleBroadcaster, handleViewer, registerViewer, unregisterViewer } from './services/ws.service.js';
 import { startRtmpServer, stopRtmpServer } from './services/rtmp.service.js';
@@ -33,6 +35,7 @@ app.get('/health', async () => ({ service: 'live', status: 'ok' }));
 ensureSchema();
 ensureSuperChatSchema();
 ensureModerationSchema();
+ensureMulticamSchema();
 ensureHlsStorage();
 logger.info('live schema and HLS storage ensured');
 
@@ -60,6 +63,7 @@ app.get('/ws/viewer', { websocket: true }, (conn: any, req: any) => {
 // ---------- HTTP routes ----------
 await app.register(liveRoutes, { prefix: '/api/v1/live' });
 await app.register(moderationRoutes, { prefix: '/api/v1/live' });
+await app.register(multicamRoutes, { prefix: '/api/v1/live' });
 
 const PORT = 4005;
 const start = async () => {
