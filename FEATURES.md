@@ -130,10 +130,10 @@ Legend:
 - [x] 10.7 Merchandise Store
 - [x] 10.8 Affiliate
 - [x] 10.9 Coupon/Promo
-- [ ] 10.10 Revenue Sharing
-- [ ] 10.11 Payout Schedule
-- [ ] 10.12 Minimum Payout Limit
-- [ ] 10.13 Tax/KYC Verification
+- [x] 10.10 Revenue Sharing
+- [x] 10.11 Payout Schedule
+- [x] 10.12 Minimum Payout Limit
+- [x] 10.13 Tax/KYC Verification
 
 ## 11. Security and Privacy
 - [x] 11.1 Report
