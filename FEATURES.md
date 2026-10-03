@@ -85,8 +85,8 @@ Legend:
 - [ ] 7.5 Multi-Camera
 - [ ] 7.6 Auto Highlight
 - [ ] 7.7 Low-Latency Streaming
-- [ ] 7.8 Slow Mode
-- [ ] 7.9 Live Moderator
+- [x] 7.8 Slow Mode
+- [x] 7.9 Live Moderator
 - [ ] 7.10 Emergency Backup
 
 ## 8. AI Features

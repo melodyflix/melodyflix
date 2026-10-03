@@ -1,6 +1,7 @@
 // melodyflix live - business logic
 import { randomUUID, randomBytes } from 'node:crypto';
 import { getDb } from '@melodyflix/shared-db';
+import * as moderationModule from './moderation.service.js';
 import type { LiveStream, LiveChat, StreamStatus, StreamSource } from '../models/live.model.js';
 
 export function ensureSchema(): void {
@@ -228,7 +229,63 @@ export function removeViewer(viewerId: string): void {
 }
 
 // ---------- Chat ----------
-export function postChat(streamId: string, userId: string, username: string, content: string): LiveChat {
+export interface PostChatOptions {
+  isSubscriber?: boolean;
+  isFollowing?: boolean;
+  /** Skip moderation (used by system messages / tests). */
+  bypassModeration?: boolean;
+}
+
+export class ChatBlockedError extends Error {
+  reason: string;
+  wait_seconds: number;
+  constructor(reason: string, wait_seconds = 0) {
+    super(`Chat blocked: ${reason}`);
+    this.name = 'ChatBlockedError';
+    this.reason = reason;
+    this.wait_seconds = wait_seconds;
+  }
+}
+
+export function postChat(
+  streamId: string,
+  userId: string,
+  username: string,
+  content: string,
+  opts: PostChatOptions = {},
+): LiveChat {
+  // Enforce slow mode + moderation (7.8, 7.9) unless bypassed
+  if (!opts.bypassModeration) {
+    try {
+      const mod = moderationModule;
+      const perm = mod.checkChatPermission({
+        streamId, userId,
+        isSubscriber: opts.isSubscriber,
+        isFollowing: opts.isFollowing,
+      });
+      if (!perm.can_post) {
+        throw new ChatBlockedError(perm.reason, perm.wait_seconds);
+      }
+      const db0 = getDb();
+      const chat: LiveChat = {
+        id: randomUUID(),
+        stream_id: streamId,
+        user_id: userId,
+        username,
+        content: content.trim(),
+        created_at: new Date().toISOString(),
+      };
+      db0.prepare(`
+        INSERT INTO live_chat (id, stream_id, user_id, username, content, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(chat.id, chat.stream_id, chat.user_id, chat.username, chat.content, chat.created_at);
+      mod.recordChatPost(streamId, userId);
+      return chat;
+    } catch (e) {
+      if (e instanceof ChatBlockedError) throw e;
+      // If moderation import fails for any reason, fall through to plain insert
+    }
+  }
   const db = getDb();
   const chat: LiveChat = {
     id: randomUUID(),
