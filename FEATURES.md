@@ -16,7 +16,7 @@ Legend:
 ## 1. Account
 - [x] 1.1 Sign Up
 - [x] 1.2 Login
-- [ ] 1.3 Social Login
+- [x] 1.3 Social Login
 - [x] 1.4 Two-Factor Authentication (2FA)
 - [x] 1.5 Guest Mode
 - [x] 1.6 Multiple Profiles

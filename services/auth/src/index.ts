@@ -3,6 +3,7 @@ import Fastify from 'fastify';
 import { loadConfig } from '@melodyflix/shared-config';
 import { createLogger } from '@melodyflix/shared-logger';
 import { ensureProfilesSchema } from './services/profiles.service.js';
+import { ensureOAuthSchema } from './services/oauth.service.js';
 import { authRoutes } from './routes/auth.route.js';
 import { adminRoutes } from './routes/admin.route.js';
 import { publicUserRoutes } from './routes/public.route.js';
@@ -17,6 +18,7 @@ import { referralRoutes } from './routes/referral.route.js';
 import { ensureReferralSchema } from './services/referral.service.js';
 import { influencerRoutes } from './routes/influencer.route.js';
 import { profilesRoutes } from './routes/profiles.route.js';
+import { oauthRoutes } from './routes/oauth.route.js';
 import { ensureInfluencerSchema } from './services/influencer.service.js';
 
 const config = loadConfig();
@@ -39,6 +41,7 @@ ensureCampaignSchema();
 ensureReferralSchema();
 ensureInfluencerSchema();
 ensureProfilesSchema();
+ensureOAuthSchema();
 logger.info('auth + 2FA + email schema ensured');
 
 await app.register(authRoutes, { prefix: '/api/v1/auth' });
@@ -49,6 +52,7 @@ await app.register(campaignRoutes, { prefix: '/api/v1/auth' });
 await app.register(referralRoutes, { prefix: '/api/v1/auth' });
 await app.register(influencerRoutes, { prefix: '/api/v1/auth' });
 await app.register(profilesRoutes, { prefix: '/api/v1/auth' });
+await app.register(oauthRoutes, { prefix: '/api/v1/auth' });
 
 const PORT = 4001;
 const start = async () => {
