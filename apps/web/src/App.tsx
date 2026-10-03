@@ -34,6 +34,7 @@ import Radio from './pages/Radio';
 import RadioPlayer from './pages/RadioPlayer';
 import LiveTvRecordings from './pages/LiveTvRecordings';
 import AdminAds from './pages/AdminAds';
+import AdminAdNetworks from './pages/AdminAdNetworks';
 import TwoFASettings from './pages/TwoFASettings';
 import Preferences from './pages/Preferences';
 import ClipView from './pages/ClipView';
@@ -162,6 +163,7 @@ function AppInner() {
             <Route path="/live-tv/:id" element={<LiveTVWatch onSignIn={requireSignIn} />} />
             <Route path="/live-tv/recordings" element={<LiveTvRecordings onSignIn={requireSignIn} />} />
             <Route path="/admin/ads" element={<AdminAds onSignIn={requireSignIn} />} />
+            <Route path="/admin/ads/networks" element={<AdminAdNetworks onSignIn={requireSignIn} />} />
             <Route path="/parental" element={<ParentalSettings onSignIn={requireSignIn} />} />
             <Route path="/sports" element={<Sports onSignIn={requireSignIn} />} />
             <Route path="/sports/match/:id" element={<SportsMatchDetail onSignIn={requireSignIn} />} />

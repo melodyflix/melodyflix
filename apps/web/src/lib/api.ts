@@ -4677,3 +4677,55 @@ export async function adminListAdBlockEvents(opts: {
   const qs = params.toString();
   return request(`/api/v1/videos/admin/ads/adblock/events${qs ? '?' + qs : ''}`);
 }
+
+// ============================================================
+// Admin — VAST Ad Networks (Section 51.13)
+// ============================================================
+
+export type AdNetworkType = 'pre-roll' | 'mid-roll' | 'post-roll';
+
+export interface AdNetwork {
+  id: string;
+  name: string;
+  vast_tag_url: string;
+  type: AdNetworkType;
+  weight: number;
+  active: number;
+  priority: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdNetworkInput {
+  name: string;
+  vast_tag_url: string;
+  type?: AdNetworkType;
+  weight?: number;
+  priority?: number;
+  active?: number;
+}
+
+export async function adminListAdNetworks(): Promise<{ networks: AdNetwork[]; count: number }> {
+  return request('/api/v1/videos/admin/ad-networks');
+}
+
+export async function adminCreateAdNetwork(input: AdNetworkInput): Promise<{ network: AdNetwork }> {
+  return request('/api/v1/videos/admin/ad-networks', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function adminUpdateAdNetwork(
+  id: string,
+  patch: Partial<AdNetworkInput>
+): Promise<{ network: AdNetwork }> {
+  return request(`/api/v1/videos/admin/ad-networks/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function adminDeleteAdNetwork(id: string): Promise<{ deleted: boolean }> {
+  return request(`/api/v1/videos/admin/ad-networks/${id}`, { method: 'DELETE' });
+}
