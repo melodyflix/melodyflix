@@ -307,10 +307,10 @@ Legend:
 - [ ] 22.5 Leaderboard
 
 ## 23. Events and Ticketing
-- [ ] 23.1 Event Creation
-- [ ] 23.2 Ticket Booking
-- [ ] 23.3 Virtual Event
-- [ ] 23.4 Event Reminder
+- [x] 23.1 Event Creation
+- [x] 23.2 Ticket Booking
+- [x] 23.3 Virtual Event
+- [x] 23.4 Event Reminder
 
 ## 24. Video Interactivity
 - [ ] 24.1 Clickable Hotspots
