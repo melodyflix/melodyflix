@@ -7,6 +7,10 @@ import {
   recordError, listErrors,
   recordBandwidth, recentBandwidth,
   getQoeMetrics, topProblemsByVideo,
+  getStreamingConfig, getEffectiveStreamingConfig, upsertStreamingConfig,
+  ensureCdnEndpoint, listCdnEndpoints, markCdnStatus,
+  getPlaybackDirective,
+  evaluateSessionForAlert, listAlerts, acknowledgeAlert,
 } from '../services/telemetry.service.js';
 
 const END_REASONS = ['completed','abandoned','error','unknown'] as const;
@@ -172,4 +176,145 @@ export async function telemetryRoutes(app: FastifyInstance) {
     });
     return reply.send({ success: true, data: { problems, count: problems.length } });
   });
+
+  // ---- Streaming Config (42.1, 42.2, 42.6, 42.8, 42.10) ----
+
+  const ProtocolEnum = z.enum(['hls', 'dash', 'auto']);
+
+  const ConfigUpsertSchema = z.object({
+    prebuffer_segments: z.number().int().min(0).max(10).optional(),
+    prebuffer_max_ms: z.number().int().min(0).max(60_000).optional(),
+    abr_enabled: z.boolean().optional(),
+    abr_min_kbps: z.number().int().min(50).max(200_000).optional(),
+    abr_max_kbps: z.number().int().min(50).max(1_000_000).optional(),
+    abr_buffer_target_s: z.number().min(2).max(60).optional(),
+    alert_rebuffer_ms_threshold: z.number().int().min(0).max(3_600_000).optional(),
+    alert_fatal_error_threshold: z.number().int().min(1).max(100).optional(),
+    alert_webhook_url: z.string().url().nullable().optional(),
+    cdn_priority: z.array(z.string().max(80)).max(10).optional(),
+    cdn_fallback_enabled: z.boolean().optional(),
+    dash_manifest_url: z.string().url().nullable().optional(),
+    hls_manifest_url: z.string().url().nullable().optional(),
+    preferred_protocol: ProtocolEnum.optional(),
+  });
+
+  const CdnUpsertSchema = z.object({
+    video_id: z.string().nullable().optional(),
+    name: z.string().min(1).max(80),
+    base_url: z.string().url(),
+    priority: z.number().int().min(0).max(10_000).optional(),
+    region: z.string().max(40).nullable().optional(),
+  });
+
+  // GET /videos/:videoId/streaming-config — effective config
+  app.get('/videos/:videoId/streaming-config', async (req, reply) => {
+    const { videoId } = req.params as { videoId: string };
+    try {
+      const cfg = getEffectiveStreamingConfig(videoId);
+      return reply.send({ success: true, data: { config: cfg } });
+    } catch (e: any) {
+      if (e?.message === 'Video not found') {
+        return reply.code(404).send({ success: false, error: 'Video not found' });
+      }
+      throw e;
+    }
+  });
+
+  // PUT /videos/:videoId/streaming-config — upsert (owner only)
+  app.put('/videos/:videoId/streaming-config', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { videoId } = req.params as { videoId: string };
+    const parsed = ConfigUpsertSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    }
+    try {
+      const cfg = upsertStreamingConfig({ video_id: videoId, owner_id: me, ...parsed.data });
+      return reply.send({ success: true, data: { config: cfg } });
+    } catch (e: any) {
+      const msg = e?.message ?? 'Upsert failed';
+      if (msg === 'Video not found') return reply.code(404).send({ success: false, error: msg });
+      if (msg === 'Not your video') return reply.code(403).send({ success: false, error: msg });
+      return reply.code(400).send({ success: false, error: msg });
+    }
+  });
+
+  // GET /videos/:videoId/playback-directive — full client directive
+  app.get('/videos/:videoId/playback-directive', async (req, reply) => {
+    const { videoId } = req.params as { videoId: string };
+    const q = req.query as { region?: string };
+    try {
+      const directive = getPlaybackDirective(videoId, q.region);
+      return reply.send({ success: true, data: directive });
+    } catch (e: any) {
+      if (e?.message === 'Video not found') {
+        return reply.code(404).send({ success: false, error: 'Video not found' });
+      }
+      throw e;
+    }
+  });
+
+  // ---- CDN endpoints ----
+
+  // GET /videos/:videoId/cdn-endpoints
+  app.get('/videos/:videoId/cdn-endpoints', async (req, reply) => {
+    const { videoId } = req.params as { videoId: string };
+    const q = req.query as { region?: string };
+    const cdns = listCdnEndpoints(videoId, q.region);
+    return reply.send({ success: true, data: { cdns, count: cdns.length } });
+  });
+
+  // POST /cdn-endpoints — register a CDN (owner or admin)
+  app.post('/cdn-endpoints', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const parsed = CdnUpsertSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    }
+    const cdn = ensureCdnEndpoint(parsed.data);
+    return reply.code(201).send({ success: true, data: { cdn } });
+  });
+
+  // POST /cdn-endpoints/:id/status — record CDN health status
+  app.post('/cdn-endpoints/:id/status', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    const body = req.body as { status?: string };
+    if (!body?.status) return reply.code(400).send({ success: false, error: 'status required' });
+    markCdnStatus(id, String(body.status).slice(0, 40));
+    return reply.send({ success: true, data: { updated: true } });
+  });
+
+  // ---- Buffering alerts (42.6) ----
+
+  // POST /telemetry/sessions/:id/evaluate-alert — trigger evaluation
+  app.post('/telemetry/sessions/:id/evaluate-alert', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const alert = evaluateSessionForAlert(id);
+    return reply.send({ success: true, data: { alert } });
+  });
+
+  // GET /telemetry/alerts — list alerts
+  app.get('/telemetry/alerts', async (req, reply) => {
+    const q = req.query as { video_id?: string; unacknowledged_only?: string; limit?: string };
+    const alerts = listAlerts({
+      video_id: q.video_id,
+      unacknowledged_only: q.unacknowledged_only === 'true',
+      limit: q.limit ? parseInt(q.limit) : undefined,
+    });
+    return reply.send({ success: true, data: { alerts, count: alerts.length } });
+  });
+
+  // POST /telemetry/alerts/:id/acknowledge
+  app.post('/telemetry/alerts/:id/acknowledge', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    const ok = acknowledgeAlert(id);
+    return reply.send({ success: true, data: { acknowledged: ok } });
+  });
+
 }
