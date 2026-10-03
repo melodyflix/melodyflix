@@ -411,10 +411,10 @@ Legend:
 - [ ] 33.4 Favorites/Bookmarks
 
 ## 34. Cross-Platform Sync
-- [ ] 34.1 Multi-Device Sync
-- [ ] 34.2 Cloud Playlist Sync
+- [x] 34.1 Multi-Device Sync
+- [x] 34.2 Cloud Playlist Sync
 - [x] 34.3 Watch Progress Sync
-- [~] 34.4 Settings Sync
+- [x] 34.4 Settings Sync
 
 ## 35. Video Transcript
 - [ ] 35.1 Automatic Transcript Generation
