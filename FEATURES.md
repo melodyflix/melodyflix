@@ -70,12 +70,12 @@ Legend:
 ## 6. Interaction
 - [x] 6.1 Like/Dislike
 - [x] 6.2 Comment
-- [ ] 6.3 Rating
-- [ ] 6.4 Poll
-- [ ] 6.5 Quiz
+- [x] 6.3 Rating
+- [x] 6.4 Poll
+- [x] 6.5 Quiz
 - [x] 6.6 Share
 - [x] 6.7 Playlist
-- [ ] 6.8 Timestamp Comment
+- [x] 6.8 Timestamp Comment
 
 ## 7. Live Streaming
 - [x] 7.1 Live Streaming

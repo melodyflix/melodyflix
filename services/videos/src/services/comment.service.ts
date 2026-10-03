@@ -12,6 +12,7 @@ export interface Comment {
   reply_count: number;
   is_edited: number;
   is_deleted: number;
+  video_timestamp_seconds: number | null;
   is_pinned: number;
   creator_heart: number;
   created_at: string;
@@ -75,6 +76,7 @@ export function ensureCommentSchema(): void {
   try { db.exec('ALTER TABLE comments ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0'); } catch {}
   try { db.exec('ALTER TABLE comments ADD COLUMN creator_heart INTEGER NOT NULL DEFAULT 0'); } catch {}
   try { db.exec('CREATE INDEX IF NOT EXISTS idx_comments_pinned ON comments(video_id, is_pinned DESC)'); } catch {}
+  try { db.exec('ALTER TABLE comments ADD COLUMN video_timestamp_seconds REAL'); } catch {}
 }
 
 // ---------- Comments ----------
@@ -82,7 +84,8 @@ export function createComment(
   videoId: string,
   userId: string,
   content: string,
-  parentId: string | null
+  parentId: string | null = null,
+  videoTimestampSeconds: number | null = null
 ): Comment {
   const db = getDb();
 
@@ -104,17 +107,19 @@ export function createComment(
     reply_count: 0,
     is_edited: 0,
     is_deleted: 0,
+    video_timestamp_seconds: videoTimestampSeconds,
     created_at: now,
     updated_at: now,
   };
 
   db.prepare(`
-    INSERT INTO comments (id, video_id, user_id, parent_id, content, like_count, reply_count, is_edited, is_deleted, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO comments (id, video_id, user_id, parent_id, content, like_count, reply_count, is_edited, is_deleted, video_timestamp_seconds, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     comment.id, comment.video_id, comment.user_id, comment.parent_id,
     comment.content, comment.like_count, comment.reply_count,
-    comment.is_edited, comment.is_deleted, comment.created_at, comment.updated_at
+      comment.is_edited, comment.is_deleted, comment.video_timestamp_seconds,
+      comment.created_at, comment.updated_at
   );
 
   if (parentId) {

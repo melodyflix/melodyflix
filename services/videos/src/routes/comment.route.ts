@@ -14,6 +14,8 @@ import { batchLookupUsers, getFallbackUser, type PublicUser } from '../services/
 const CreateCommentSchema = z.object({
   content: z.string().min(1).max(2000),
   parentId: z.string().uuid().nullable().optional(),
+  // 6.8 Timestamp Comment: attach a playback position (0 - 86400s)
+  video_timestamp_seconds: z.number().min(0).max(86400).nullable().optional(),
 });
 
 const UpdateCommentSchema = z.object({
@@ -86,7 +88,7 @@ export async function commentRoutes(app: FastifyInstance) {
 
     try {
       const { videoId } = req.params as { videoId: string };
-      const comment = createComment(videoId, user.sub, parsed.data.content, parsed.data.parentId ?? null);
+      const comment = createComment(videoId, user.sub, parsed.data.content, parsed.data.parentId ?? null, parsed.data.video_timestamp_seconds ?? null);
 
       const userMap = await batchLookupUsers([user.sub]);
       const enriched = attachUsers([{ ...comment, replies: [] }], userMap)[0];
