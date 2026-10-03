@@ -7,6 +7,8 @@ import {
   updateRadioStation, deleteRadioStation,
   listRadioGenres, countStationsByOwner,
   checkRadioHealth, getLatestRadioHealth,
+  createJingle, getJingle, listJingles, updateJingle, deleteJingle,
+  pickJingle, countJingles, jinglesByType,
 } from '../services/radio.service.js';
 
 function userId(req: any): string | null {
@@ -130,4 +132,107 @@ export async function radioRoutes(app: FastifyInstance) {
     const latest = getLatestRadioHealth(id);
     return reply.send({ success: true, data: { health: latest } });
   });
+
+  // ---- Jingles (124.3) ----
+
+  const JINGLE_TYPES = ['intro','outro','transition','ad_break','station_id','news'] as const;
+
+  const JingleCreateSchema = z.object({
+    name: z.string().min(1).max(200),
+    audio_url: z.string().url(),
+    duration_seconds: z.number().min(0).max(300).optional(),
+    jingle_type: z.enum(JINGLE_TYPES).optional(),
+    weight: z.number().int().min(1).max(100).optional(),
+  });
+
+  const JingleUpdateSchema = JingleCreateSchema.partial().extend({
+    is_active: z.boolean().optional(),
+  });
+
+  // GET /radio/stations/:id/jingles — list (filter by type)
+  app.get('/radio/stations/:id/jingles', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const q = req.query as { jingle_type?: string; active_only?: string; limit?: string };
+    const jingles = listJingles(id, {
+      jingle_type: q.jingle_type as any,
+      active_only: q.active_only !== 'false',
+      limit: q.limit ? parseInt(q.limit) : undefined,
+    });
+    return reply.send({ success: true, data: { jingles, count: jingles.length } });
+  });
+
+  // POST /radio/stations/:id/jingles — create
+  app.post('/radio/stations/:id/jingles', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    const parsed = JingleCreateSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    try {
+      const jingle = createJingle({ station_id: id, owner_id: me, ...parsed.data });
+      return reply.code(201).send({ success: true, data: { jingle } });
+    } catch (e: any) {
+      const msg = e?.message ?? 'Create failed';
+      if (msg === 'Station not found') return reply.code(404).send({ success: false, error: msg });
+      if (msg === 'Not your station') return reply.code(403).send({ success: false, error: msg });
+      return reply.code(400).send({ success: false, error: msg });
+    }
+  });
+
+  // PATCH /radio/jingles/:id — update
+  app.patch('/radio/jingles/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    const parsed = JingleUpdateSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    try {
+      const updated = updateJingle(id, me, parsed.data);
+      if (!updated) return reply.code(404).send({ success: false, error: 'Jingle not found' });
+      return reply.send({ success: true, data: { jingle: updated } });
+    } catch (e: any) {
+      return reply.code(403).send({ success: false, error: e?.message ?? 'Forbidden' });
+    }
+  });
+
+  // DELETE /radio/jingles/:id
+  app.delete('/radio/jingles/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    try {
+      const removed = deleteJingle(id, me);
+      return reply.send({ success: true, data: { removed } });
+    } catch (e: any) {
+      return reply.code(403).send({ success: false, error: e?.message ?? 'Forbidden' });
+    }
+  });
+
+  // GET /radio/jingles/:id — single
+  app.get('/radio/jingles/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const j = getJingle(id);
+    if (!j) return reply.code(404).send({ success: false, error: 'Jingle not found' });
+    return reply.send({ success: true, data: { jingle: j } });
+  });
+
+  // GET /radio/stations/:id/jingles/stats — by-type counts
+  app.get('/radio/stations/:id/jingles/stats', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    return reply.send({
+      success: true,
+      data: { total: countJingles(id), by_type: jinglesByType(id) },
+    });
+  });
+
+  // POST /radio/stations/:id/jingles/pick — preview weighted pick
+  app.post('/radio/stations/:id/jingles/pick', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = req.body as { jingle_type?: string; seed?: number };
+    const type = (body?.jingle_type as any) ?? 'transition';
+    const seed = typeof body?.seed === 'number' ? body.seed : Date.now();
+    const jingle = pickJingle(id, type, seed);
+    return reply.send({ success: true, data: { jingle, seed } });
+  });
+
 }

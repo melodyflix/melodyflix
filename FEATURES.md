@@ -1126,7 +1126,7 @@ Legend:
 ## 124. Internet Radio
 - [x] 124.1 Live Radio Streaming
 - [ ] 124.2 Station Scheduling
-- [ ] 124.3 Radio Jingles
+- [x] 124.3 Radio Jingles
 - [ ] 124.4 Song History
 
 ## 125. Karaoke Platform
