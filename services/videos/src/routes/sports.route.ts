@@ -9,6 +9,9 @@ import {
   addTimelineEvent, listTimeline, deleteTimelineEvent,
   createReminder, listUserReminders, cancelReminder,
   getDueReminders, markReminderSent,
+  ensureSportsReplaySchema,
+  saveReplay, getReplay, listReplays, listUserReplays,
+  deleteReplay, rewindLive, linkReplayToEvent,
 } from '../services/livetv.service.js';
 
 const STATUSES = ['scheduled','live','halftime','finished','postponed','cancelled'] as const;
@@ -240,4 +243,106 @@ export async function sportsRoutes(app: FastifyInstance) {
     markReminderSent(id);
     return reply.send({ success: true, data: { sent: true } });
   });
+
+  // ---- Instant Replay (68.3) ----
+
+  const SaveReplaySchema = z.object({
+    match_id: z.string().min(1),
+    label: z.string().min(1).max(200),
+    start_ts: z.string(),
+    duration_seconds: z.number().min(0).max(600),
+    event_id: z.string().nullable().optional(),
+    is_public: z.boolean().optional(),
+  });
+
+  const RewindSchema = z.object({
+    seconds: z.number().int().min(1).max(6 * 3600),
+  });
+
+  // GET /sports/matches/:id/replays — public replays of a match
+  app.get('/sports/matches/:id/replays', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const q = req.query as { limit?: string };
+    const replays = listReplays(id, q.limit ? parseInt(q.limit) : 100);
+    return reply.send({ success: true, data: { replays, count: replays.length } });
+  });
+
+  // POST /sports/replays — save a replay clip
+  app.post('/sports/replays', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const parsed = SaveReplaySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    try {
+      const replay = saveReplay({ user_id: me, ...parsed.data });
+      return reply.code(201).send({ success: true, data: { replay } });
+    } catch (e: any) {
+      return reply.code(400).send({ success: false, error: e?.message ?? 'Save failed' });
+    }
+  });
+
+  // GET /sports/replays/mine — my saved clips
+  app.get('/sports/replays/mine', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const q = req.query as { limit?: string };
+    const replays = listUserReplays(me, q.limit ? parseInt(q.limit) : 100);
+    return reply.send({ success: true, data: { replays, count: replays.length } });
+  });
+
+  // GET /sports/replays/:id — single
+  app.get('/sports/replays/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const r = getReplay(id);
+    if (!r) return reply.code(404).send({ success: false, error: 'Replay not found' });
+    if (!r.is_public) {
+      const me = userId(req as any);
+      if (r.user_id !== me) return reply.code(403).send({ success: false, error: 'Private replay' });
+    }
+    return reply.send({ success: true, data: { replay: r } });
+  });
+
+  // DELETE /sports/replays/:id
+  app.delete('/sports/replays/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    try {
+      const removed = deleteReplay(id, me);
+      return reply.send({ success: true, data: { removed } });
+    } catch (e: any) {
+      return reply.code(403).send({ success: false, error: e?.message ?? 'Forbidden' });
+    }
+  });
+
+  // POST /sports/replays/:id/link — link to timeline event
+  app.post('/sports/replays/:id/link', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    const body = req.body as { event_id?: string };
+    if (!body?.event_id) return reply.code(400).send({ success: false, error: 'event_id required' });
+    const r0 = getReplay(id);
+    if (!r0) return reply.code(404).send({ success: false, error: 'Replay not found' });
+    if (r0.user_id !== me) return reply.code(403).send({ success: false, error: 'Not your replay' });
+    const r = linkReplayToEvent(id, body.event_id);
+    return reply.send({ success: true, data: { replay: r } });
+  });
+
+  // POST /sports/matches/:id/rewind — validate live rewind against time-shift
+  app.post('/sports/matches/:id/rewind', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const parsed = RewindSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    try {
+      const result = rewindLive(id, parsed.data.seconds);
+      return reply.send({ success: true, data: result });
+    } catch (e: any) {
+      if (e?.message === 'Match not found') {
+        return reply.code(404).send({ success: false, error: 'Match not found' });
+      }
+      return reply.code(500).send({ success: false, error: e?.message ?? 'Rewind failed' });
+    }
+  });
+
 }

@@ -2524,3 +2524,143 @@ export function markReminderSent(id: string): void {
   db.prepare('UPDATE sports_reminders SET sent_at = ? WHERE id = ?')
     .run(new Date().toISOString(), id);
 }
+
+// ============================================================
+// 68.3 — Sports: Instant Replay
+// Two layers:
+//  1. Live rewind — validated against existing time-shift window
+//  2. Saved replay clips — bookmarked moments linked to timeline events
+// ============================================================
+
+export interface SportsReplayClip {
+  id: string;
+  match_id: string;
+  user_id: string;
+  label: string;
+  start_ts: string;
+  duration_seconds: number;
+  event_id: string | null;
+  is_public: number;
+  created_at: string;
+}
+
+export function ensureSportsReplaySchema(): void {
+  const db = getDb();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sports_replay_clips (
+      id TEXT PRIMARY KEY,
+      match_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      label TEXT NOT NULL,
+      start_ts TEXT NOT NULL,
+      duration_seconds REAL NOT NULL DEFAULT 0,
+      event_id TEXT,
+      is_public INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_sports_replays_match ON sports_replay_clips(match_id, start_ts DESC);
+    CREATE INDEX IF NOT EXISTS idx_sports_replays_user  ON sports_replay_clips(user_id, created_at DESC);
+  `);
+}
+
+export interface SaveReplayInput {
+  match_id: string;
+  user_id: string;
+  label: string;
+  start_ts: string;
+  duration_seconds: number;
+  event_id?: string | null;
+  is_public?: boolean;
+}
+
+export function saveReplay(input: SaveReplayInput): SportsReplayClip {
+  const m = getSportsMatch(input.match_id);
+  if (!m) throw new Error('Match not found');
+  if (isNaN(new Date(input.start_ts).getTime())) throw new Error('Invalid start_ts');
+  const dur = Math.max(0, Math.min(input.duration_seconds, 600)); // 0..10min
+  if (!input.label.trim()) throw new Error('Label required');
+
+  const db = getDb();
+  const now = new Date().toISOString();
+  const id = randomUUID();
+  db.prepare(`
+    INSERT INTO sports_replay_clips
+      (id, match_id, user_id, label, start_ts, duration_seconds, event_id, is_public, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, input.match_id, input.user_id, input.label.slice(0, 200),
+    input.start_ts, dur, input.event_id ?? null,
+    input.is_public === false ? 0 : 1, now
+  );
+  return db.prepare('SELECT * FROM sports_replay_clips WHERE id = ?').get(id) as SportsReplayClip;
+}
+
+export function getReplay(id: string): SportsReplayClip | null {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM sports_replay_clips WHERE id = ?').get(id) as SportsReplayClip | undefined;
+  return row ?? null;
+}
+
+export function listReplays(matchId: string, limit = 100): SportsReplayClip[] {
+  const db = getDb();
+  const n = Math.min(Math.max(limit, 1), 500);
+  return db.prepare(`
+    SELECT * FROM sports_replay_clips
+    WHERE match_id = ? AND is_public = 1
+    ORDER BY start_ts DESC LIMIT ?
+  `).all(matchId, n) as SportsReplayClip[];
+}
+
+export function listUserReplays(userId: string, limit = 100): SportsReplayClip[] {
+  const db = getDb();
+  const n = Math.min(Math.max(limit, 1), 500);
+  return db.prepare(`
+    SELECT * FROM sports_replay_clips
+    WHERE user_id = ?
+    ORDER BY created_at DESC LIMIT ?
+  `).all(userId, n) as SportsReplayClip[];
+}
+
+export function deleteReplay(id: string, requesterId: string): boolean {
+  const r = getReplay(id);
+  if (!r) return false;
+  if (r.user_id !== requesterId) throw new Error('Not your replay');
+  const db = getDb();
+  return db.prepare('DELETE FROM sports_replay_clips WHERE id = ?').run(id).changes > 0;
+}
+
+// ---- Live rewind (reuses time-shift window) ----
+
+export interface RewindResult {
+  allowed: boolean;
+  reason: 'ok' | 'no_window' | 'too_far';
+  at_ts: string;
+  seconds: number;
+  segments: TimeshiftSegment[];
+}
+
+export function rewindLive(matchId: string, seconds: number): RewindResult {
+  const m = getSportsMatch(matchId);
+  if (!m) throw new Error('Match not found');
+  const sec = Math.max(1, Math.min(seconds, 6 * 3600));
+  const atTs = new Date(Date.now() - sec * 1000).toISOString();
+
+  // Reuse time-shift seek validation on the underlying channel
+  const seek = seekTimeshift(m.channel_id, atTs);
+  if (seek.reason === 'before_window') {
+    return { allowed: false, reason: 'too_far', at_ts: atTs, seconds: sec, segments: [] };
+  }
+  if (seek.segments.length === 0) {
+    return { allowed: false, reason: 'no_window', at_ts: atTs, seconds: sec, segments: [] };
+  }
+  return { allowed: true, reason: 'ok', at_ts: atTs, seconds: sec, segments: seek.segments };
+}
+
+// Auto-link saved replays to their timeline event (if provided)
+export function linkReplayToEvent(replayId: string, eventId: string): SportsReplayClip | null {
+  const r = getReplay(replayId);
+  if (!r) return null;
+  const db = getDb();
+  db.prepare('UPDATE sports_replay_clips SET event_id = ? WHERE id = ?').run(eventId, replayId);
+  return getReplay(replayId);
+}

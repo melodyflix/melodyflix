@@ -746,7 +746,7 @@ Legend:
 ## 68. Sports Streaming
 - [x] 68.1 Live Score Overlay
 - [x] 68.2 Match Timeline
-- [ ] 68.3 Instant Replay
+- [x] 68.3 Instant Replay
 - [x] 68.4 Team/Match Reminder
 
 ## 69. Device Control

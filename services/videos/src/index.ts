@@ -61,7 +61,7 @@ import { ensureIntroOutroSchema } from './services/introoutro.service.js';
 import { ensureOverlaysSchema, ensureTransitionSchema } from './services/overlays.service.js';
 import { ensureDistributionSchema } from './services/distribution.service.js';
 import { ensureAdCampaignSchema } from './services/adcampaign.service.js';
-import { ensureLiveTvSchema, ensureLiveTvStateSchema, ensureXmltvSchema, ensureLiveTvFavoritesSchema, ensureLiveTvParentalSchema, ensureLiveTvChatSchema, ensureLiveTvDvrSchema, ensureLiveTvTimeshiftSchema, ensureSportsSchema } from './services/livetv.service.js';
+import { ensureLiveTvSchema, ensureLiveTvStateSchema, ensureXmltvSchema, ensureLiveTvFavoritesSchema, ensureLiveTvParentalSchema, ensureLiveTvChatSchema, ensureLiveTvDvrSchema, ensureLiveTvTimeshiftSchema, ensureSportsSchema, ensureSportsReplaySchema } from './services/livetv.service.js';
 import { ensureAdvancedAnalyticsSchema } from './services/advancedanalytics.service.js';
 import { ensureCreatorStudioSchema } from './services/creatorstudio.service.js';
 import { ensurePreferencesSchema } from './services/preferences.service.js';
@@ -133,6 +133,7 @@ ensureLiveTvChatSchema();
 ensureLiveTvDvrSchema();
 ensureLiveTvTimeshiftSchema();
 ensureSportsSchema();
+ensureSportsReplaySchema();
 logger.info('videos storage and schema ensured');
 
 // Specific routes first (before wildcards)
