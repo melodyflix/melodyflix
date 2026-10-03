@@ -489,10 +489,10 @@ Legend:
 
 ---
 ## 41. Video Version Management
-- [ ] 41.1 Director's Cut
-- [ ] 41.2 Extended Version
-- [ ] 41.3 Theatrical Version
-- [ ] 41.4 Multiple Editions
+- [x] 41.1 Director's Cut
+- [x] 41.2 Extended Version
+- [x] 41.3 Theatrical Version
+- [x] 41.4 Multiple Editions
 
 ## 42. Streaming Performance
 - [ ] 42.1 Pre-Buffering
