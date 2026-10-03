@@ -438,3 +438,301 @@ export function jinglesByType(stationId: string): { jingle_type: string; count: 
     ORDER BY count DESC
   `).all(stationId) as { jingle_type: string; count: number }[];
 }
+
+// ============================================================
+// 124.2 — Station Scheduling
+// Time-blocked programming: shows, rotations, jingles, ad-breaks.
+// ============================================================
+
+export type ScheduleSlotKind = 'show' | 'music_rotation' | 'jingle' | 'ad_break' | 'news';
+
+export interface RadioScheduleSlot {
+  id: string;
+  station_id: string;
+  owner_id: string;
+  title: string;
+  kind: ScheduleSlotKind;
+  day_of_week: number | null;   // 0=Sunday..6=Saturday; null = every day
+  start_minute: number;         // minute of day 0..1439
+  duration_minutes: number;
+  playlist_url: string | null;
+  jingle_id: string | null;
+  description: string | null;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export function ensureRadioScheduleSchema(): void {
+  const db = getDb();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS radio_schedule_slots (
+      id TEXT PRIMARY KEY,
+      station_id TEXT NOT NULL,
+      owner_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'music_rotation'
+        CHECK (kind IN ('show','music_rotation','jingle','ad_break','news')),
+      day_of_week INTEGER,
+      start_minute INTEGER NOT NULL,
+      duration_minutes INTEGER NOT NULL,
+      playlist_url TEXT,
+      jingle_id TEXT,
+      description TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_radio_sched_station_time
+      ON radio_schedule_slots(station_id, day_of_week, start_minute, is_active);
+    CREATE INDEX IF NOT EXISTS idx_radio_sched_owner
+      ON radio_schedule_slots(owner_id, station_id);
+  `);
+}
+
+export interface CreateScheduleSlotInput {
+  station_id: string;
+  owner_id: string;
+  title: string;
+  kind?: ScheduleSlotKind;
+  day_of_week?: number | null;
+  start_minute: number;
+  duration_minutes: number;
+  playlist_url?: string | null;
+  jingle_id?: string | null;
+  description?: string | null;
+}
+
+export function createScheduleSlot(input: CreateScheduleSlotInput): RadioScheduleSlot {
+  const st = getRadioStation(input.station_id);
+  if (!st) throw new Error('Station not found');
+  if (st.owner_id !== input.owner_id) throw new Error('Not your station');
+  if (!input.title?.trim()) throw new Error('Title required');
+
+  const dow = input.day_of_week === undefined || input.day_of_week === null ? null : input.day_of_week;
+  if (dow !== null && (dow < 0 || dow > 6)) throw new Error('day_of_week must be 0-6');
+
+  const sm = input.start_minute;
+  if (sm < 0 || sm > 1439) throw new Error('start_minute must be 0-1439');
+  const dm = input.duration_minutes;
+  if (dm < 1 || dm > 1440) throw new Error('duration_minutes must be 1-1440');
+  if (sm + dm > 1440) throw new Error('Slot extends past midnight — split into two slots');
+
+  // Optional jingle validation
+  if (input.jingle_id) {
+    const j = getJingle(input.jingle_id);
+    if (!j) throw new Error('Jingle not found');
+    if (j.station_id !== input.station_id) throw new Error('Jingle belongs to a different station');
+  }
+
+  // Overlap check (same station + same day + overlapping minutes)
+  const db = getDb();
+  const overlap = db.prepare(`
+    SELECT id, title, start_minute, duration_minutes
+    FROM radio_schedule_slots
+    WHERE station_id = ? AND is_active = 1
+      AND (day_of_week IS NULL OR day_of_week = ?)
+      AND start_minute < ? AND (start_minute + duration_minutes) > ?
+  `).all(
+    input.station_id,
+    dow,
+    sm + dm, sm
+  ) as { id: string; title: string; start_minute: number; duration_minutes: number }[];
+
+  if (overlap.length > 0) {
+    throw new Error(`Overlaps with slot "${overlap[0].title}" at ${overlap[0].start_minute}-${overlap[0].start_minute + overlap[0].duration_minutes}`);
+  }
+
+  const now = new Date().toISOString();
+  const id = randomUUID();
+  db.prepare(`
+    INSERT INTO radio_schedule_slots
+      (id, station_id, owner_id, title, kind, day_of_week, start_minute,
+       duration_minutes, playlist_url, jingle_id, description,
+       is_active, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+  `).run(
+    id, input.station_id, input.owner_id, input.title.slice(0, 200),
+    input.kind ?? 'music_rotation', dow, sm, dm,
+    input.playlist_url ?? null, input.jingle_id ?? null,
+    input.description ?? null, now, now
+  );
+  return getScheduleSlot(id)!;
+}
+
+export function getScheduleSlot(id: string): RadioScheduleSlot | null {
+  const row = getDb().prepare('SELECT * FROM radio_schedule_slots WHERE id = ?')
+    .get(id) as RadioScheduleSlot | undefined;
+  return row ?? null;
+}
+
+export interface ListScheduleFilters {
+  day_of_week?: number | null;
+  active_only?: boolean;
+  limit?: number;
+}
+
+export function listSchedule(stationId: string, f: ListScheduleFilters = {}): RadioScheduleSlot[] {
+  const db = getDb();
+  const where: string[] = ['station_id = ?'];
+  const params: any[] = [stationId];
+  if (f.day_of_week !== undefined) {
+    where.push('(day_of_week IS NULL OR day_of_week = ?)');
+    params.push(f.day_of_week);
+  }
+  if (f.active_only !== false) where.push('is_active = 1');
+  const n = Math.min(Math.max(f.limit ?? 200, 1), 500);
+  params.push(n);
+  return db.prepare(`
+    SELECT * FROM radio_schedule_slots
+    WHERE ${where.join(' AND ')}
+    ORDER BY day_of_week IS NULL DESC, day_of_week ASC, start_minute ASC
+    LIMIT ?
+  `).all(...params) as RadioScheduleSlot[];
+}
+
+export interface UpdateScheduleSlotInput {
+  title?: string;
+  kind?: ScheduleSlotKind;
+  day_of_week?: number | null;
+  start_minute?: number;
+  duration_minutes?: number;
+  playlist_url?: string | null;
+  jingle_id?: string | null;
+  description?: string | null;
+  is_active?: boolean;
+}
+
+export function updateScheduleSlot(
+  id: string,
+  ownerId: string,
+  patch: UpdateScheduleSlotInput
+): RadioScheduleSlot | null {
+  const s = getScheduleSlot(id);
+  if (!s) return null;
+  if (s.owner_id !== ownerId) throw new Error('Not your slot');
+
+  const fields: string[] = [];
+  const values: any[] = [];
+  const nextStart = patch.start_minute ?? s.start_minute;
+  const nextDur = patch.duration_minutes ?? s.duration_minutes;
+  if (nextStart < 0 || nextStart > 1439) throw new Error('start_minute invalid');
+  if (nextDur < 1 || nextDur > 1440) throw new Error('duration_minutes invalid');
+  if (nextStart + nextDur > 1440) throw new Error('Slot extends past midnight');
+
+  const dow = patch.day_of_week !== undefined ? patch.day_of_week : s.day_of_week;
+  if (dow !== null && (dow < 0 || dow > 6)) throw new Error('day_of_week invalid');
+
+  if (patch.jingle_id) {
+    const j = getJingle(patch.jingle_id);
+    if (!j) throw new Error('Jingle not found');
+    if (j.station_id !== s.station_id) throw new Error('Jingle belongs to another station');
+  }
+
+  // Overlap check (excluding self)
+  const db = getDb();
+  const overlap = db.prepare(`
+    SELECT title, start_minute, duration_minutes
+    FROM radio_schedule_slots
+    WHERE station_id = ? AND is_active = 1 AND id != ?
+      AND (day_of_week IS NULL OR day_of_week = ?)
+      AND start_minute < ? AND (start_minute + duration_minutes) > ?
+    LIMIT 1
+  `).get(s.station_id, id, dow, nextStart + nextDur, nextStart) as
+    | { title: string; start_minute: number; duration_minutes: number }
+    | undefined;
+  if (overlap) {
+    throw new Error(`Overlaps with slot "${overlap.title}"`);
+  }
+
+  const map: Record<string, any> = {
+    title: patch.title,
+    kind: patch.kind,
+    day_of_week: dow,
+    start_minute: patch.start_minute,
+    duration_minutes: patch.duration_minutes,
+    playlist_url: patch.playlist_url,
+    jingle_id: patch.jingle_id,
+    description: patch.description,
+    is_active: patch.is_active === undefined ? undefined : (patch.is_active ? 1 : 0),
+  };
+  for (const [k, v] of Object.entries(map)) {
+    if (v === undefined) continue;
+    fields.push(`${k} = ?`);
+    values.push(v);
+  }
+  if (fields.length === 0) return s;
+  fields.push('updated_at = ?');
+  values.push(new Date().toISOString());
+  values.push(id);
+  db.prepare(`UPDATE radio_schedule_slots SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  return getScheduleSlot(id);
+}
+
+export function deleteScheduleSlot(id: string, ownerId: string): boolean {
+  const s = getScheduleSlot(id);
+  if (!s) return false;
+  if (s.owner_id !== ownerId) throw new Error('Not your slot');
+  return getDb().prepare('DELETE FROM radio_schedule_slots WHERE id = ?').run(id).changes > 0;
+}
+
+// "What's on now?" — pick the active slot for a given time
+export function getScheduleNow(stationId: string, atIso?: string): {
+  now: RadioScheduleSlot | null;
+  next: RadioScheduleSlot | null;
+  server_time: string;
+  minute_of_day: number;
+  day_of_week: number;
+} {
+  const at = atIso ? new Date(atIso) : new Date();
+  // Schedules are stored in UTC minute-of-day / day-of-week. Station owners
+  // whose local timezone differs should convert their slots to UTC.
+  const dow = at.getUTCDay();
+  const minute = at.getUTCHours() * 60 + at.getUTCMinutes();
+
+  const slots = listSchedule(stationId, { active_only: true, limit: 500 });
+  const candidates = slots.filter(
+    (s) => (s.day_of_week === null || s.day_of_week === dow) &&
+            s.start_minute <= minute &&
+            s.start_minute + s.duration_minutes > minute
+  );
+  const now = candidates[0] ?? null;
+
+  // Next: smallest future start_minute today or tomorrow
+  const todayLater = slots
+    .filter((s) => (s.day_of_week === null || s.day_of_week === dow) && s.start_minute > minute)
+    .sort((a, b) => a.start_minute - b.start_minute)[0] ?? null;
+  const nextDay = (dow + 1) % 7;
+  const tomorrow = slots
+    .filter((s) => (s.day_of_week === null || s.day_of_week === nextDay))
+    .sort((a, b) => a.start_minute - b.start_minute)[0] ?? null;
+  const next = todayLater ?? tomorrow ?? null;
+
+  return {
+    now,
+    next,
+    server_time: at.toISOString(),
+    minute_of_day: minute,
+    day_of_week: dow,
+  };
+}
+
+export function scheduleStats(stationId: string): {
+  total_slots: number;
+  active_slots: number;
+  by_kind: { kind: string; count: number }[];
+} {
+  const db = getDb();
+  const total = db.prepare(
+    'SELECT COUNT(*) as n FROM radio_schedule_slots WHERE station_id = ?'
+  ).get(stationId) as { n: number };
+  const active = db.prepare(
+    'SELECT COUNT(*) as n FROM radio_schedule_slots WHERE station_id = ? AND is_active = 1'
+  ).get(stationId) as { n: number };
+  const byKind = db.prepare(`
+    SELECT kind, COUNT(*) as count FROM radio_schedule_slots
+    WHERE station_id = ? AND is_active = 1
+    GROUP BY kind ORDER BY count DESC
+  `).all(stationId) as { kind: string; count: number }[];
+  return { total_slots: total.n, active_slots: active.n, by_kind: byKind };
+}

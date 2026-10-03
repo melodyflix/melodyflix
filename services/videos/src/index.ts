@@ -46,7 +46,7 @@ import { ensureStorySchema } from './services/story.service.js';
 import { ensureMusicSchema } from './services/music.service.js';
 import { ensureStorage } from './services/storage.service.js';
 import { ensureChapterSchema } from './services/chapter.service.js';
-import { ensureRadioSchema, ensureRadioJinglesSchema } from './services/radio.service.js';
+import { ensureRadioSchema, ensureRadioJinglesSchema, ensureRadioScheduleSchema } from './services/radio.service.js';
 import { ensureQueueSchema } from './services/queue.service.js';
 import { ensurePollSchema } from './services/poll.service.js';
 import { ensureQuizSchema } from './services/quiz.service.js';
@@ -138,6 +138,7 @@ ensureSportsSchema();
 ensureSportsReplaySchema();
 ensureRadioSchema();
 ensureRadioJinglesSchema();
+ensureRadioScheduleSchema();
 logger.info('videos storage and schema ensured');
 
 // Specific routes first (before wildcards)

@@ -9,6 +9,9 @@ import {
   checkRadioHealth, getLatestRadioHealth,
   createJingle, getJingle, listJingles, updateJingle, deleteJingle,
   pickJingle, countJingles, jinglesByType,
+  ensureRadioScheduleSchema,
+  createScheduleSlot, getScheduleSlot, listSchedule, updateScheduleSlot,
+  deleteScheduleSlot, getScheduleNow, scheduleStats,
 } from '../services/radio.service.js';
 
 function userId(req: any): string | null {
@@ -233,6 +236,112 @@ export async function radioRoutes(app: FastifyInstance) {
     const seed = typeof body?.seed === 'number' ? body.seed : Date.now();
     const jingle = pickJingle(id, type, seed);
     return reply.send({ success: true, data: { jingle, seed } });
+  });
+
+
+  // ---- Station Scheduling (124.2) ----
+
+  const SLOT_KINDS = ['show','music_rotation','jingle','ad_break','news'] as const;
+
+  const SlotCreateSchema = z.object({
+    title: z.string().min(1).max(200),
+    kind: z.enum(SLOT_KINDS).optional(),
+    day_of_week: z.number().int().min(0).max(6).nullable().optional(),
+    start_minute: z.number().int().min(0).max(1439),
+    duration_minutes: z.number().int().min(1).max(1440),
+    playlist_url: z.string().url().nullable().optional(),
+    jingle_id: z.string().nullable().optional(),
+    description: z.string().max(1000).nullable().optional(),
+  });
+
+  const SlotUpdateSchema = SlotCreateSchema.partial().extend({
+    is_active: z.boolean().optional(),
+  });
+
+  // GET /radio/stations/:id/schedule — list slots (filter by day)
+  app.get('/radio/stations/:id/schedule', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const q = req.query as { day_of_week?: string; active_only?: string; limit?: string };
+    const dow = q.day_of_week !== undefined ? parseInt(q.day_of_week) : undefined;
+    const slots = listSchedule(id, {
+      day_of_week: dow,
+      active_only: q.active_only !== 'false',
+      limit: q.limit ? parseInt(q.limit) : undefined,
+    });
+    return reply.send({ success: true, data: { slots, count: slots.length } });
+  });
+
+  // GET /radio/stations/:id/schedule/now — what's on now + next
+  app.get('/radio/stations/:id/schedule/now', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const q = req.query as { at?: string };
+    const result = getScheduleNow(id, q.at);
+    return reply.send({ success: true, data: result });
+  });
+
+  // GET /radio/stations/:id/schedule/stats
+  app.get('/radio/stations/:id/schedule/stats', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    return reply.send({ success: true, data: scheduleStats(id) });
+  });
+
+  // POST /radio/stations/:id/schedule — create slot
+  app.post('/radio/stations/:id/schedule', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    const parsed = SlotCreateSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    try {
+      const slot = createScheduleSlot({ station_id: id, owner_id: me, ...parsed.data });
+      return reply.code(201).send({ success: true, data: { slot } });
+    } catch (e: any) {
+      const msg = e?.message ?? 'Create failed';
+      if (msg === 'Station not found') return reply.code(404).send({ success: false, error: msg });
+      if (msg === 'Not your station') return reply.code(403).send({ success: false, error: msg });
+      if (msg.startsWith('Overlaps')) return reply.code(409).send({ success: false, error: msg });
+      return reply.code(400).send({ success: false, error: msg });
+    }
+  });
+
+  // GET /radio/schedule/:id — single slot
+  app.get('/radio/schedule/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const s = getScheduleSlot(id);
+    if (!s) return reply.code(404).send({ success: false, error: 'Slot not found' });
+    return reply.send({ success: true, data: { slot: s } });
+  });
+
+  // PATCH /radio/schedule/:id — update
+  app.patch('/radio/schedule/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    const parsed = SlotUpdateSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    try {
+      const updated = updateScheduleSlot(id, me, parsed.data);
+      if (!updated) return reply.code(404).send({ success: false, error: 'Slot not found' });
+      return reply.send({ success: true, data: { slot: updated } });
+    } catch (e: any) {
+      const msg = e?.message ?? 'Forbidden';
+      if (msg.startsWith('Overlaps')) return reply.code(409).send({ success: false, error: msg });
+      if (msg === 'Not your slot') return reply.code(403).send({ success: false, error: msg });
+      return reply.code(400).send({ success: false, error: msg });
+    }
+  });
+
+  // DELETE /radio/schedule/:id
+  app.delete('/radio/schedule/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    try {
+      const removed = deleteScheduleSlot(id, me);
+      return reply.send({ success: true, data: { removed } });
+    } catch (e: any) {
+      return reply.code(403).send({ success: false, error: e?.message ?? 'Forbidden' });
+    }
   });
 
 }
