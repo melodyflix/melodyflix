@@ -17,6 +17,7 @@ import { commentRoutes } from './routes/comment.route.js';
 import { adminReportRoutes } from './routes/admin.route.js';
 import { adNetworkRoutes } from './routes/adnetworks.route.js';
 import { migrationRoutes } from './routes/migration.route.js';
+import { discoveryRoutes } from './routes/discovery.route.js';
 import { chapterRoutes } from './routes/chapter.route.js';
 import { queueRoutes } from './routes/queue.route.js';
 import { pollRoutes } from './routes/poll.route.js';
@@ -197,6 +198,7 @@ await app.register(musicRoutes, { prefix: '/api/v1/videos/music' });
 await app.register(adminReportRoutes, { prefix: '/api/v1/videos/admin' });
 await app.register(adNetworkRoutes, { prefix: '/api/v1/videos/admin' });
 await app.register(migrationRoutes, { prefix: '/api/v1/videos' });
+await app.register(discoveryRoutes, { prefix: '/api/v1/videos' });
 
 const PORT = 4003;
 const start = async () => {

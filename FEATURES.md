@@ -56,16 +56,16 @@ Legend:
 - [x] 5.2 Filter
 - [x] 5.3 Category
 - [x] 5.4 Trending
-- [ ] 5.5 AI Recommendation
+- [x] 5.5 AI Recommendation
 - [ ] 5.6 Voice Search
-- [ ] 5.7 Object/Face Search
+- [x] 5.7 Object/Face Search
 - [x] 5.8 Typo-Tolerant Search
 - [x] 5.9 Search Suggestions
 - [x] 5.10 Search History
 - [x] 5.11 Search Analytics
-- [ ] 5.12 Related Videos
-- [ ] 5.13 Up Next Suggestions
-- [ ] 5.14 Personalized Homepage
+- [x] 5.12 Related Videos
+- [x] 5.13 Up Next Suggestions
+- [x] 5.14 Personalized Homepage
 
 ## 6. Interaction
 - [x] 6.1 Like/Dislike
