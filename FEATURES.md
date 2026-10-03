@@ -497,11 +497,11 @@ Legend:
 ## 42. Streaming Performance
 - [ ] 42.1 Pre-Buffering
 - [ ] 42.2 Network-Adaptive Streaming
-- [ ] 42.3 Bandwidth Monitoring
+- [x] 42.3 Bandwidth Monitoring
 - [x] 42.4 Automatic Quality Adjustment
-- [ ] 42.5 Quality of Experience (QoE) Monitoring
+- [x] 42.5 Quality of Experience (QoE) Monitoring
 - [ ] 42.6 Buffering Alert
-- [ ] 42.7 Playback Error Diagnosis
+- [x] 42.7 Playback Error Diagnosis
 - [ ] 42.8 CDN Switching
 - [x] 42.9 HLS
 - [ ] 42.10 MPEG-DASH
