@@ -32,24 +32,24 @@ Legend:
 - [x] 3.1 Long Video
 - [x] 3.2 Shorts
 - [x] 3.3 Stories
-- [ ] 3.4 Clips
+- [x] 3.4 Clips
 - [x] 3.5 Podcast Mode
-- [ ] 3.6 VR/360
+- [x] 3.6 VR/360
 
 ## 4. Video Player and Playback
 - [x] 4.1 Quality Selection
 - [x] 4.2 Playback Speed
 - [x] 4.3 Picture-in-Picture
 - [x] 4.4 Mini Player
-- [~] 4.5 Queue
-- [ ] 4.6 Autoplay
-- [ ] 4.7 Chromecast/Google Cast
-- [ ] 4.8 HDR Support
-- [ ] 4.9 Loop Video
-- [ ] 4.10 A-B Repeat
-- [ ] 4.11 Frame-by-Frame Navigation
-- [ ] 4.12 Gesture Controls
-- [ ] 4.13 Sleep Timer
+- [x] 4.5 Queue
+- [x] 4.6 Autoplay
+- [x] 4.7 Chromecast/Google Cast
+- [x] 4.8 HDR Support
+- [x] 4.9 Loop Video
+- [x] 4.10 A-B Repeat
+- [x] 4.11 Frame-by-Frame Navigation
+- [x] 4.12 Gesture Controls
+- [x] 4.13 Sleep Timer
 
 ## 5. Search and Discovery
 - [x] 5.1 Search

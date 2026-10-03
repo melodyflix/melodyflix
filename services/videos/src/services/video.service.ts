@@ -569,3 +569,85 @@ export function listShortsByChannel(channelId: string, limit = 50, offset = 0): 
     LIMIT ? OFFSET ?
   `).all(channelId, limit, offset) as Video[];
 }
+
+// ============================================================
+// 4.8 HDR Support — idempotent columns + setters
+// ============================================================
+
+export function ensureHdrColumns(): void {
+  const db = getDb();
+  try { db.exec('ALTER TABLE videos ADD COLUMN is_hdr INTEGER NOT NULL DEFAULT 0'); } catch {}
+  try { db.exec('ALTER TABLE videos ADD COLUMN hdr_format TEXT'); } catch {}
+  try { db.exec('ALTER TABLE videos ADD COLUMN max_luminance_nits INTEGER'); } catch {}
+  try { db.exec('ALTER TABLE videos ADD COLUMN color_primaries TEXT'); } catch {}
+  try { db.exec('ALTER TABLE videos ADD COLUMN transfer_characteristics TEXT'); } catch {}
+}
+
+export interface HdrInfo {
+  video_id: string;
+  is_hdr: number;
+  hdr_format: string | null;
+  max_luminance_nits: number | null;
+  color_primaries: string | null;
+  transfer_characteristics: string | null;
+}
+
+export function getHdrInfo(videoId: string): HdrInfo | null {
+  const db = getDb();
+  const row = db.prepare(
+    'SELECT id as video_id, is_hdr, hdr_format, max_luminance_nits, color_primaries, transfer_characteristics FROM videos WHERE id = ?'
+  ).get(videoId) as HdrInfo | undefined;
+  return row ?? null;
+}
+
+export interface SetHdrInput {
+  is_hdr?: boolean;
+  hdr_format?: string | null;    // 'hdr10' | 'hdr10+' | 'dolby_vision' | 'hlg' | null
+  max_luminance_nits?: number | null;
+  color_primaries?: string | null;       // 'bt2020' | 'bt709' | ...
+  transfer_characteristics?: string | null; // 'pq' | 'hlg' | ...
+}
+
+const VALID_HDR_FORMATS = ['hdr10', 'hdr10+', 'dolby_vision', 'hlg'];
+
+export function setHdrInfo(videoId: string, ownerId: string, input: SetHdrInput): HdrInfo | null {
+  const db = getDb();
+  const cur = db.prepare('SELECT owner_id FROM videos WHERE id = ?')
+    .get(videoId) as { owner_id: string } | undefined;
+  if (!cur) return null;
+  if (cur.owner_id !== ownerId) throw new Error('Not your video');
+
+  if (input.hdr_format && !VALID_HDR_FORMATS.includes(input.hdr_format)) {
+    throw new Error(`hdr_format must be one of ${VALID_HDR_FORMATS.join(', ')}`);
+  }
+  if (input.max_luminance_nits !== undefined && input.max_luminance_nits !== null) {
+    if (input.max_luminance_nits < 100 || input.max_luminance_nits > 10000) {
+      throw new Error('max_luminance_nits must be 100-10000');
+    }
+  }
+
+  const fields: string[] = [];
+  const values: any[] = [];
+  if (input.is_hdr !== undefined) { fields.push('is_hdr = ?'); values.push(input.is_hdr ? 1 : 0); }
+  if (input.hdr_format !== undefined) { fields.push('hdr_format = ?'); values.push(input.hdr_format); }
+  if (input.max_luminance_nits !== undefined) { fields.push('max_luminance_nits = ?'); values.push(input.max_luminance_nits); }
+  if (input.color_primaries !== undefined) { fields.push('color_primaries = ?'); values.push(input.color_primaries); }
+  if (input.transfer_characteristics !== undefined) { fields.push('transfer_characteristics = ?'); values.push(input.transfer_characteristics); }
+
+  if (fields.length === 0) return getHdrInfo(videoId);
+
+  values.push(new Date().toISOString());
+  values.push(videoId);
+  db.prepare(`UPDATE videos SET ${fields.join(', ')}, updated_at = ? WHERE id = ?`).run(...values);
+  return getHdrInfo(videoId);
+}
+
+export function listHdrVideos(limit = 40): { id: string; title: string; hdr_format: string | null; thumbnail_url: string | null }[] {
+  const db = getDb();
+  const n = Math.min(Math.max(limit, 1), 200);
+  return db.prepare(`
+    SELECT id, title, hdr_format, thumbnail_url FROM videos
+    WHERE is_hdr = 1 AND visibility = 'public'
+    ORDER BY created_at DESC LIMIT ?
+  `).all(n) as any[];
+}

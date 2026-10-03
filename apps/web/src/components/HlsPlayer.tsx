@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { usePlayerKeyboard } from '../hooks/usePlayerKeyboard';
+import { useHdrDetect } from '../hooks/useHdrDetect';
+import { useChromecast } from '../hooks/useChromecast';
 import { listVideoSubtitles, type SubtitleTrack, listVideoAudioTracks, setAudioTrackPreference, type AudioTrack } from '../lib/api';
 import { getVideoVr, type VrMetadata, getChannelCustomization, type PlayerCustomization, listChannelIntros, type ChannelIntro } from '../lib/api';
 import { lazy, Suspense } from 'react';
@@ -60,6 +63,17 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
 
   // Loop
   const [loop, setLoop] = useState(false);
+
+  // ==== Section 4.x: keyboard / HDR / Cast ====
+  const containerRef = useRef<HTMLDivElement>(null);
+  usePlayerKeyboard({ videoRef, containerRef, fps: 30 });
+  const hdrDetection = useHdrDetect({
+    videoRef,
+    manifestUrl: (props as any).src ?? null,
+    serverIsHdr: (props as any).isHdr,
+    serverHdrFormat: (props as any).hdrFormat,
+  });
+  const castCtl = useChromecast();
 
   // A-B Repeat
   const [aPoint, setAPoint] = useState<number | null>(null);
@@ -917,6 +931,33 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
           ♾
         </button>
 
+        {/* Frame step (4.11) */}
+        <button
+          className="mf-player-btn"
+          onClick={() => {
+            const v = videoRef.current;
+            if (!v) return;
+            v.pause();
+            v.currentTime = Math.max(0, v.currentTime - 1 / 30);
+          }}
+          title="Previous frame (,) — frame-by-frame"
+          style={{ background: 'rgba(0,0,0,0.65)' }}
+        >
+          ⟨
+        </button>
+        <button
+          className="mf-player-btn"
+          onClick={() => {
+            const v = videoRef.current;
+            if (!v) return;
+            v.pause();
+            v.currentTime = Math.min(v.duration || v.currentTime, v.currentTime + 1 / 30);
+          }}
+          title="Next frame (.) — frame-by-frame"
+          style={{ background: 'rgba(0,0,0,0.65)' }}
+        >
+          ⟩
+        </button>
         {/* A-B Repeat */}
         <div style={{ display: 'flex', gap: 2 }}>
           <button
@@ -1062,6 +1103,58 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
           }}
         >
           🔁 A: {formatTime(aPoint!)} → B: {formatTime(bPoint!)}
+        </div>
+      )}
+
+      {/* Cast button (4.7) */}
+      {castCtl.supported && castCtl.available && (
+        <button
+          className="mf-player-btn"
+          onClick={async () => {
+            if (castCtl.connected) {
+              castCtl.disconnect();
+            } else if ((props as any).src) {
+              await castCtl.cast({
+                contentId: (props as any).src,
+                contentType: 'application/x-mpegurl',
+                title: (props as any).mediaTitle ?? undefined,
+                poster: (props as any).poster ?? undefined,
+              });
+            }
+          }}
+          title={castCtl.connected ? 'Disconnect cast' : 'Cast to device'}
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            background: castCtl.connected ? '#065fd4' : 'rgba(0,0,0,0.65)',
+            zIndex: 15,
+          }}
+        >
+          📺
+        </button>
+      )}
+
+      {/* HDR badge (4.8) */}
+      {hdrDetection.isHdr && (
+        <div
+          title={`HDR: ${hdrDetection.format ?? 'detected'}`}
+          style={{
+            position: 'absolute',
+            top: 12,
+            left: 12,
+            padding: '3px 8px',
+            borderRadius: 4,
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: 0.5,
+            color: '#fff',
+            background: 'linear-gradient(135deg, #d4af37, #b8860b)',
+            zIndex: 15,
+            textTransform: 'uppercase',
+          }}
+        >
+          HDR{hdrDetection.format === 'dolby_vision' ? ' DV' : hdrDetection.format === 'hlg' ? ' HLG' : ''}
         </div>
       )}
 

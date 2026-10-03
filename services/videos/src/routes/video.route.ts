@@ -12,6 +12,7 @@ import {
   updateVideo, deleteVideo, updateVideoStatus,
   recordView, likeVideo, getUserReaction,
   rateVideo, deleteRating, getUserRating, getRatingStats,
+  getHdrInfo, setHdrInfo, listHdrVideos,
 } from '../services/video.service.js';
 import { uploadsDir, processedDir } from '../services/storage.service.js';
 import { transcodeToHls } from '../services/transcode.service.js';
@@ -286,4 +287,50 @@ export async function videoRoutes(app: FastifyInstance) {
     }
     return reply.send(createReadStream(filePath));
   });
+
+  // ============ 4.8 HDR Support ============
+
+  const HdrSchema = z.object({
+    is_hdr: z.boolean().optional(),
+    hdr_format: z.enum(['hdr10', 'hdr10+', 'dolby_vision', 'hlg']).nullable().optional(),
+    max_luminance_nits: z.number().int().min(100).max(10000).nullable().optional(),
+    color_primaries: z.string().max(40).nullable().optional(),
+    transfer_characteristics: z.string().max(20).nullable().optional(),
+  });
+
+  // GET /hdr/videos — list HDR-tagged public videos
+  app.get('/hdr/videos', async (req, reply) => {
+    const q = req.query as { limit?: string };
+    const videos = listHdrVideos(q.limit ? parseInt(q.limit) : 40);
+    return reply.send({ success: true, data: { videos, count: videos.length } });
+  });
+
+  // GET /:videoId/hdr — HDR metadata (public read)
+  app.get('/:videoId/hdr', async (req, reply) => {
+    const { videoId } = req.params as { videoId: string };
+    const info = getHdrInfo(videoId);
+    if (!info) return reply.code(404).send({ success: false, error: 'Video not found' });
+    return reply.send({ success: true, data: { hdr: info } });
+  });
+
+  // PUT /:videoId/hdr — set HDR metadata (owner only)
+  app.put('/:videoId/hdr', { preHandler: [requireAuth] }, async (req, reply) => {
+    const userId = (req as any).user?.id ?? (req as any).user?.sub;
+    if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { videoId } = req.params as { videoId: string };
+    const parsed = HdrSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    }
+    try {
+      const info = setHdrInfo(videoId, userId, parsed.data);
+      if (!info) return reply.code(404).send({ success: false, error: 'Video not found' });
+      return reply.send({ success: true, data: { hdr: info } });
+    } catch (e: any) {
+      const msg = e?.message ?? 'HDR update failed';
+      if (msg === 'Not your video') return reply.code(403).send({ success: false, error: msg });
+      return reply.code(400).send({ success: false, error: msg });
+    }
+  });
+
 }
