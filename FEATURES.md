@@ -79,7 +79,7 @@ Legend:
 
 ## 7. Live Streaming
 - [x] 7.1 Live Streaming
-- [ ] 7.2 Premiere
+- [x] 7.2 Premiere
 - [x] 7.3 Live Chat
 - [x] 7.4 DVR/Rewind
 - [x] 7.5 Multi-Camera
