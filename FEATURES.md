@@ -108,17 +108,17 @@ Legend:
 - [ ] 8.16 Prompt Safety Filter
 
 ## 9. Creator Tools
-- [ ] 9.1 Creator Studio
+- [x] 9.1 Creator Studio
 - [x] 9.2 Analytics
-- [ ] 9.3 Heatmap
-- [ ] 9.4 A/B Testing
-- [ ] 9.5 Online Editor
-- [ ] 9.6 Screen Recorder
-- [ ] 9.7 End Screen/Cards
+- [x] 9.3 Heatmap
+- [x] 9.4 A/B Testing
+- [x] 9.5 Online Editor
+- [x] 9.6 Screen Recorder
+- [x] 9.7 End Screen/Cards
 - [x] 9.8 Channel Analytics Dashboard
-- [ ] 9.9 Subscriber Milestones
-- [ ] 9.10 Growth Tips and Insights
-- [ ] 9.11 Competitor Analysis
+- [x] 9.9 Subscriber Milestones
+- [x] 9.10 Growth Tips and Insights
+- [x] 9.11 Competitor Analysis
 
 ## 10. Monetization
 - [x] 10.1 Ads
