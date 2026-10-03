@@ -127,8 +127,8 @@ Legend:
 - [x] 10.4 Super Chat
 - [x] 10.5 Pay-per-View
 - [x] 10.6 Rent/Buy
-- [ ] 10.7 Merchandise Store
-- [ ] 10.8 Affiliate
+- [x] 10.7 Merchandise Store
+- [x] 10.8 Affiliate
 - [x] 10.9 Coupon/Promo
 - [ ] 10.10 Revenue Sharing
 - [ ] 10.11 Payout Schedule
