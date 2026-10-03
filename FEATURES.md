@@ -1124,7 +1124,7 @@ Legend:
 - [ ] 123.4 Supply-Chain Dashboard
 
 ## 124. Internet Radio
-- [ ] 124.1 Live Radio Streaming
+- [x] 124.1 Live Radio Streaming
 - [ ] 124.2 Station Scheduling
 - [ ] 124.3 Radio Jingles
 - [ ] 124.4 Song History

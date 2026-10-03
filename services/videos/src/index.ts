@@ -38,6 +38,7 @@ import { creatorStudioRoutes } from './routes/creatorstudio.route.js';
 import { preferencesRoutes } from './routes/preferences.route.js';
 import { liveTvRoutes } from './routes/livetv.route.js';
 import { sportsRoutes } from './routes/sports.route.js';
+import { radioRoutes } from './routes/radio.route.js';
 import { ensureSchema } from './services/video.service.js';
 import { ensureCommentSchema, ensureHistorySchema, ensurePlaylistSchema } from './services/comment.service.js';
 import { ensureSeriesSchema } from './services/series.service.js';
@@ -45,6 +46,7 @@ import { ensureStorySchema } from './services/story.service.js';
 import { ensureMusicSchema } from './services/music.service.js';
 import { ensureStorage } from './services/storage.service.js';
 import { ensureChapterSchema } from './services/chapter.service.js';
+import { ensureRadioSchema } from './services/radio.service.js';
 import { ensureQueueSchema } from './services/queue.service.js';
 import { ensurePollSchema } from './services/poll.service.js';
 import { ensureQuizSchema } from './services/quiz.service.js';
@@ -134,6 +136,7 @@ ensureLiveTvDvrSchema();
 ensureLiveTvTimeshiftSchema();
 ensureSportsSchema();
 ensureSportsReplaySchema();
+ensureRadioSchema();
 logger.info('videos storage and schema ensured');
 
 // Specific routes first (before wildcards)
@@ -167,6 +170,7 @@ await app.register(creatorStudioRoutes, { prefix: '/api/v1/videos' });
 await app.register(preferencesRoutes, { prefix: '/api/v1/videos' });
 await app.register(liveTvRoutes, { prefix: '/api/v1/videos' });
 await app.register(sportsRoutes, { prefix: '/api/v1/videos' });
+await app.register(radioRoutes, { prefix: '/api/v1/videos' });
 await app.register(musicRoutes, { prefix: '/api/v1/videos/music' });
 await app.register(adminReportRoutes, { prefix: '/api/v1/videos/admin' });
 
