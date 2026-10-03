@@ -4391,3 +4391,289 @@ export async function getLiveTvCatchUpSummary(
 export async function getLiveTvCatchUpForProgram(programId: string): Promise<{ entry: CatchUpEntry }> {
   return request(`/api/v1/videos/live-tv/catchup/program/${programId}`);
 }
+
+// ============================================================
+// Admin — Ad Management (Section 51)
+// ============================================================
+
+export type AdminAdFormat = 'banner' | 'overlay' | 'pre-roll' | 'mid-roll' | 'post-roll' | 'native' | 'sponsored-card';
+export type AdminAdStatus = 'draft' | 'pending_review' | 'approved' | 'rejected' | 'active' | 'paused' | 'completed' | 'archived';
+export type AdminTargetingGender = 'any' | 'male' | 'female' | 'other';
+
+export interface AdPod {
+  id: string;
+  name: string;
+  max_ads: number;
+  max_duration_seconds: number;
+  ad_break_type: string;
+  created_at: string;
+}
+
+export interface AdminAdCampaign {
+  id: string;
+  name: string;
+  advertiser: string;
+  format: AdminAdFormat;
+  creative_url: string;
+  click_url: string;
+  thumbnail_url: string | null;
+  cta_text: string | null;
+  target_countries: string;
+  target_languages: string;
+  target_age_min: number;
+  target_age_max: number;
+  target_gender: AdminTargetingGender;
+  target_interests: string;
+  target_categories: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  freq_cap_per_user: number;
+  freq_cap_window_hours: number;
+  freq_cap_per_session: number;
+  is_skippable: number;
+  skip_after_seconds: number;
+  duration_seconds: number;
+  pod_id: string | null;
+  requires_consent: number;
+  consent_scope: string;
+  budget_total: number;
+  budget_spent: number;
+  cpm: number;
+  cpc: number;
+  status: AdminAdStatus;
+  review_notes: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  impression_count: number;
+  click_count: number;
+  view_count: number;
+  completion_count: number;
+  created_by: string;
+  created_at: string;
+}
+
+export interface AdminAdCampaignAnalytics {
+  campaign_id: string;
+  impressions: number;
+  clicks: number;
+  views: number;
+  completions: number;
+  ctr: number;
+  view_rate: number;
+  completion_rate: number;
+  spend: number;
+  budget_remaining: number;
+}
+
+export interface AdminAdDailyPoint {
+  date: string;
+  impressions: number;
+  clicks: number;
+  revenue: number;
+}
+
+export interface AdminAdRevenueOverview {
+  window_start: string;
+  window_end: string;
+  total_impressions: number;
+  total_clicks: number;
+  total_completions: number;
+  total_revenue: number;
+  gross_revenue: number;
+  net_revenue: number;
+  platform_fee: number;
+  ctr: number;
+  completion_rate: number;
+  active_campaigns: number;
+  pending_review: number;
+}
+
+export interface AdminAdTopAdvertiser {
+  advertiser: string;
+  campaign_count: number;
+  impressions: number;
+  clicks: number;
+  revenue: number;
+  ctr: number;
+}
+
+export interface AdminAdBlockStats {
+  window_start: string;
+  window_end: string;
+  total_events: number;
+  unique_users: number;
+  detected_count: number;
+  detection_rate: number;
+  by_method: { detection_method: string; count: number }[];
+}
+
+export interface AdminAdBlockEvent {
+  id: string;
+  user_id: string | null;
+  session_id: string | null;
+  video_id: string | null;
+  detected: number;
+  detection_method: string | null;
+  user_agent: string | null;
+  ip_hash: string | null;
+  created_at: string;
+}
+
+export interface AdminAdBillingSummary {
+  advertiser: string;
+  status: AdminAdStatus;
+  campaigns: number;
+  impressions: number;
+  clicks: number;
+  total_spent: number;
+  total_budget: number;
+  utilization: number;
+}
+
+// Formats & Pods
+export async function adminListAdFormats(): Promise<{ formats: AdminAdFormat[] }> {
+  return request('/api/v1/videos/admin/ads/formats');
+}
+
+export async function adminListAdPods(): Promise<{ pods: AdPod[] }> {
+  return request('/api/v1/videos/admin/ads/pods');
+}
+
+export async function adminCreateAdPod(input: {
+  name: string;
+  max_ads?: number;
+  max_duration_seconds?: number;
+  ad_break_type?: string;
+}): Promise<{ pod: AdPod }> {
+  return request('/api/v1/videos/admin/ads/pods', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function adminDeleteAdPod(id: string): Promise<{ deleted: boolean }> {
+  return request(`/api/v1/videos/admin/ads/pods/${id}`, { method: 'DELETE' });
+}
+
+// Campaigns
+export async function adminListAdCampaigns(filters: {
+  status?: AdminAdStatus;
+  format?: AdminAdFormat;
+  advertiser?: string;
+  limit?: number;
+} = {}): Promise<{ campaigns: AdminAdCampaign[]; count: number }> {
+  const params = new URLSearchParams();
+  if (filters.status) params.set('status', filters.status);
+  if (filters.format) params.set('format', filters.format);
+  if (filters.advertiser) params.set('advertiser', filters.advertiser);
+  if (filters.limit) params.set('limit', String(filters.limit));
+  const qs = params.toString();
+  return request(`/api/v1/videos/admin/ads/campaigns${qs ? '?' + qs : ''}`);
+}
+
+export async function adminGetAdCampaign(id: string): Promise<{ campaign: AdminAdCampaign }> {
+  return request(`/api/v1/videos/admin/ads/campaigns/${id}`);
+}
+
+export async function adminUpdateAdCampaign(
+  id: string,
+  patch: Partial<AdminAdCampaign> & { status?: AdminAdStatus; review_notes?: string | null }
+): Promise<{ campaign: AdminAdCampaign }> {
+  return request(`/api/v1/videos/admin/ads/campaigns/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function adminDeleteAdCampaign(id: string): Promise<{ deleted: boolean }> {
+  return request(`/api/v1/videos/admin/ads/campaigns/${id}`, { method: 'DELETE' });
+}
+
+export async function adminSubmitAdCampaign(id: string): Promise<{ campaign: AdminAdCampaign }> {
+  return request(`/api/v1/videos/admin/ads/campaigns/${id}/submit`, { method: 'POST' });
+}
+
+export async function adminApproveAdCampaign(id: string): Promise<{ campaign: AdminAdCampaign }> {
+  return request(`/api/v1/videos/admin/ads/campaigns/${id}/approve`, { method: 'POST' });
+}
+
+export async function adminRejectAdCampaign(id: string, notes?: string): Promise<{ campaign: AdminAdCampaign }> {
+  return request(`/api/v1/videos/admin/ads/campaigns/${id}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ notes: notes ?? null }),
+  });
+}
+
+export async function adminSetAdCampaignStatus(
+  id: string,
+  status: AdminAdStatus
+): Promise<{ campaign: AdminAdCampaign }> {
+  return request(`/api/v1/videos/admin/ads/campaigns/${id}/status`, {
+    method: 'POST',
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function adminGetAdCampaignAnalytics(id: string): Promise<AdminAdCampaignAnalytics> {
+  return request(`/api/v1/videos/admin/ads/campaigns/${id}/analytics`);
+}
+
+export async function adminGetAdBilling(filters: {
+  status?: AdminAdStatus;
+  advertiser?: string;
+} = {}): Promise<{ summary: AdminAdBillingSummary[]; count: number }> {
+  const params = new URLSearchParams();
+  if (filters.status) params.set('status', filters.status);
+  if (filters.advertiser) params.set('advertiser', filters.advertiser);
+  const qs = params.toString();
+  return request(`/api/v1/videos/admin/ads/billing${qs ? '?' + qs : ''}`);
+}
+
+// Revenue dashboard
+export async function adminGetAdRevenueOverview(opts: { from?: string; to?: string } = {}): Promise<AdminAdRevenueOverview> {
+  const params = new URLSearchParams();
+  if (opts.from) params.set('from', opts.from);
+  if (opts.to) params.set('to', opts.to);
+  const qs = params.toString();
+  return request(`/api/v1/videos/admin/ads/revenue/overview${qs ? '?' + qs : ''}`);
+}
+
+export async function adminGetAdRevenueDaily(opts: { from?: string; to?: string; days?: number } = {}): Promise<{ daily: AdminAdDailyPoint[]; count: number }> {
+  const params = new URLSearchParams();
+  if (opts.from) params.set('from', opts.from);
+  if (opts.to) params.set('to', opts.to);
+  if (opts.days) params.set('days', String(opts.days));
+  const qs = params.toString();
+  return request(`/api/v1/videos/admin/ads/revenue/daily${qs ? '?' + qs : ''}`);
+}
+
+export async function adminGetAdTopAdvertisers(opts: { from?: string; to?: string; limit?: number } = {}): Promise<{ advertisers: AdminAdTopAdvertiser[]; count: number }> {
+  const params = new URLSearchParams();
+  if (opts.from) params.set('from', opts.from);
+  if (opts.to) params.set('to', opts.to);
+  if (opts.limit) params.set('limit', String(opts.limit));
+  const qs = params.toString();
+  return request(`/api/v1/videos/admin/ads/revenue/advertisers${qs ? '?' + qs : ''}`);
+}
+
+// Ad block
+export async function adminGetAdBlockStats(opts: { from?: string; to?: string } = {}): Promise<AdminAdBlockStats> {
+  const params = new URLSearchParams();
+  if (opts.from) params.set('from', opts.from);
+  if (opts.to) params.set('to', opts.to);
+  const qs = params.toString();
+  return request(`/api/v1/videos/admin/ads/adblock/stats${qs ? '?' + qs : ''}`);
+}
+
+export async function adminListAdBlockEvents(opts: {
+  detected_only?: boolean;
+  user_id?: string;
+  limit?: number;
+} = {}): Promise<{ events: AdminAdBlockEvent[]; count: number }> {
+  const params = new URLSearchParams();
+  if (opts.detected_only) params.set('detected_only', 'true');
+  if (opts.user_id) params.set('user_id', opts.user_id);
+  if (opts.limit) params.set('limit', String(opts.limit));
+  const qs = params.toString();
+  return request(`/api/v1/videos/admin/ads/adblock/events${qs ? '?' + qs : ''}`);
+}
