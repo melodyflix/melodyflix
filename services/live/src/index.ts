@@ -8,11 +8,13 @@ import { superChatRoutes } from './routes/superchat.route.js';
 import { moderationRoutes } from './routes/moderation.route.js';
 import { multicamRoutes } from './routes/multicam.route.js';
 import { streamingConfigRoutes } from './routes/streaming-config.route.js';
+import { highlightRoutes } from './routes/highlight.route.js';
 import { ensureSchema, cleanupStaleStreams } from './services/live.service.js';
 import { ensureSuperChatSchema } from './services/superchat.service.js';
 import { ensureModerationSchema } from './services/moderation.service.js';
 import { ensureMulticamSchema } from './services/multicam.service.js';
 import { ensureStreamingConfigSchema } from './services/streaming-config.service.js';
+import { ensureHighlightSchema } from './services/highlight.service.js';
 import { ensureHlsStorage, stopAllPipelines } from './services/pipeline.service.js';
 import { handleBroadcaster, handleViewer, registerViewer, unregisterViewer } from './services/ws.service.js';
 import { startRtmpServer, stopRtmpServer } from './services/rtmp.service.js';
@@ -39,6 +41,7 @@ ensureSuperChatSchema();
 ensureModerationSchema();
 ensureMulticamSchema();
 ensureStreamingConfigSchema();
+ensureHighlightSchema();
 ensureHlsStorage();
 logger.info('live schema and HLS storage ensured');
 
@@ -68,6 +71,7 @@ await app.register(liveRoutes, { prefix: '/api/v1/live' });
 await app.register(moderationRoutes, { prefix: '/api/v1/live' });
 await app.register(multicamRoutes, { prefix: '/api/v1/live' });
 await app.register(streamingConfigRoutes, { prefix: '/api/v1/live' });
+await app.register(highlightRoutes, { prefix: '/api/v1/live' });
 
 const PORT = 4005;
 const start = async () => {
