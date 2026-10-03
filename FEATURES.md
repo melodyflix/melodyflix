@@ -81,10 +81,10 @@ Legend:
 - [x] 7.1 Live Streaming
 - [ ] 7.2 Premiere
 - [x] 7.3 Live Chat
-- [ ] 7.4 DVR/Rewind
+- [x] 7.4 DVR/Rewind
 - [x] 7.5 Multi-Camera
 - [ ] 7.6 Auto Highlight
-- [ ] 7.7 Low-Latency Streaming
+- [x] 7.7 Low-Latency Streaming
 - [x] 7.8 Slow Mode
 - [x] 7.9 Live Moderator
 - [x] 7.10 Emergency Backup
