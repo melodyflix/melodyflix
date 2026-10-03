@@ -92,14 +92,14 @@ Legend:
 ## 8. AI Features
 - [x] 8.1 Auto Caption
 - [x] 8.2 Translation
-- [ ] 8.3 Dubbing
+- [x] 8.3 Dubbing
 - [x] 8.4 Video Summary
-- [ ] 8.5 Auto Thumbnail
+- [x] 8.5 Auto Thumbnail
 - [x] 8.6 Auto Tag
 - [x] 8.7 Key Moments
-- [ ] 8.8 Multi-Language Auto Audio Dubbing
-- [ ] 8.9 Voice Cloning for Dubbing
-- [ ] 8.10 Real-Time Audio Translation
+- [x] 8.8 Multi-Language Auto Audio Dubbing
+- [x] 8.9 Voice Cloning for Dubbing
+- [x] 8.10 Real-Time Audio Translation
 - [ ] 8.11 Auto Content Filtering
 - [ ] 8.12 Inappropriate Content Detection
 - [ ] 8.13 Spam Comment Filter
