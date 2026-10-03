@@ -12,6 +12,9 @@ import {
   ensureRadioScheduleSchema,
   createScheduleSlot, getScheduleSlot, listSchedule, updateScheduleSlot,
   deleteScheduleSlot, getScheduleNow, scheduleStats,
+  ensureRadioHistorySchema,
+  logPlay, getPlay, listPlays, nowPlaying, historyStats,
+  deleteOldPlays, deletePlay,
 } from '../services/radio.service.js';
 
 function userId(req: any): string | null {
@@ -342,6 +345,102 @@ export async function radioRoutes(app: FastifyInstance) {
     } catch (e: any) {
       return reply.code(403).send({ success: false, error: e?.message ?? 'Forbidden' });
     }
+  });
+
+
+  // ---- Song History / Now Playing (124.4) ----
+
+  const SOURCES = ['playlist','live','manual','schedule'] as const;
+
+  const PlayLogSchema = z.object({
+    title: z.string().min(1).max(300),
+    artist: z.string().max(200).nullable().optional(),
+    album: z.string().max(200).nullable().optional(),
+    duration_seconds: z.number().min(0).max(6 * 3600).optional(),
+    played_at: z.string().optional(),
+    source: z.enum(SOURCES).optional(),
+    cover_url: z.string().url().nullable().optional(),
+    metadata_json: z.string().max(5000).nullable().optional(),
+  });
+
+  // GET /radio/stations/:id/history — list plays (filters)
+  app.get('/radio/stations/:id/history', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const q = req.query as { from?: string; to?: string; artist?: string; search?: string; limit?: string };
+    const plays = listPlays(id, {
+      from: q.from,
+      to: q.to,
+      artist: q.artist,
+      search: q.search,
+      limit: q.limit ? parseInt(q.limit) : 50,
+    });
+    return reply.send({ success: true, data: { plays, count: plays.length } });
+  });
+
+  // GET /radio/stations/:id/now-playing — current track
+  app.get('/radio/stations/:id/now-playing', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const play = nowPlaying(id);
+    return reply.send({ success: true, data: { play } });
+  });
+
+  // GET /radio/stations/:id/history/stats
+  app.get('/radio/stations/:id/history/stats', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    return reply.send({ success: true, data: historyStats(id) });
+  });
+
+  // POST /radio/stations/:id/history — log a play (owner or worker)
+  app.post('/radio/stations/:id/history', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    const st = getRadioStation(id);
+    if (!st) return reply.code(404).send({ success: false, error: 'Station not found' });
+    if (st.owner_id !== me) return reply.code(403).send({ success: false, error: 'Not your station' });
+    const parsed = PlayLogSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
+    try {
+      const play = logPlay({ station_id: id, ...parsed.data });
+      return reply.code(201).send({ success: true, data: { play } });
+    } catch (e: any) {
+      return reply.code(400).send({ success: false, error: e?.message ?? 'Log failed' });
+    }
+  });
+
+  // GET /radio/history/:id — single play
+  app.get('/radio/history/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const play = getPlay(id);
+    if (!play) return reply.code(404).send({ success: false, error: 'Play not found' });
+    return reply.send({ success: true, data: { play } });
+  });
+
+  // DELETE /radio/history/:id — delete a play (owner-only)
+  app.delete('/radio/history/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    try {
+      const removed = deletePlay(id, me);
+      return reply.send({ success: true, data: { removed } });
+    } catch (e: any) {
+      return reply.code(403).send({ success: false, error: e?.message ?? 'Forbidden' });
+    }
+  });
+
+  // POST /radio/stations/:id/history/prune — retention prune (owner or worker)
+  app.post('/radio/stations/:id/history/prune', { preHandler: [requireAuth] }, async (req, reply) => {
+    const me = userId(req as any);
+    if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { id } = req.params as { id: string };
+    const st = getRadioStation(id);
+    if (!st) return reply.code(404).send({ success: false, error: 'Station not found' });
+    if (st.owner_id !== me) return reply.code(403).send({ success: false, error: 'Not your station' });
+    const body = (req.body ?? {}) as { keep_days?: number };
+    const keepDays = Math.max(1, Math.min(body.keep_days ?? 30, 365));
+    const pruned = deleteOldPlays(id, keepDays);
+    return reply.send({ success: true, data: { pruned, keep_days: keepDays } });
   });
 
 }

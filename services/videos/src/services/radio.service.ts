@@ -736,3 +736,178 @@ export function scheduleStats(stationId: string): {
   `).all(stationId) as { kind: string; count: number }[];
   return { total_slots: total.n, active_slots: active.n, by_kind: byKind };
 }
+
+// ============================================================
+// 124.4 — Song History / Now Playing
+// Tracks what played on each station + track metadata log.
+// ============================================================
+
+export interface RadioTrackPlay {
+  id: string;
+  station_id: string;
+  title: string;
+  artist: string | null;
+  album: string | null;
+  duration_seconds: number;
+  played_at: string;
+  source: 'playlist' | 'live' | 'manual' | 'schedule';
+  cover_url: string | null;
+  metadata_json: string | null;
+  created_at: string;
+}
+
+export function ensureRadioHistorySchema(): void {
+  const db = getDb();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS radio_track_plays (
+      id TEXT PRIMARY KEY,
+      station_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      artist TEXT,
+      album TEXT,
+      duration_seconds REAL NOT NULL DEFAULT 0,
+      played_at TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'playlist'
+        CHECK (source IN ('playlist','live','manual','schedule')),
+      cover_url TEXT,
+      metadata_json TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_radio_plays_station_time
+      ON radio_track_plays(station_id, played_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_radio_plays_artist
+      ON radio_track_plays(station_id, artist);
+    CREATE INDEX IF NOT EXISTS idx_radio_plays_title
+      ON radio_track_plays(station_id, title);
+  `);
+}
+
+export interface LogPlayInput {
+  station_id: string;
+  title: string;
+  artist?: string | null;
+  album?: string | null;
+  duration_seconds?: number;
+  played_at?: string;
+  source?: 'playlist' | 'live' | 'manual' | 'schedule';
+  cover_url?: string | null;
+  metadata_json?: string | null;
+}
+
+export function logPlay(input: LogPlayInput): RadioTrackPlay {
+  const st = getRadioStation(input.station_id);
+  if (!st) throw new Error('Station not found');
+  if (!input.title?.trim()) throw new Error('Title required');
+  const dur = Math.max(0, Math.min(input.duration_seconds ?? 0, 6 * 3600));
+  const playedAt = input.played_at ?? new Date().toISOString();
+  if (isNaN(new Date(playedAt).getTime())) throw new Error('Invalid played_at');
+
+  const db = getDb();
+  const now = new Date().toISOString();
+  const id = randomUUID();
+  db.prepare(`
+    INSERT INTO radio_track_plays
+      (id, station_id, title, artist, album, duration_seconds, played_at,
+       source, cover_url, metadata_json, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, input.station_id, input.title.slice(0, 300),
+    input.artist ?? null, input.album ?? null, dur,
+    playedAt, input.source ?? 'playlist',
+    input.cover_url ?? null, input.metadata_json ?? null, now
+  );
+  return getPlay(id)!;
+}
+
+export function getPlay(id: string): RadioTrackPlay | null {
+  const row = getDb().prepare('SELECT * FROM radio_track_plays WHERE id = ?')
+    .get(id) as RadioTrackPlay | undefined;
+  return row ?? null;
+}
+
+export interface ListPlaysFilters {
+  from?: string;
+  to?: string;
+  artist?: string;
+  search?: string;
+  limit?: number;
+}
+
+export function listPlays(stationId: string, f: ListPlaysFilters = {}): RadioTrackPlay[] {
+  const db = getDb();
+  const where: string[] = ['station_id = ?'];
+  const params: any[] = [stationId];
+  if (f.from)   { where.push('played_at >= ?'); params.push(f.from); }
+  if (f.to)     { where.push('played_at <= ?'); params.push(f.to); }
+  if (f.artist) { where.push('artist = ?');     params.push(f.artist); }
+  if (f.search) {
+    where.push('(title LIKE ? OR artist LIKE ? OR album LIKE ?)');
+    const p = `%${f.search}%`;
+    params.push(p, p, p);
+  }
+  const n = Math.min(Math.max(f.limit ?? 50, 1), 500);
+  params.push(n);
+  return db.prepare(`
+    SELECT * FROM radio_track_plays
+    WHERE ${where.join(' AND ')}
+    ORDER BY played_at DESC LIMIT ?
+  `).all(...params) as RadioTrackPlay[];
+}
+
+export function nowPlaying(stationId: string): RadioTrackPlay | null {
+  const db = getDb();
+  const row = db.prepare(
+    'SELECT * FROM radio_track_plays WHERE station_id = ? ORDER BY played_at DESC LIMIT 1'
+  ).get(stationId) as RadioTrackPlay | undefined;
+  return row ?? null;
+}
+
+export interface StationHistoryStats {
+  total_plays: number;
+  last_24h_plays: number;
+  top_artists: { artist: string; count: number }[];
+  top_titles: { title: string; artist: string | null; count: number }[];
+}
+
+export function historyStats(stationId: string): StationHistoryStats {
+  const db = getDb();
+  const total = db.prepare(
+    'SELECT COUNT(*) as n FROM radio_track_plays WHERE station_id = ?'
+  ).get(stationId) as { n: number };
+  const since24 = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const last24 = db.prepare(
+    'SELECT COUNT(*) as n FROM radio_track_plays WHERE station_id = ? AND played_at >= ?'
+  ).get(stationId, since24) as { n: number };
+  const topArtists = db.prepare(`
+    SELECT artist, COUNT(*) as count FROM radio_track_plays
+    WHERE station_id = ? AND artist IS NOT NULL
+    GROUP BY artist ORDER BY count DESC LIMIT 10
+  `).all(stationId) as { artist: string; count: number }[];
+  const topTitles = db.prepare(`
+    SELECT title, artist, COUNT(*) as count FROM radio_track_plays
+    WHERE station_id = ?
+    GROUP BY title, artist ORDER BY count DESC LIMIT 10
+  `).all(stationId) as { title: string; artist: string | null; count: number }[];
+  return {
+    total_plays: total.n,
+    last_24h_plays: last24.n,
+    top_artists: topArtists,
+    top_titles: topTitles,
+  };
+}
+
+export function deleteOldPlays(stationId: string, keepDays = 30): number {
+  const cutoff = new Date(Date.now() - keepDays * 24 * 3600 * 1000).toISOString();
+  const r = getDb().prepare(
+    'DELETE FROM radio_track_plays WHERE station_id = ? AND played_at < ?'
+  ).run(stationId, cutoff);
+  return r.changes;
+}
+
+export function deletePlay(id: string, ownerId: string): boolean {
+  const p = getPlay(id);
+  if (!p) return false;
+  const st = getRadioStation(p.station_id);
+  if (!st || st.owner_id !== ownerId) throw new Error('Not your station');
+  return getDb().prepare('DELETE FROM radio_track_plays WHERE id = ?').run(id).changes > 0;
+}

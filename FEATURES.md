@@ -1127,7 +1127,7 @@ Legend:
 - [x] 124.1 Live Radio Streaming
 - [x] 124.2 Station Scheduling
 - [x] 124.3 Radio Jingles
-- [ ] 124.4 Song History
+- [x] 124.4 Song History
 
 ## 125. Karaoke Platform
 - [ ] 125.1 Synchronized Lyrics
