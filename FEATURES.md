@@ -744,10 +744,10 @@ Legend:
 - [ ] 67.12 Locale Fallback
 
 ## 68. Sports Streaming
-- [ ] 68.1 Live Score Overlay
-- [ ] 68.2 Match Timeline
+- [x] 68.1 Live Score Overlay
+- [x] 68.2 Match Timeline
 - [ ] 68.3 Instant Replay
-- [ ] 68.4 Team/Match Reminder
+- [x] 68.4 Team/Match Reminder
 
 ## 69. Device Control
 - [ ] 69.1 Device Limit

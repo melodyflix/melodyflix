@@ -2160,3 +2160,367 @@ export function getCatchUpForProgram(programId: string): CatchUpEntry | null {
   });
   return entries.find((e) => e.program_id === programId) ?? null;
 }
+
+// ============================================================
+// 68.1 — Sports: Live Score Overlay
+// 68.2 — Sports: Match Timeline
+// 68.4 — Sports: Team/Match Reminder
+// ============================================================
+
+export interface SportsTeam {
+  id: string;
+  owner_id: string;
+  name: string;
+  short_name: string | null;
+  logo_url: string | null;
+  country: string | null;
+  created_at: string;
+}
+
+export type SportsMatchStatus = 'scheduled' | 'live' | 'halftime' | 'finished' | 'postponed' | 'cancelled';
+
+export interface SportsMatch {
+  id: string;
+  owner_id: string;
+  channel_id: string;
+  home_team_id: string;
+  away_team_id: string;
+  league: string | null;
+  venue: string | null;
+  start_ts: string;
+  status: SportsMatchStatus;
+  home_score: number;
+  away_score: number;
+  minute: number | null;
+  period: string | null;
+  overlay_style: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SportsEventType = 'goal' | 'own_goal' | 'yellow_card' | 'red_card' | 'substitution' | 'penalty' | 'var' | 'kickoff' | 'halftime' | 'fulltime' | 'info';
+
+export interface SportsTimelineEvent {
+  id: string;
+  match_id: string;
+  team_id: string | null;
+  event_type: SportsEventType;
+  minute: number | null;
+  player_name: string | null;
+  player_out: string | null;
+  description: string | null;
+  created_at: string;
+}
+
+export interface SportsReminder {
+  id: string;
+  user_id: string;
+  match_id: string;
+  remind_at: string;
+  sent_at: string | null;
+  channel: 'push' | 'email' | 'inapp';
+  created_at: string;
+}
+
+export function ensureSportsSchema(): void {
+  const db = getDb();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sports_teams (
+      id TEXT PRIMARY KEY,
+      owner_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      short_name TEXT,
+      logo_url TEXT,
+      country TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_sports_teams_owner ON sports_teams(owner_id);
+
+    CREATE TABLE IF NOT EXISTS sports_matches (
+      id TEXT PRIMARY KEY,
+      owner_id TEXT NOT NULL,
+      channel_id TEXT NOT NULL,
+      home_team_id TEXT NOT NULL,
+      away_team_id TEXT NOT NULL,
+      league TEXT,
+      venue TEXT,
+      start_ts TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'scheduled'
+        CHECK (status IN ('scheduled','live','halftime','finished','postponed','cancelled')),
+      home_score INTEGER NOT NULL DEFAULT 0,
+      away_score INTEGER NOT NULL DEFAULT 0,
+      minute INTEGER,
+      period TEXT,
+      overlay_style TEXT NOT NULL DEFAULT 'default',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_sports_matches_owner   ON sports_matches(owner_id, start_ts DESC);
+    CREATE INDEX IF NOT EXISTS idx_sports_matches_channel ON sports_matches(channel_id, start_ts DESC);
+    CREATE INDEX IF NOT EXISTS idx_sports_matches_status  ON sports_matches(status, start_ts);
+
+    CREATE TABLE IF NOT EXISTS sports_timeline_events (
+      id TEXT PRIMARY KEY,
+      match_id TEXT NOT NULL,
+      team_id TEXT,
+      event_type TEXT NOT NULL,
+      minute INTEGER,
+      player_name TEXT,
+      player_out TEXT,
+      description TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_sports_timeline_match ON sports_timeline_events(match_id, minute, created_at);
+
+    CREATE TABLE IF NOT EXISTS sports_reminders (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      match_id TEXT NOT NULL,
+      remind_at TEXT NOT NULL,
+      sent_at TEXT,
+      channel TEXT NOT NULL DEFAULT 'push' CHECK (channel IN ('push','email','inapp')),
+      created_at TEXT NOT NULL,
+      UNIQUE (user_id, match_id, channel)
+    );
+    CREATE INDEX IF NOT EXISTS idx_sports_reminders_pending ON sports_reminders(remind_at) WHERE sent_at IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_sports_reminders_user ON sports_reminders(user_id, remind_at DESC);
+  `);
+}
+
+// ---------- Teams ----------
+
+export function createSportsTeam(input: {
+  owner_id: string;
+  name: string;
+  short_name?: string | null;
+  logo_url?: string | null;
+  country?: string | null;
+}): SportsTeam {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const id = randomUUID();
+  db.prepare(`
+    INSERT INTO sports_teams (id, owner_id, name, short_name, logo_url, country, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, input.owner_id, input.name, input.short_name ?? null, input.logo_url ?? null, input.country ?? null, now);
+  return db.prepare('SELECT * FROM sports_teams WHERE id = ?').get(id) as SportsTeam;
+}
+
+export function getSportsTeam(id: string): SportsTeam | null {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM sports_teams WHERE id = ?').get(id) as SportsTeam | undefined;
+  return row ?? null;
+}
+
+export function listSportsTeams(ownerId: string, limit = 200): SportsTeam[] {
+  const db = getDb();
+  const n = Math.min(Math.max(limit, 1), 500);
+  return db.prepare(
+    'SELECT * FROM sports_teams WHERE owner_id = ? ORDER BY name ASC LIMIT ?'
+  ).all(ownerId, n) as SportsTeam[];
+}
+
+// ---------- Matches ----------
+
+export interface CreateSportsMatchInput {
+  owner_id: string;
+  channel_id: string;
+  home_team_id: string;
+  away_team_id: string;
+  league?: string | null;
+  venue?: string | null;
+  start_ts: string;
+  overlay_style?: string;
+}
+
+export function createSportsMatch(input: CreateSportsMatchInput): SportsMatch {
+  const ch = getChannel(input.channel_id);
+  if (!ch) throw new Error('Channel not found');
+  if (!getSportsTeam(input.home_team_id)) throw new Error('Home team not found');
+  if (!getSportsTeam(input.away_team_id)) throw new Error('Away team not found');
+  if (input.home_team_id === input.away_team_id) throw new Error('Teams must differ');
+  if (isNaN(new Date(input.start_ts).getTime())) throw new Error('Invalid start_ts');
+
+  const db = getDb();
+  const now = new Date().toISOString();
+  const id = randomUUID();
+  db.prepare(`
+    INSERT INTO sports_matches
+      (id, owner_id, channel_id, home_team_id, away_team_id, league, venue, start_ts,
+       status, home_score, away_score, minute, period, overlay_style, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', 0, 0, NULL, NULL, ?, ?, ?)
+  `).run(
+    id, input.owner_id, input.channel_id, input.home_team_id, input.away_team_id,
+    input.league ?? null, input.venue ?? null, input.start_ts,
+    input.overlay_style ?? 'default', now, now
+  );
+  return getSportsMatch(id)!;
+}
+
+export function getSportsMatch(id: string): SportsMatch | null {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM sports_matches WHERE id = ?').get(id) as SportsMatch | undefined;
+  return row ?? null;
+}
+
+export function listSportsMatches(f: {
+  owner_id?: string;
+  channel_id?: string;
+  status?: SportsMatchStatus;
+  from?: string;
+  to?: string;
+  limit?: number;
+} = {}): SportsMatch[] {
+  const db = getDb();
+  const where: string[] = [];
+  const params: any[] = [];
+  if (f.owner_id)   { where.push('owner_id = ?');   params.push(f.owner_id); }
+  if (f.channel_id) { where.push('channel_id = ?'); params.push(f.channel_id); }
+  if (f.status)     { where.push('status = ?');     params.push(f.status); }
+  if (f.from)       { where.push('start_ts >= ?');  params.push(f.from); }
+  if (f.to)         { where.push('start_ts <= ?');  params.push(f.to); }
+  const limit = Math.min(Math.max(f.limit ?? 100, 1), 500);
+  const sql = `SELECT * FROM sports_matches
+    ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+    ORDER BY start_ts DESC LIMIT ?`;
+  params.push(limit);
+  return db.prepare(sql).all(...params) as SportsMatch[];
+}
+
+export function updateSportsMatchStatus(
+  matchId: string,
+  status: SportsMatchStatus,
+  extras: { minute?: number | null; period?: string | null } = {}
+): SportsMatch | null {
+  const m = getSportsMatch(matchId);
+  if (!m) return null;
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE sports_matches
+    SET status = ?, minute = ?, period = ?, updated_at = ?
+    WHERE id = ?
+  `).run(status, extras.minute ?? m.minute, extras.period ?? m.period, now, matchId);
+  return getSportsMatch(matchId);
+}
+
+export function updateSportsScore(
+  matchId: string,
+  homeScore: number,
+  awayScore: number,
+  minute?: number | null
+): SportsMatch | null {
+  const m = getSportsMatch(matchId);
+  if (!m) return null;
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE sports_matches
+    SET home_score = ?, away_score = ?, minute = ?, updated_at = ?
+    WHERE id = ?
+  `).run(Math.max(0, homeScore), Math.max(0, awayScore), minute ?? m.minute, now, matchId);
+  return getSportsMatch(matchId);
+}
+
+// ---------- Timeline (68.2) ----------
+
+export function addTimelineEvent(input: {
+  match_id: string;
+  team_id?: string | null;
+  event_type: SportsEventType;
+  minute?: number | null;
+  player_name?: string | null;
+  player_out?: string | null;
+  description?: string | null;
+}): SportsTimelineEvent {
+  const m = getSportsMatch(input.match_id);
+  if (!m) throw new Error('Match not found');
+  const db = getDb();
+  const now = new Date().toISOString();
+  const id = randomUUID();
+  db.prepare(`
+    INSERT INTO sports_timeline_events
+      (id, match_id, team_id, event_type, minute, player_name, player_out, description, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, input.match_id, input.team_id ?? null, input.event_type,
+    input.minute ?? null, input.player_name ?? null, input.player_out ?? null,
+    input.description ?? null, now
+  );
+  return db.prepare('SELECT * FROM sports_timeline_events WHERE id = ?')
+    .get(id) as SportsTimelineEvent;
+}
+
+export function listTimeline(matchId: string, limit = 200): SportsTimelineEvent[] {
+  const db = getDb();
+  const n = Math.min(Math.max(limit, 1), 500);
+  return db.prepare(`
+    SELECT * FROM sports_timeline_events
+    WHERE match_id = ?
+    ORDER BY minute ASC NULLS FIRST, created_at ASC
+    LIMIT ?
+  `).all(matchId, n) as SportsTimelineEvent[];
+}
+
+export function deleteTimelineEvent(eventId: string): boolean {
+  const db = getDb();
+  return db.prepare('DELETE FROM sports_timeline_events WHERE id = ?').run(eventId).changes > 0;
+}
+
+// ---------- Reminders (68.4) ----------
+
+export function createReminder(input: {
+  user_id: string;
+  match_id: string;
+  remind_at: string;
+  channel?: 'push' | 'email' | 'inapp';
+}): SportsReminder {
+  const m = getSportsMatch(input.match_id);
+  if (!m) throw new Error('Match not found');
+  if (isNaN(new Date(input.remind_at).getTime())) throw new Error('Invalid remind_at');
+  const db = getDb();
+  const now = new Date().toISOString();
+  const id = randomUUID();
+  const channel = input.channel ?? 'push';
+  db.prepare(`
+    INSERT INTO sports_reminders (id, user_id, match_id, remind_at, sent_at, channel, created_at)
+    VALUES (?, ?, ?, ?, NULL, ?, ?)
+    ON CONFLICT(user_id, match_id, channel) DO UPDATE SET
+      remind_at = excluded.remind_at,
+      sent_at = NULL
+  `).run(id, input.user_id, input.match_id, input.remind_at, channel, now);
+  return db.prepare(
+    'SELECT * FROM sports_reminders WHERE user_id = ? AND match_id = ? AND channel = ?'
+  ).get(input.user_id, input.match_id, channel) as SportsReminder;
+}
+
+export function listUserReminders(userId: string, limit = 100): SportsReminder[] {
+  const db = getDb();
+  const n = Math.min(Math.max(limit, 1), 500);
+  return db.prepare(
+    'SELECT * FROM sports_reminders WHERE user_id = ? ORDER BY remind_at ASC LIMIT ?'
+  ).all(userId, n) as SportsReminder[];
+}
+
+export function cancelReminder(userId: string, reminderId: string): boolean {
+  const db = getDb();
+  const r = db.prepare(
+    'DELETE FROM sports_reminders WHERE id = ? AND user_id = ?'
+  ).run(reminderId, userId);
+  return r.changes > 0;
+}
+
+export function getDueReminders(nowIso = new Date().toISOString()): SportsReminder[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT * FROM sports_reminders
+    WHERE sent_at IS NULL AND remind_at <= ?
+    ORDER BY remind_at ASC
+  `).all(nowIso) as SportsReminder[];
+}
+
+export function markReminderSent(id: string): void {
+  const db = getDb();
+  db.prepare('UPDATE sports_reminders SET sent_at = ? WHERE id = ?')
+    .run(new Date().toISOString(), id);
+}
