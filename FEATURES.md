@@ -123,13 +123,13 @@ Legend:
 ## 10. Monetization
 - [x] 10.1 Ads
 - [x] 10.2 Membership
-- [ ] 10.3 Donation
+- [x] 10.3 Donation
 - [x] 10.4 Super Chat
 - [ ] 10.5 Pay-per-View
 - [ ] 10.6 Rent/Buy
 - [ ] 10.7 Merchandise Store
 - [ ] 10.8 Affiliate
-- [ ] 10.9 Coupon/Promo
+- [x] 10.9 Coupon/Promo
 - [ ] 10.10 Revenue Sharing
 - [ ] 10.11 Payout Schedule
 - [ ] 10.12 Minimum Payout Limit
