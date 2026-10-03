@@ -526,10 +526,10 @@ Legend:
 - [ ] 43.15 Desktop/Mobile/Tablet Preview
 
 ## 44. Content Migration
-- [ ] 44.1 YouTube Import
-- [ ] 44.2 Vimeo Import
-- [ ] 44.3 Bulk Migration Tools
-- [ ] 44.4 Metadata Preservation
+- [x] 44.1 YouTube Import
+- [x] 44.2 Vimeo Import
+- [x] 44.3 Bulk Migration Tools
+- [x] 44.4 Metadata Preservation
 
 ## 45. Voice and Audio Features
 - [ ] 45.1 Audio-Only Mode
@@ -546,11 +546,11 @@ Legend:
 - [ ] 45.12 Spatial Audio Quality Check
 
 ## 46. Video Tagging and Metadata
-- [ ] 46.1 AI-Powered Auto-Tagging
-- [ ] 46.2 Custom Tags
-- [ ] 46.3 Hashtag Support
-- [ ] 46.4 Genre Classification
-- [ ] 46.5 Cast and Crew Information
+- [x] 46.1 AI-Powered Auto-Tagging
+- [x] 46.2 Custom Tags
+- [x] 46.3 Hashtag Support
+- [x] 46.4 Genre Classification
+- [x] 46.5 Cast and Crew Information
 
 ## 47. Social Media Integration
 - [ ] 47.1 Facebook Integration

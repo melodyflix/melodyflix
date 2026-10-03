@@ -16,6 +16,7 @@ import { musicRoutes } from './routes/music.route.js';
 import { commentRoutes } from './routes/comment.route.js';
 import { adminReportRoutes } from './routes/admin.route.js';
 import { adNetworkRoutes } from './routes/adnetworks.route.js';
+import { migrationRoutes } from './routes/migration.route.js';
 import { chapterRoutes } from './routes/chapter.route.js';
 import { queueRoutes } from './routes/queue.route.js';
 import { pollRoutes } from './routes/poll.route.js';
@@ -53,6 +54,7 @@ import { ensureChapterSchema } from './services/chapter.service.js';
 import { ensureRadioSchema, ensureRadioJinglesSchema, ensureRadioScheduleSchema, ensureRadioHistorySchema } from './services/radio.service.js';
 import { ensureVersionsSchema } from './services/versions.service.js';
 import { ensureTelemetrySchema, ensureStreamingConfigSchema } from './services/telemetry.service.js';
+import { ensureMigrationSchema } from './services/migration.service.js';
 import { ensureQueueSchema } from './services/queue.service.js';
 import { ensurePollSchema } from './services/poll.service.js';
 import { ensureQuizSchema } from './services/quiz.service.js';
@@ -151,6 +153,7 @@ ensureRadioHistorySchema();
 ensureVersionsSchema();
 ensureTelemetrySchema();
 ensureStreamingConfigSchema();
+ensureMigrationSchema();
 logger.info('videos storage and schema ensured');
 
 // Specific routes first (before wildcards)
@@ -191,6 +194,7 @@ await app.register(telemetryRoutes, { prefix: '/api/v1/videos' });
 await app.register(musicRoutes, { prefix: '/api/v1/videos/music' });
 await app.register(adminReportRoutes, { prefix: '/api/v1/videos/admin' });
 await app.register(adNetworkRoutes, { prefix: '/api/v1/videos/admin' });
+await app.register(migrationRoutes, { prefix: '/api/v1/videos' });
 
 const PORT = 4003;
 const start = async () => {
