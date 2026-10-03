@@ -28,6 +28,10 @@ import LiveWatch from './pages/LiveWatch';
 import LiveTV from './pages/LiveTV';
 import LiveTVWatch from './pages/LiveTVWatch';
 import ParentalSettings from './pages/ParentalSettings';
+import Sports from './pages/Sports';
+import SportsMatchDetail from './pages/SportsMatchDetail';
+import Radio from './pages/Radio';
+import RadioPlayer from './pages/RadioPlayer';
 import TwoFASettings from './pages/TwoFASettings';
 import Preferences from './pages/Preferences';
 import ClipView from './pages/ClipView';
@@ -155,6 +159,10 @@ function AppInner() {
             <Route path="/live-tv" element={<LiveTV onSignIn={requireSignIn} />} />
             <Route path="/live-tv/:id" element={<LiveTVWatch onSignIn={requireSignIn} />} />
             <Route path="/parental" element={<ParentalSettings onSignIn={requireSignIn} />} />
+            <Route path="/sports" element={<Sports onSignIn={requireSignIn} />} />
+            <Route path="/sports/match/:id" element={<SportsMatchDetail onSignIn={requireSignIn} />} />
+            <Route path="/radio" element={<Radio onSignIn={requireSignIn} />} />
+            <Route path="/radio/:id" element={<RadioPlayer onSignIn={requireSignIn} />} />
         <Route path="/settings/security" element={<TwoFASettings user={user} onSignIn={requireSignIn} />} />
         <Route path="/settings/preferences" element={<Preferences onSignIn={requireSignIn} />} />
         <Route path="/go-live" element={<GoLive user={user} onSignIn={() => setShowLogin(true)} />} />

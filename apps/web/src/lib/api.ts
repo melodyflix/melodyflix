@@ -3773,3 +3773,423 @@ export async function hideLiveTvChatMessage(
     method: 'POST',
   });
 }
+
+// ============================================================
+// Sports (Section 68)
+// ============================================================
+
+export interface SportsTeam {
+  id: string;
+  owner_id: string;
+  name: string;
+  short_name: string | null;
+  logo_url: string | null;
+  country: string | null;
+  created_at: string;
+}
+
+export type SportsMatchStatus = 'scheduled' | 'live' | 'halftime' | 'finished' | 'postponed' | 'cancelled';
+
+export interface SportsMatch {
+  id: string;
+  owner_id: string;
+  channel_id: string;
+  home_team_id: string;
+  away_team_id: string;
+  league: string | null;
+  venue: string | null;
+  start_ts: string;
+  status: SportsMatchStatus;
+  home_score: number;
+  away_score: number;
+  minute: number | null;
+  period: string | null;
+  overlay_style: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SportsEventType = 'goal' | 'own_goal' | 'yellow_card' | 'red_card' | 'substitution' | 'penalty' | 'var' | 'kickoff' | 'halftime' | 'fulltime' | 'info';
+
+export interface SportsTimelineEvent {
+  id: string;
+  match_id: string;
+  team_id: string | null;
+  event_type: SportsEventType;
+  minute: number | null;
+  player_name: string | null;
+  player_out: string | null;
+  description: string | null;
+  created_at: string;
+}
+
+export interface SportsReminder {
+  id: string;
+  user_id: string;
+  match_id: string;
+  remind_at: string;
+  sent_at: string | null;
+  channel: 'push' | 'email' | 'inapp';
+  created_at: string;
+}
+
+export interface SportsReplayClip {
+  id: string;
+  match_id: string;
+  user_id: string;
+  label: string;
+  start_ts: string;
+  duration_seconds: number;
+  event_id: string | null;
+  is_public: number;
+  created_at: string;
+}
+
+// Teams
+export async function listSportsTeams(limit = 200): Promise<{ teams: SportsTeam[]; count: number }> {
+  return request(`/api/v1/videos/sports/teams?limit=${limit}`);
+}
+
+export async function createSportsTeam(input: {
+  name: string;
+  short_name?: string | null;
+  logo_url?: string | null;
+  country?: string | null;
+}): Promise<{ team: SportsTeam }> {
+  return request('/api/v1/videos/sports/teams', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+// Matches
+export async function listSportsMatches(filters: {
+  owner_id?: string;
+  channel_id?: string;
+  status?: SportsMatchStatus;
+  from?: string;
+  to?: string;
+  limit?: number;
+} = {}): Promise<{ matches: SportsMatch[]; count: number }> {
+  const params = new URLSearchParams();
+  if (filters.owner_id) params.set('owner_id', filters.owner_id);
+  if (filters.channel_id) params.set('channel_id', filters.channel_id);
+  if (filters.status) params.set('status', filters.status);
+  if (filters.from) params.set('from', filters.from);
+  if (filters.to) params.set('to', filters.to);
+  if (filters.limit) params.set('limit', String(filters.limit));
+  const qs = params.toString();
+  return request(`/api/v1/videos/sports/matches${qs ? '?' + qs : ''}`);
+}
+
+export async function listLiveSportsMatches(): Promise<{ matches: SportsMatch[]; count: number }> {
+  return request('/api/v1/videos/sports/matches/live');
+}
+
+export async function getSportsMatch(id: string): Promise<{ match: SportsMatch }> {
+  return request(`/api/v1/videos/sports/matches/${id}`);
+}
+
+export async function createSportsMatch(input: {
+  channel_id: string;
+  home_team_id: string;
+  away_team_id: string;
+  league?: string | null;
+  venue?: string | null;
+  start_ts: string;
+  overlay_style?: string;
+}): Promise<{ match: SportsMatch }> {
+  return request('/api/v1/videos/sports/matches', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateSportsMatchStatus(
+  id: string,
+  patch: { status: SportsMatchStatus; minute?: number | null; period?: string | null }
+): Promise<{ match: SportsMatch }> {
+  return request(`/api/v1/videos/sports/matches/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function updateSportsScore(
+  id: string,
+  patch: { home_score: number; away_score: number; minute?: number | null }
+): Promise<{ match: SportsMatch }> {
+  return request(`/api/v1/videos/sports/matches/${id}/score`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+}
+
+// Timeline
+export async function listSportsTimeline(
+  matchId: string,
+  limit = 200
+): Promise<{ events: SportsTimelineEvent[]; count: number }> {
+  return request(`/api/v1/videos/sports/matches/${matchId}/timeline?limit=${limit}`);
+}
+
+export async function addSportsTimelineEvent(
+  matchId: string,
+  input: {
+    team_id?: string | null;
+    event_type: SportsEventType;
+    minute?: number | null;
+    player_name?: string | null;
+    player_out?: string | null;
+    description?: string | null;
+  }
+): Promise<{ event: SportsTimelineEvent }> {
+  return request(`/api/v1/videos/sports/matches/${matchId}/timeline`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteSportsTimelineEvent(eventId: string): Promise<{ removed: boolean }> {
+  return request(`/api/v1/videos/sports/timeline/${eventId}`, { method: 'DELETE' });
+}
+
+// Reminders
+export async function listSportsReminders(limit = 100): Promise<{ reminders: SportsReminder[]; count: number }> {
+  return request(`/api/v1/videos/sports/reminders?limit=${limit}`);
+}
+
+export async function createSportsReminder(input: {
+  match_id: string;
+  remind_at: string;
+  channel?: 'push' | 'email' | 'inapp';
+}): Promise<{ reminder: SportsReminder }> {
+  return request('/api/v1/videos/sports/reminders', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function cancelSportsReminder(id: string): Promise<{ removed: boolean }> {
+  return request(`/api/v1/videos/sports/reminders/${id}`, { method: 'DELETE' });
+}
+
+// Replays
+export async function listSportsReplays(
+  matchId: string,
+  limit = 100
+): Promise<{ replays: SportsReplayClip[]; count: number }> {
+  return request(`/api/v1/videos/sports/matches/${matchId}/replays?limit=${limit}`);
+}
+
+export async function listMySportsReplays(limit = 100): Promise<{ replays: SportsReplayClip[]; count: number }> {
+  return request(`/api/v1/videos/sports/replays/mine?limit=${limit}`);
+}
+
+export async function saveSportsReplay(input: {
+  match_id: string;
+  label: string;
+  start_ts: string;
+  duration_seconds: number;
+  event_id?: string | null;
+  is_public?: boolean;
+}): Promise<{ replay: SportsReplayClip }> {
+  return request('/api/v1/videos/sports/replays', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function rewindSportsMatch(
+  matchId: string,
+  seconds: number
+): Promise<{ allowed: boolean; reason: string; at_ts: string; seconds: number; segments: any[] }> {
+  return request(`/api/v1/videos/sports/matches/${matchId}/rewind`, {
+    method: 'POST',
+    body: JSON.stringify({ seconds }),
+  });
+}
+
+// ============================================================
+// Radio (Section 124)
+// ============================================================
+
+export interface RadioStation {
+  id: string;
+  owner_id: string;
+  name: string;
+  stream_url: string;
+  logo_url: string | null;
+  genre: string | null;
+  country: string | null;
+  language: string | null;
+  description: string | null;
+  bitrate_kbps: number | null;
+  sample_rate_hz: number | null;
+  is_active: number;
+  is_public: number;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RadioHealth {
+  id: string;
+  station_id: string;
+  status: 'ok' | 'error' | 'timeout';
+  http_code: number | null;
+  response_ms: number;
+  error_message: string | null;
+  checked_at: string;
+}
+
+export interface RadioJingle {
+  id: string;
+  station_id: string;
+  owner_id: string;
+  name: string;
+  audio_url: string;
+  duration_seconds: number;
+  jingle_type: 'intro' | 'outro' | 'transition' | 'ad_break' | 'station_id' | 'news';
+  weight: number;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RadioScheduleSlot {
+  id: string;
+  station_id: string;
+  owner_id: string;
+  title: string;
+  kind: 'show' | 'music_rotation' | 'jingle' | 'ad_break' | 'news';
+  day_of_week: number | null;
+  start_minute: number;
+  duration_minutes: number;
+  playlist_url: string | null;
+  jingle_id: string | null;
+  description: string | null;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RadioTrackPlay {
+  id: string;
+  station_id: string;
+  title: string;
+  artist: string | null;
+  album: string | null;
+  duration_seconds: number;
+  played_at: string;
+  source: 'playlist' | 'live' | 'manual' | 'schedule';
+  cover_url: string | null;
+  metadata_json: string | null;
+  created_at: string;
+}
+
+// Stations
+export async function listRadioStations(filters: {
+  genre?: string;
+  country?: string;
+  language?: string;
+  owner_id?: string;
+  search?: string;
+  limit?: number;
+} = {}): Promise<{ stations: RadioStation[]; count: number }> {
+  const params = new URLSearchParams();
+  if (filters.genre) params.set('genre', filters.genre);
+  if (filters.country) params.set('country', filters.country);
+  if (filters.language) params.set('language', filters.language);
+  if (filters.owner_id) params.set('owner_id', filters.owner_id);
+  if (filters.search) params.set('search', filters.search);
+  if (filters.limit) params.set('limit', String(filters.limit));
+  const qs = params.toString();
+  return request(`/api/v1/videos/radio/stations${qs ? '?' + qs : ''}`);
+}
+
+export async function listRadioGenres(): Promise<{ genres: { genre: string; count: number }[] }> {
+  return request('/api/v1/videos/radio/genres');
+}
+
+export async function getRadioStation(id: string): Promise<{ station: RadioStation }> {
+  return request(`/api/v1/videos/radio/stations/${id}`);
+}
+
+export async function createRadioStation(input: {
+  name: string;
+  stream_url: string;
+  logo_url?: string | null;
+  genre?: string | null;
+  country?: string | null;
+  language?: string | null;
+  description?: string | null;
+  bitrate_kbps?: number | null;
+  sample_rate_hz?: number | null;
+  is_public?: boolean;
+}): Promise<{ station: RadioStation }> {
+  return request('/api/v1/videos/radio/stations', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function checkRadioHealth(id: string): Promise<{ health: RadioHealth }> {
+  return request(`/api/v1/videos/radio/stations/${id}/health`, { method: 'POST' });
+}
+
+export async function getRadioHealth(id: string): Promise<{ health: RadioHealth | null }> {
+  return request(`/api/v1/videos/radio/stations/${id}/health`);
+}
+
+// Now Playing / History
+export async function getRadioNowPlaying(id: string): Promise<{ play: RadioTrackPlay | null }> {
+  return request(`/api/v1/videos/radio/stations/${id}/now-playing`);
+}
+
+export async function listRadioHistory(
+  id: string,
+  opts: { from?: string; to?: string; artist?: string; search?: string; limit?: number } = {}
+): Promise<{ plays: RadioTrackPlay[]; count: number }> {
+  const params = new URLSearchParams();
+  if (opts.from) params.set('from', opts.from);
+  if (opts.to) params.set('to', opts.to);
+  if (opts.artist) params.set('artist', opts.artist);
+  if (opts.search) params.set('search', opts.search);
+  if (opts.limit) params.set('limit', String(opts.limit));
+  const qs = params.toString();
+  return request(`/api/v1/videos/radio/stations/${id}/history${qs ? '?' + qs : ''}`);
+}
+
+export async function getRadioHistoryStats(id: string): Promise<{
+  total_plays: number;
+  last_24h_plays: number;
+  top_artists: { artist: string; count: number }[];
+  top_titles: { title: string; artist: string | null; count: number }[];
+}> {
+  return request(`/api/v1/videos/radio/stations/${id}/history/stats`);
+}
+
+// Schedule
+export async function listRadioSchedule(
+  stationId: string,
+  opts: { day_of_week?: number; active_only?: boolean; limit?: number } = {}
+): Promise<{ slots: RadioScheduleSlot[]; count: number }> {
+  const params = new URLSearchParams();
+  if (opts.day_of_week !== undefined) params.set('day_of_week', String(opts.day_of_week));
+  if (opts.active_only === false) params.set('active_only', 'false');
+  if (opts.limit) params.set('limit', String(opts.limit));
+  const qs = params.toString();
+  return request(`/api/v1/videos/radio/stations/${stationId}/schedule${qs ? '?' + qs : ''}`);
+}
+
+export async function getRadioScheduleNow(stationId: string, at?: string): Promise<{
+  now: RadioScheduleSlot | null;
+  next: RadioScheduleSlot | null;
+  server_time: string;
+  minute_of_day: number;
+  day_of_week: number;
+}> {
+  const qs = at ? `?at=${encodeURIComponent(at)}` : '';
+  return request(`/api/v1/videos/radio/stations/${stationId}/schedule/now${qs}`);
+}
