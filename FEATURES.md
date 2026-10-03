@@ -90,13 +90,13 @@ Legend:
 - [x] 7.10 Emergency Backup
 
 ## 8. AI Features
-- [ ] 8.1 Auto Caption
-- [ ] 8.2 Translation
+- [x] 8.1 Auto Caption
+- [x] 8.2 Translation
 - [ ] 8.3 Dubbing
-- [ ] 8.4 Video Summary
+- [x] 8.4 Video Summary
 - [ ] 8.5 Auto Thumbnail
-- [ ] 8.6 Auto Tag
-- [ ] 8.7 Key Moments
+- [x] 8.6 Auto Tag
+- [x] 8.7 Key Moments
 - [ ] 8.8 Multi-Language Auto Audio Dubbing
 - [ ] 8.9 Voice Cloning for Dubbing
 - [ ] 8.10 Real-Time Audio Translation
