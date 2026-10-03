@@ -586,26 +586,26 @@ Legend:
 - [x] 51.1 Pre-Roll Ads
 - [x] 51.2 Mid-Roll Ads
 - [x] 51.3 Post-Roll Ads
-- [ ] 51.4 Banner Ads
-- [ ] 51.5 Overlay Ads
+- [x] 51.4 Banner Ads
+- [x] 51.5 Overlay Ads
 - [x] 51.6 Skippable Ads
-- [ ] 51.7 Non-Skippable Ads
-- [ ] 51.8 Ad Frequency Control
-- [ ] 51.9 Ad Targeting
-- [ ] 51.10 Ad Scheduling
-- [~] 51.11 Ad Revenue Dashboard
+- [x] 51.7 Non-Skippable Ads
+- [x] 51.8 Ad Frequency Control
+- [x] 51.9 Ad Targeting
+- [x] 51.10 Ad Scheduling
+- [x] 51.11 Ad Revenue Dashboard
 - [x] 51.12 Google AdSense Integration
 - [x] 51.13 Custom Ad Network Integration
-- [ ] 51.14 Ad Block Detection
-- [ ] 51.15 Ad Performance Analytics
+- [x] 51.14 Ad Block Detection
+- [x] 51.15 Ad Performance Analytics
 - [x] 51.16 VAST/VPAID Support
-- [ ] 51.17 Server-Side Ad Insertion
-- [ ] 51.18 Ad Podding
-- [ ] 51.19 Consent-Based Ads
-- [ ] 51.20 Campaign Creator
-- [ ] 51.21 Budget Management
-- [ ] 51.22 Creative Approval
-- [ ] 51.23 Billing Report
+- [x] 51.17 Server-Side Ad Insertion
+- [x] 51.18 Ad Podding
+- [x] 51.19 Consent-Based Ads
+- [x] 51.20 Campaign Creator
+- [x] 51.21 Budget Management
+- [x] 51.22 Creative Approval
+- [x] 51.23 Billing Report
 
 ## 52. Video Server Management
 - [ ] 52.1 Multiple Video Server Support
