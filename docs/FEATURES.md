@@ -22,6 +22,7 @@
 20. Push Notifications (VAPID)
 
 ## Extra
+- Community Management (25.1 Forum/Threads/Posts + 25.2 Groups + 25.3 Guidelines + 25.4 Reputation)
 - Video Upload (Web + Admin)
 - HLS Player (Quality/Speed/PiP/Mini/Loop/A-B/Sleep)
 - Search backend + Filters
