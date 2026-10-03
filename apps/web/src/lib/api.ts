@@ -4193,3 +4193,201 @@ export async function getRadioScheduleNow(stationId: string, at?: string): Promi
   const qs = at ? `?at=${encodeURIComponent(at)}` : '';
   return request(`/api/v1/videos/radio/stations/${stationId}/schedule/now${qs}`);
 }
+
+// ============================================================
+// Live TV — DVR (40.4), Time-Shift (40.5), Catch-Up (40.8)
+// ============================================================
+
+export type RecordingStatus = 'scheduled' | 'recording' | 'completed' | 'failed' | 'cancelled';
+
+export interface LiveTvRecording {
+  id: string;
+  channel_id: string;
+  user_id: string;
+  title: string;
+  start_ts: string;
+  stop_ts: string;
+  status: RecordingStatus;
+  file_path: string | null;
+  file_size_bytes: number;
+  duration_seconds: number;
+  pid: number | null;
+  error_message: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RecordingStats {
+  total: number;
+  scheduled: number;
+  recording: number;
+  completed: number;
+  failed: number;
+  total_bytes: number;
+}
+
+export interface TimeshiftWindow {
+  channel_id: string;
+  window_seconds: number;
+  earliest_ts: string | null;
+  latest_ts: string | null;
+  segment_count: number;
+}
+
+export interface TimeshiftSegment {
+  id: string;
+  channel_id: string;
+  segment_path: string;
+  start_ts: string;
+  duration_seconds: number;
+  bytes: number;
+  created_at: string;
+}
+
+export interface TimeshiftSeekResult {
+  allowed: boolean;
+  reason: 'ok' | 'before_window' | 'future';
+  at_ts: string;
+  earliest_ts: string | null;
+  latest_ts: string | null;
+  segments: TimeshiftSegment[];
+}
+
+export interface CatchUpEntry {
+  program_id: string;
+  channel_id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  start_ts: string;
+  stop_ts: string;
+  duration_seconds: number;
+  available: boolean;
+  recording_id: string | null;
+  file_path: string | null;
+  replay_url: string | null;
+  source: 'recording' | 'none';
+}
+
+export interface CatchUpSummary {
+  channel_id: string;
+  from_ts: string;
+  to_ts: string;
+  program_count: number;
+  available_count: number;
+  earliest_available_ts: string | null;
+  latest_available_ts: string | null;
+}
+
+// DVR
+export async function listLiveTvRecordings(opts: {
+  status?: RecordingStatus;
+  channel_id?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+} = {}): Promise<{ recordings: LiveTvRecording[]; count: number }> {
+  const params = new URLSearchParams();
+  if (opts.status) params.set('status', opts.status);
+  if (opts.channel_id) params.set('channel_id', opts.channel_id);
+  if (opts.from) params.set('from', opts.from);
+  if (opts.to) params.set('to', opts.to);
+  if (opts.limit) params.set('limit', String(opts.limit));
+  const qs = params.toString();
+  return request(`/api/v1/videos/live-tv/recordings${qs ? '?' + qs : ''}`);
+}
+
+export async function getLiveTvRecordingStats(): Promise<RecordingStats> {
+  return request('/api/v1/videos/live-tv/recordings/stats');
+}
+
+export async function getLiveTvRecording(id: string): Promise<{ recording: LiveTvRecording }> {
+  return request(`/api/v1/videos/live-tv/recordings/${id}`);
+}
+
+export async function scheduleLiveTvRecording(input: {
+  channel_id: string;
+  title?: string;
+  start_ts: string;
+  stop_ts: string;
+}): Promise<{ recording: LiveTvRecording }> {
+  return request('/api/v1/videos/live-tv/recordings', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function cancelLiveTvRecording(id: string): Promise<{ cancelled: boolean }> {
+  return request(`/api/v1/videos/live-tv/recordings/${id}/cancel`, { method: 'POST' });
+}
+
+export async function deleteLiveTvRecording(id: string): Promise<{ deleted: boolean }> {
+  return request(`/api/v1/videos/live-tv/recordings/${id}`, { method: 'DELETE' });
+}
+
+// Time-Shift
+export async function getLiveTvTimeshiftWindow(channelId: string): Promise<TimeshiftWindow> {
+  return request(`/api/v1/videos/live-tv/timeshift/window/${channelId}`);
+}
+
+export async function listLiveTvTimeshiftSegments(
+  channelId: string,
+  opts: { from?: string; to?: string } = {}
+): Promise<{ segments: TimeshiftSegment[]; count: number }> {
+  const params = new URLSearchParams();
+  if (opts.from) params.set('from', opts.from);
+  if (opts.to) params.set('to', opts.to);
+  const qs = params.toString();
+  return request(`/api/v1/videos/live-tv/timeshift/segments/${channelId}${qs ? '?' + qs : ''}`);
+}
+
+export async function seekLiveTvTimeshift(
+  channelId: string,
+  at_ts: string
+): Promise<TimeshiftSeekResult> {
+  return request(`/api/v1/videos/live-tv/timeshift/seek/${channelId}`, {
+    method: 'POST',
+    body: JSON.stringify({ at_ts }),
+  });
+}
+
+export async function startLiveTvTimeshiftSession(
+  channelId: string
+): Promise<{ session: { user_id: string; channel_id: string; session_start_ts: string; last_seen_ts: string } }> {
+  return request(`/api/v1/videos/live-tv/timeshift/session/${channelId}`, { method: 'POST' });
+}
+
+export async function heartbeatLiveTvTimeshiftSession(): Promise<{ ok: boolean }> {
+  return request('/api/v1/videos/live-tv/timeshift/session/heartbeat', { method: 'PATCH' });
+}
+
+export async function endLiveTvTimeshiftSession(): Promise<{ ended: boolean }> {
+  return request('/api/v1/videos/live-tv/timeshift/session', { method: 'DELETE' });
+}
+
+// Catch-Up
+export async function getLiveTvCatchUp(
+  channelId: string,
+  opts: { from?: string; to?: string; limit?: number } = {}
+): Promise<{ entries: CatchUpEntry[]; count: number }> {
+  const params = new URLSearchParams();
+  if (opts.from) params.set('from', opts.from);
+  if (opts.to) params.set('to', opts.to);
+  if (opts.limit) params.set('limit', String(opts.limit));
+  const qs = params.toString();
+  return request(`/api/v1/videos/live-tv/catchup/${channelId}${qs ? '?' + qs : ''}`);
+}
+
+export async function getLiveTvCatchUpSummary(
+  channelId: string,
+  from?: string
+): Promise<CatchUpSummary> {
+  const qs = from ? `?from=${encodeURIComponent(from)}` : '';
+  return request(`/api/v1/videos/live-tv/catchup/${channelId}/summary${qs}`);
+}
+
+export async function getLiveTvCatchUpForProgram(programId: string): Promise<{ entry: CatchUpEntry }> {
+  return request(`/api/v1/videos/live-tv/catchup/program/${programId}`);
+}

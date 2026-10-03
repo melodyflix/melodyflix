@@ -11,6 +11,8 @@ import {
   listLiveTvChat, postLiveTvChat, LiveTvChatMessage,
 } from '../lib/api';
 import { usePictureInPicture } from '../hooks/usePictureInPicture';
+import TimeshiftSlider from '../components/TimeshiftSlider';
+import CatchUpTab from '../components/CatchUpTab';
 
 interface Props {
   onSignIn: () => void;
@@ -34,6 +36,7 @@ export default function LiveTVWatch({ onSignIn: _onSignIn }: Props) {
   const [chatInput, setChatInput] = useState('');
   const [chatSending, setChatSending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [sideTab, setSideTab] = useState<'chat' | 'catchup'>('chat');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const pip = usePictureInPicture(videoRef);
@@ -240,6 +243,11 @@ export default function LiveTVWatch({ onSignIn: _onSignIn }: Props) {
             </span>
           </div>
 
+          {/* Time-Shift (40.5) */}
+          <div style={{ marginTop: 12 }}>
+            <TimeshiftSlider channelId={id!} />
+          </div>
+
           {/* Channel info */}
           <div style={{ marginTop: 20, padding: 16, border: '1px solid #eee', borderRadius: 12 }}>
             <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -309,7 +317,37 @@ export default function LiveTVWatch({ onSignIn: _onSignIn }: Props) {
         </aside>
 
         {/* Chat panel */}
-        <aside style={{ border: '1px solid #eee', borderRadius: 12, background: '#fafafa', display: 'flex', flexDirection: 'column', maxHeight: 420 }}>
+        <aside style={{ border: '1px solid #eee', borderRadius: 12, background: '#fafafa', display: 'flex', flexDirection: 'column', maxHeight: 480 }}>
+          {/* Tab switcher */}
+          <div style={{ display: 'flex', borderBottom: '1px solid #eee' }}>
+            <button
+              onClick={() => setSideTab('chat')}
+              style={{
+                flex: 1, padding: '10px 12px', border: 'none', cursor: 'pointer',
+                background: sideTab === 'chat' ? '#fff' : '#fafafa',
+                fontSize: 13, fontWeight: 600,
+                color: sideTab === 'chat' ? '#1a1a1a' : '#888',
+                borderBottom: sideTab === 'chat' ? '2px solid #0a7' : '2px solid transparent',
+              }}
+            >💬 Chat</button>
+            <button
+              onClick={() => setSideTab('catchup')}
+              style={{
+                flex: 1, padding: '10px 12px', border: 'none', cursor: 'pointer',
+                background: sideTab === 'catchup' ? '#fff' : '#fafafa',
+                fontSize: 13, fontWeight: 600,
+                color: sideTab === 'catchup' ? '#1a1a1a' : '#888',
+                borderBottom: sideTab === 'catchup' ? '2px solid #7c5bff' : '2px solid transparent',
+              }}
+            >⏪ Catch-Up</button>
+          </div>
+
+          {sideTab === 'catchup' ? (
+            <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
+              <CatchUpTab channelId={id!} />
+            </div>
+          ) : (
+          <>
           <div style={{ padding: '12px 16px', borderBottom: '1px solid #eee', fontWeight: 600, fontSize: 14 }}>
             💬 Live chat
           </div>
@@ -352,6 +390,8 @@ export default function LiveTVWatch({ onSignIn: _onSignIn }: Props) {
             <div style={{ padding: '6px 12px', fontSize: 11, color: 'crimson', background: '#fff0f0' }}>
               {chatError}
             </div>
+          )}
+          </>
           )}
         </aside>
         </div>
