@@ -203,7 +203,14 @@
 | 13.17 | Study Notes | [DONE] 4 styles + flashcards |
 | 13.18 | Question Bank | [DONE] 5 types |
 | 13.19 | Personalized Study Plan | [DONE] |
-| 13.20-13.27 | Exam + Certificate | [TODO] |
+| 13.20 | Timed Exam | [DONE] exam.service.ts |
+| 13.21 | Question Randomization | [DONE] seed-based |
+| 13.22 | AI Proctoring | [DONE] 11 event types + auto-DQ |
+| 13.23 | Result Verification | [DONE] SHA-256 hash |
+| 13.24 | QR Certificate | [DONE] certificate.service.ts |
+| 13.25 | Verification Portal | [DONE] public /verify/:code |
+| 13.26 | Digital Credential | [DONE] JSON-LD + integrity |
+| 13.27 | Certificate Revocation | [DONE] revoke + reactivate |
 
 **Scope:** 12 countries, 85 levels, 84 subjects — Class 1 → BCS, US K-12, UK GCSE/A-Level, IB, Cambridge, professional certs.
 
