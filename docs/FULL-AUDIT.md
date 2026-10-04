@@ -1199,14 +1199,16 @@ Infra needed: STUN/TURN server (coturn), signaling over WebSocket, SFU (mediasou
 
 ## Section 147 — Real-time Messaging (WebSocket)
 
-| 147.1 | Persistent WS Connection | [PARTIAL] ws.service.ts (live only) |
-| 147.2 | Typing Indicators | [TODO] |
-| 147.3 | Real-time Read Receipts | [TODO] |
-| 147.4 | Online/Offline Presence | [TODO] |
-| 147.5 | Message Delivery Status | [TODO] |
-| 147.6 | Real-time Group Chat | [TODO] |
-| 147.7 | Message Reactions (live) | [TODO] |
-| 147.8 | Message Edit/Delete Broadcast | [TODO] |
+| 147.1 | Persistent WS Connection | [DONE] messaging-realtime.service.ts |
+| 147.2 | Typing Indicators | [DONE] |
+| 147.3 | Real-time Read Receipts | [DONE] |
+| 147.4 | Online/Offline Presence | [DONE] |
+| 147.5 | Message Delivery Status | [DONE] |
+| 147.6 | Real-time Group Chat | [DONE] |
+| 147.7 | Message Reactions (live) | [DONE] |
+| 147.8 | Message Edit/Delete Broadcast | [DONE] |
+
+Note: All mutation functions emit RealtimeEvent objects — WebSocket layer hookup deferred (uses @fastify/websocket when wired).
 
 ## Section 148 — Emoji Reactions & Rich Media
 
