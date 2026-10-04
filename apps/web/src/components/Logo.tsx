@@ -1,30 +1,89 @@
-// melodyflix - premium logo component (uses official PNG brand mark)
-// The official logo is at /public/logo.png (3264x3264 PNG with transparency).
+// melodyflix - premium logo component (crystalline SVG default)
+// Custom logo can be provided via imageSrc prop (used by admin upload feature).
 
 interface Props {
   size?: number;
   showText?: boolean;
   showTagline?: boolean;
   variant?: 'light' | 'dark';
+  imageSrc?: string | null;
 }
 
-export default function Logo({ size = 32, showText = true, showTagline = false, variant = 'light' }: Props) {
+export default function Logo({ size = 32, showText = true, showTagline = false, variant = 'light', imageSrc = null }: Props) {
   const textColor = variant === 'light' ? '#0f0f0f' : '#fff';
   const taglineColor = variant === 'light' ? '#71717a' : '#a1a1aa';
+  const uid = `mf-${size}-${variant}`;
 
+  // Custom image logo (admin-uploaded) — renders as <img>
+  if (imageSrc) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: Math.max(8, size * 0.22) }}>
+        <img
+          src={imageSrc}
+          alt="MelodyFlix"
+          width={size}
+          height={size}
+          style={{
+            objectFit: 'contain',
+            flexShrink: 0,
+            filter: variant === 'dark' ? 'drop-shadow(0 0 8px rgba(168, 85, 247, 0.4))' : 'none',
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Default crystalline SVG mark
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: Math.max(8, size * 0.22) }}>
-      <img
-        src="/logo.png"
-        alt="MelodyFlix"
+    <div style={{ display: 'flex', alignItems: 'center', gap: Math.max(8, size * 0.28) }}>
+      <svg
         width={size}
         height={size}
-        style={{
-          objectFit: 'contain',
-          flexShrink: 0,
-          filter: variant === 'dark' ? 'drop-shadow(0 0 8px rgba(168, 85, 247, 0.4))' : 'none',
-        }}
-      />
+        viewBox="0 0 64 64"
+        xmlns="http://www.w3.org/2000/svg"
+        style={{ flexShrink: 0 }}
+      >
+        <defs>
+          <linearGradient id={`${uid}-g1`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#c084fc" />
+            <stop offset="100%" stopColor="#7c3aed" />
+          </linearGradient>
+          <linearGradient id={`${uid}-g2`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#f0abfc" />
+            <stop offset="100%" stopColor="#a855f7" />
+          </linearGradient>
+          <linearGradient id={`${uid}-g3`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#ec4899" />
+            <stop offset="100%" stopColor="#7c3aed" />
+          </linearGradient>
+          <linearGradient id={`${uid}-g4`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#e879f9" />
+            <stop offset="100%" stopColor="#c026d3" />
+          </linearGradient>
+          <filter id={`${uid}-glow`} x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="1.1" result="b" />
+            <feMerge>
+              <feMergeNode in="b" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        <g filter={`url(#${uid}-glow)`}>
+          <polygon points="4,46 18,32 32,46 18,60" fill={`url(#${uid}-g1)`} />
+          <polygon points="4,46 18,32 18,60" fill={`url(#${uid}-g2)`} opacity="0.75" />
+          <polygon points="18,32 32,46 18,60" fill={`url(#${uid}-g3)`} opacity="0.85" />
+          <polygon points="10,44 18,36 26,44 18,52" fill="#fff" opacity="0.14" />
+          <polygon points="14,42 18,38 22,42 18,46" fill="#fff" opacity="0.3" />
+          <polygon points="26,10 34,8 34,46 26,48" fill={`url(#${uid}-g1)`} />
+          <polygon points="26,10 26,48 30,48 30,10" fill={`url(#${uid}-g4)`} opacity="0.7" />
+          <polygon points="30,10 34,8 34,46 30,48" fill={`url(#${uid}-g3)`} opacity="0.55" />
+          <polygon points="34,8 56,18 42,32 34,22" fill={`url(#${uid}-g2)`} />
+          <polygon points="34,8 56,18 48,13 34,10" fill={`url(#${uid}-g1)`} opacity="0.9" />
+          <polygon points="34,22 42,32 36,34 34,26" fill={`url(#${uid}-g3)`} opacity="0.9" />
+          <polygon points="34,10 48,13 42,16" fill="#fff" opacity="0.18" />
+        </g>
+      </svg>
 
       {showText && (
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>

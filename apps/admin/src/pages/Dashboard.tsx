@@ -50,7 +50,7 @@ export default function Dashboard() {
           <li><strong>Users</strong> — manage users and roles</li>
           <li><strong>Settings</strong> — platform configuration</li>
         </ul>
-        <p className="mf-muted mf-mt-16">More pages coming: Videos, Live, Analytics, Monetization...</p>
+        <p className="mf-muted mf-mt-16">All systems running. Use the sidebar to manage platform content.</p>
       </div>
     </>
   );
