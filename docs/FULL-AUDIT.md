@@ -199,7 +199,11 @@
 | 13.13 | Learning Progress Tracking | [DONE] |
 | 13.14 | Teacher Review/Escalation | [DONE] |
 | 13.15 | Answer Verification + Source Citation | [DONE] |
-| 13.16-13.27 | Content Gen + Exam Integrity | [TODO] |
+| 13.16 | Lesson Generator | [DONE] ai-content-gen.service.ts |
+| 13.17 | Study Notes | [DONE] 4 styles + flashcards |
+| 13.18 | Question Bank | [DONE] 5 types |
+| 13.19 | Personalized Study Plan | [DONE] |
+| 13.20-13.27 | Exam + Certificate | [TODO] |
 
 **Scope:** 12 countries, 85 levels, 84 subjects — Class 1 → BCS, US K-12, UK GCSE/A-Level, IB, Cambridge, professional certs.
 

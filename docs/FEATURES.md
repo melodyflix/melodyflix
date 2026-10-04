@@ -36,6 +36,7 @@
 - Content Ingest Engine (37.1 movies + 37.2 TV/drama + 37.3 music + 37.4 web series + news/podcast/generic — full pipeline)
 - Global Education Core (13.1-13.5: 12 countries, 85 levels, 84 subjects, multi-curriculum, chapters/topics/lessons, courses, enrollments, progress)
 - AI Tutor (13.6-13.15: student Q&A + AI answers via OpenAI/Anthropic/Gemini + step-by-step + image/voice + practice quiz + error analysis + teacher escalation + answer verification)
+- AI Content Generation (13.16 lesson generator + 13.17 study notes + 13.18 question bank + 13.19 personalized study plan)
 - News Management (72.1 breaking alerts + 72.2 ticker + 72.3 reporter portal + 72.4 fact-checking)
 - Emoji Reactions & Rich Media (148.1 reactions + 148.2 custom emoji + 148.3 stickers + 148.4 GIFs + 148.5 analytics + 148.6 super thanks)
 - Real-time Messaging Layer (147.1 connection + 147.2 typing + 147.3 read receipts + 147.4 presence + 147.5 delivery + 147.6 group chat + 147.7 DM reactions + 147.8 edit log)
