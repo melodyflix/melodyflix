@@ -189,7 +189,17 @@
 | 13.3 | Certificate | [TODO] |
 | 13.4 | Help Center | [DONE] support.service.ts |
 | 13.5 | Support Ticket | [DONE] support.service.ts |
-| 13.6-13.27 | AI Tutor / Content Gen / Exam Integrity | [TODO] |
+| 13.6 | Student Question Submission | [DONE] ai-tutor.service.ts |
+| 13.7 | AI-Based Answer + Explanation | [DONE] OpenAI/Anthropic/Gemini |
+| 13.8 | Step-by-Step Solution | [DONE] |
+| 13.9 | Image and Voice Questions | [DONE] |
+| 13.10 | Subject and Grade-Based AI Tutor | [DONE] |
+| 13.11 | Practice Quiz and Homework Help | [DONE] |
+| 13.12 | Error Analysis and Feedback | [DONE] |
+| 13.13 | Learning Progress Tracking | [DONE] |
+| 13.14 | Teacher Review/Escalation | [DONE] |
+| 13.15 | Answer Verification + Source Citation | [DONE] |
+| 13.16-13.27 | Content Gen + Exam Integrity | [TODO] |
 
 **Scope:** 12 countries, 85 levels, 84 subjects — Class 1 → BCS, US K-12, UK GCSE/A-Level, IB, Cambridge, professional certs.
 
