@@ -45,6 +45,36 @@ export default function HelpCenter({ onSignIn }: Props) {
       {tab === 'faq' && <FaqTab onSignIn={onSignIn} onOpenTicket={() => setTab('tickets')} />}
       {tab === 'chatbot' && <ChatbotTab />}
       {tab === 'tickets' && <TicketsTab me={!!me} onSignIn={onSignIn} />}
+
+      {/* Legal documents */}
+      <div style={{ marginTop: 40, padding: 20, background: '#f9f9f9', borderRadius: 10 }}>
+        <h2 style={{ fontSize: 16, marginBottom: 12 }}>📄 Legal & Policies</h2>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          {[
+            { doc: 'terms', icon: '📜', label: 'Terms of Service' },
+            { doc: 'privacy', icon: '🔒', label: 'Privacy Policy' },
+            { doc: 'cookies', icon: '🍪', label: 'Cookie Policy' },
+            { doc: 'dmca', icon: '©️', label: 'DMCA / Copyright' },
+            { doc: 'age-policy', icon: '👶', label: 'Age Policy' },
+          ].map((d) => (
+            <button
+              key={d.doc}
+              onClick={() => navigate(`/legal/${d.doc}`)}
+              style={{
+                padding: '8px 14px',
+                background: '#fff',
+                border: '1px solid #e5e5e5',
+                borderRadius: 20,
+                cursor: 'pointer',
+                fontSize: 13,
+                color: '#0f0f0f',
+              }}
+            >
+              {d.icon} {d.label}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -588,6 +618,7 @@ function TicketsTab({ me, onSignIn }: { me: boolean; onSignIn: () => void }) {
           ))}
         </div>
       )}
+
     </>
   );
 }

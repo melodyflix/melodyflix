@@ -52,6 +52,7 @@ import MyMemberships from './pages/MyMemberships';
 import Analytics from './pages/Analytics';
 import HelpCenter from './pages/HelpCenter';
 import VerifyEmail from './pages/VerifyEmail';
+import Legal from './pages/Legal';
 import { api, getCachedUser, getToken, clearAuth, type User } from './lib/api';
 
 function AppInner() {
@@ -155,6 +156,8 @@ function AppInner() {
         <Route path="/studio" element={<CreatorStudio onSignIn={requireSignIn} />} />
         <Route path="/help" element={<HelpCenter onSignIn={requireSignIn} />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/legal" element={<Legal onSignIn={requireSignIn} />} />
+        <Route path="/legal/:doc" element={<Legal onSignIn={requireSignIn} />} />
         <Route path="/shorts/:id" element={<ShortsFeed onSignIn={requireSignIn} />} />
         <Route path="/series" element={<SeriesList onSignIn={requireSignIn} />} />
         <Route path="/series/:id" element={<SeriesDetail onSignIn={requireSignIn} />} />
