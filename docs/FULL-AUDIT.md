@@ -1173,3 +1173,65 @@ Sections: 13, 16, 21, 22 (partial), 24, 28, 36, 37 (partial), 39, 43, 47, 52, 53
 ---
 
 **Note:** This audit was generated from a code scan of all `services/*/src/services/` and `services/*/src/routes/`. For definitive verification of any [DONE] item, inspect the corresponding service file.
+
+---
+
+# NEW SECTIONS (146-150)
+
+> These were added after initial audit based on launch-scope requirements:
+> YouTube + Facebook calling + real-time chat + emoji reactions + auto content.
+
+## Section 146 — Voice & Video Calling
+
+| 146.1 | 1-to-1 Voice Call | [TODO] WebRTC |
+| 146.2 | 1-to-1 Video Call | [TODO] WebRTC |
+| 146.3 | Group Voice Call | [TODO] SFU/MCU |
+| 146.4 | Group Video Call | [TODO] SFU/MCU |
+| 146.5 | Call Recording | [TODO] server-side |
+| 146.6 | Screen Sharing | [TODO] getDisplayMedia |
+| 146.7 | Call History & Missed Log | [TODO] |
+| 146.8 | Do Not Disturb / Call Block | [TODO] |
+
+Infra needed: STUN/TURN server (coturn), signaling over WebSocket, SFU (mediasoup/Janus) for group.
+
+## Section 147 — Real-time Messaging (WebSocket)
+
+| 147.1 | Persistent WS Connection | [PARTIAL] ws.service.ts (live only) |
+| 147.2 | Typing Indicators | [TODO] |
+| 147.3 | Real-time Read Receipts | [TODO] |
+| 147.4 | Online/Offline Presence | [TODO] |
+| 147.5 | Message Delivery Status | [TODO] |
+| 147.6 | Real-time Group Chat | [TODO] |
+| 147.7 | Message Reactions (live) | [TODO] |
+| 147.8 | Message Edit/Delete Broadcast | [TODO] |
+
+## Section 148 — Emoji Reactions & Rich Media
+
+| 148.1 | Emoji Reactions (Like/Love/Haha/Wow/Sad/Angry) | [TODO] |
+| 148.2 | Custom Emoji Sets | [TODO] |
+| 148.3 | Stickers | [TODO] |
+| 148.4 | Animated GIFs (Giphy/Tenor) | [TODO] |
+| 148.5 | Reaction Analytics | [TODO] |
+| 148.6 | Super Thanks / Tip Reactions | [PARTIAL] superchat.service.ts |
+
+## Section 149 — TMDB/IMDb Metadata Automation
+
+| 149.1 | TMDB Search & Match | [TODO] |
+| 149.2 | Movie Metadata Import | [TODO] |
+| 149.3 | TV Series Metadata Import | [TODO] |
+| 149.4 | Cast & Crew Import | [PARTIAL] castcrew.service.ts |
+| 149.5 | Poster/Backdrop Import | [TODO] |
+| 149.6 | Trailer Import | [TODO] |
+| 149.7 | IMDb Rating Integration | [TODO] |
+| 149.8 | Multi-Language Metadata | [TODO] |
+| 149.9 | Auto Season/Episode Mapping | [PARTIAL] series.service.ts |
+| 149.10 | Metadata Sync & Update | [TODO] |
+
+## Section 150 — Live Collaboration
+
+| 150.1 | Screen Share Room | [TODO] |
+| 150.2 | Whiteboard | [TODO] |
+| 150.3 | Remote Guest Invite | [PARTIAL] multicam.service.ts |
+| 150.4 | Scene Switching | [TODO] |
+| 150.5 | Production Chat | [TODO] |
+| 150.6 | Multi-Presenter Stream | [TODO] |

@@ -118,6 +118,22 @@
 
 ---
 
+## Launch-Scope Extensions (Sections 146-150)
+
+Added after initial audit based on launch vision (YouTube + Facebook calling + auto content):
+
+| # | Section | Items | Status |
+|---|---|---|---|
+| 146 | Voice & Video Calling | 8 | NOT STARTED |
+| 147 | Real-time Messaging (WebSocket) | 8 | PARTIAL (live chat only) |
+| 148 | Emoji Reactions & Rich Media | 6 | NOT STARTED |
+| 149 | TMDB/IMDb Metadata Automation | 10 | PARTIAL |
+| 150 | Live Collaboration | 6 | PARTIAL (multicam) |
+
+**Additional infra needed:** STUN/TURN (coturn), WebSocket signaling, SFU (mediasoup/Janus).
+
+---
+
 ## Pending Work
 
 ### Section 21 — Download & Offline (5 items)
