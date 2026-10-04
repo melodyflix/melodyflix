@@ -33,6 +33,7 @@
 - TMDB/IMDb Metadata (149.1 search + 149.2 movie + 149.3 TV + 149.4 cast/crew + 149.5 poster + 149.6 trailer + 149.7 IMDb rating + 149.8 multi-lang + 149.9 episode + 149.10 sync)
 - Auto Content Upload foundation (37.6-37.9 sources + 37.13 dedupe + 37.14 quality + 37.19-37.22 rules/retry)
 - Auto Content Worker (RSS/Atom parser + fetch orchestrator + worker stats)
+- News Management (72.1 breaking alerts + 72.2 ticker + 72.3 reporter portal + 72.4 fact-checking)
 - Autoplay Chain (series/playlist/channel + preferences gating)
 - Video Upload (Web + Admin)
 - HLS Player (Quality/Speed/PiP/Mini/Loop/A-B/Sleep)

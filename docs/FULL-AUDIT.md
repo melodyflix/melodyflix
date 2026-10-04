@@ -746,7 +746,10 @@ All items [TODO] — zero code
 
 ## Section 72 — News Management
 
-All items [TODO] — zero code
+| 72.1 | Breaking News Alerts | [DONE] news.service.ts |
+| 72.2 | News Ticker | [DONE] |
+| 72.3 | Reporter Portal | [DONE] |
+| 72.4 | Fact-Checking Workflow | [DONE] |
 
 ## Section 73 — Database Management
 
