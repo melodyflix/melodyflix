@@ -49,6 +49,19 @@ export default function Users() {
     }
   }
 
+  async function toggleEmailVerified(userId: string, current: number) {
+    setBusy(userId);
+    try {
+      if (current) await api.unverifyUserEmail(userId);
+      else await api.verifyUserEmail(userId);
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <>
       <div className="mf-flex-between mf-mb-16">
@@ -70,6 +83,7 @@ export default function Users() {
             <tr>
               <th>Username</th>
               <th>Email</th>
+              <th>Email Verified</th>
               <th>Display Name</th>
               <th>Role</th>
               <th>Joined</th>
@@ -81,6 +95,13 @@ export default function Users() {
               <tr key={u.id}>
                 <td><strong>{u.username}</strong></td>
                 <td>{u.email}</td>
+                <td>
+                  {u.email_verified ? (
+                    <span className="mf-badge mf-badge-info">verified</span>
+                  ) : (
+                    <span className="mf-badge mf-badge-warning">unverified</span>
+                  )}
+                </td>
                 <td className="mf-muted">{u.display_name ?? '—'}</td>
                 <td>
                   <span className={`mf-badge ${
@@ -101,6 +122,14 @@ export default function Users() {
                     <option value="creator">creator</option>
                     <option value="admin">admin</option>
                   </select>
+                  <button
+                    className="mf-btn"
+                    style={{ padding: '4px 8px', marginRight: 6 }}
+                    disabled={busy === u.id}
+                    onClick={() => toggleEmailVerified(u.id, u.email_verified)}
+                  >
+                    {u.email_verified ? 'Unverify' : 'Verify'}
+                  </button>
                   <button
                     className="mf-btn mf-btn-danger"
                     style={{ padding: '4px 8px' }}

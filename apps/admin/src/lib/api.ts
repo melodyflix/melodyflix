@@ -178,6 +178,12 @@ export const api = {
   deleteUser: (userId: string) =>
     request<{ deleted: boolean }>(`/api/admin/users/${userId}`, { method: 'DELETE' }),
 
+  verifyUserEmail: (userId: string) =>
+    request<User>(`/api/admin/users/${userId}/verify-email`, { method: 'POST' }),
+
+  unverifyUserEmail: (userId: string) =>
+    request<User>(`/api/admin/users/${userId}/unverify-email`, { method: 'POST' }),
+
   // videos
   listVideos: (limit = 50, offset = 0) =>
     request<VideosListResponse>(`/api/v1/videos?limit=${limit}&offset=${offset}`),

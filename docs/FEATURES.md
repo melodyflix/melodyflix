@@ -34,9 +34,8 @@
 - Trending + Categories
 - Notifications (Bell + full stack)
 - Admin Panel (Users/Channels/Videos/Reports/Ads/Payments/Support/Email/Settings)
-- Email Verification (SMTP settings)
+- Email Verification (SMTP settings + admin verify/unverify panel)
 - Backup (mf-backup)
 
 ## Pending
-- Email Verification admin panel build + push (if unfinished)
 - Deploy to Oracle Cloud Always Free

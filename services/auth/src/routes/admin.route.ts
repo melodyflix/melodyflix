@@ -47,6 +47,38 @@ export async function adminRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: toSafeUser(updated) });
   });
 
+  // POST /api/v1/admin/users/:id/verify-email
+  app.post('/users/:id/verify-email', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+
+    const { id } = req.params as { id: string };
+    const db = getDb();
+    const existing = db.prepare('SELECT id FROM users WHERE id = ?').get(id);
+    if (!existing) return reply.code(404).send({ success: false, error: 'User not found' });
+
+    db.prepare('UPDATE users SET email_verified = 1, updated_at = ? WHERE id = ?')
+      .run(new Date().toISOString(), id);
+    const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as User;
+    return reply.send({ success: true, data: toSafeUser(updated) });
+  });
+
+  // POST /api/v1/admin/users/:id/unverify-email
+  app.post('/users/:id/unverify-email', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+
+    const { id } = req.params as { id: string };
+    const db = getDb();
+    const existing = db.prepare('SELECT id FROM users WHERE id = ?').get(id);
+    if (!existing) return reply.code(404).send({ success: false, error: 'User not found' });
+
+    db.prepare('UPDATE users SET email_verified = 0, updated_at = ? WHERE id = ?')
+      .run(new Date().toISOString(), id);
+    const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as User;
+    return reply.send({ success: true, data: toSafeUser(updated) });
+  });
+
   // DELETE /api/v1/admin/users/:id
   app.delete('/users/:id', async (req, reply) => {
     let payload;
