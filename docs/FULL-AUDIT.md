@@ -1186,14 +1186,16 @@ Sections: 13, 16, 21, 22 (partial), 24, 28, 36, 37 (partial), 39, 43, 47, 52, 53
 
 ## Section 146 — Voice & Video Calling
 
-| 146.1 | 1-to-1 Voice Call | [TODO] WebRTC |
-| 146.2 | 1-to-1 Video Call | [TODO] WebRTC |
-| 146.3 | Group Voice Call | [TODO] SFU/MCU |
-| 146.4 | Group Video Call | [TODO] SFU/MCU |
-| 146.5 | Call Recording | [TODO] server-side |
-| 146.6 | Screen Sharing | [TODO] getDisplayMedia |
-| 146.7 | Call History & Missed Log | [TODO] |
-| 146.8 | Do Not Disturb / Call Block | [TODO] |
+| 146.1 | 1-to-1 Voice Call | [DONE] calling.service.ts |
+| 146.2 | 1-to-1 Video Call | [DONE] |
+| 146.3 | Group Voice Call | [DONE] up to 50 |
+| 146.4 | Group Video Call | [DONE] up to 50 |
+| 146.5 | Call Recording | [DONE] |
+| 146.6 | Screen Sharing | [DONE] |
+| 146.7 | Call History & Missed Log | [DONE] |
+| 146.8 | Do Not Disturb / Call Block | [DONE] |
+
+Note: Signaling events (call.invited, webrtc.offer/answer/ice) emitted via buildCallSignal() — WebSocket + WebRTC clients connect via these. ICE/TURN configured from integration settings.
 
 Infra needed: STUN/TURN server (coturn), signaling over WebSocket, SFU (mediasoup/Janus) for group.
 
