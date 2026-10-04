@@ -418,10 +418,10 @@ All items [TODO] — mobile apps separately built
 
 ## Section 37 — Auto Content Upload System
 
-| 37.1 | Automatic Movie Upload | [PARTIAL] migration.service.ts |
-| 37.2 | Automatic Drama/Series Upload | [PARTIAL] |
-| 37.3 | Automatic Music/Song Upload | [PARTIAL] music.service.ts |
-| 37.4 | Automatic Web Series Upload | [PARTIAL] |
+| 37.1 | Automatic Movie Upload | [DONE] content-ingest.service.ts |
+| 37.2 | Automatic Drama/Series Upload | [DONE] |
+| 37.3 | Automatic Music/Song Upload | [DONE] auto artist+track |
+| 37.4 | Automatic Web Series Upload | [DONE] |
 | 37.5 | Multi-Language Audio Support | [DONE] audiotrack.service.ts |
 | 37.6 | Automatic News Portal Integration | [DONE] content-source.service.ts |
 | 37.7 | RSS/API Content Fetching | [DONE] |
@@ -429,11 +429,11 @@ All items [TODO] — mobile apps separately built
 | 37.9 | Content Source Management | [DONE] |
 | 37.10 | Automatic Metadata Extraction | [DONE] applySourceDefaults |
 | 37.11 | Automatic Thumbnail Generation | [DONE] ai.service.ts |
-| 37.12 | Automatic Category Assignment | [PARTIAL] genre |
+| 37.12 | Automatic Category Assignment | [DONE] mapCategory |
 | 37.13 | Duplicate Content Detection | [DONE] SHA-256 hash |
 | 37.14 | Pre-Upload Quality Check | [DONE] runQualityCheck |
 | 37.15 | Multi-Audio Track Support | [DONE] audiotrack |
-| 37.16 | Language Detection and Tagging | [PARTIAL] |
+| 37.16 | Language Detection and Tagging | [DONE] |
 | 37.17 | TMDB Automatic Import/Upload | [DONE] tmdb.service.ts |
 | 37.18 | IMDb Integration | [DONE] via OMDb in tmdb.service |
 | 37.19 | Source Approval | [DONE] |

@@ -33,6 +33,7 @@
 - TMDB/IMDb Metadata (149.1 search + 149.2 movie + 149.3 TV + 149.4 cast/crew + 149.5 poster + 149.6 trailer + 149.7 IMDb rating + 149.8 multi-lang + 149.9 episode + 149.10 sync)
 - Auto Content Upload foundation (37.6-37.9 sources + 37.13 dedupe + 37.14 quality + 37.19-37.22 rules/retry)
 - Auto Content Worker (RSS/Atom parser + fetch orchestrator + worker stats)
+- Content Ingest Engine (37.1 movies + 37.2 TV/drama + 37.3 music + 37.4 web series + news/podcast/generic — full pipeline)
 - News Management (72.1 breaking alerts + 72.2 ticker + 72.3 reporter portal + 72.4 fact-checking)
 - Emoji Reactions & Rich Media (148.1 reactions + 148.2 custom emoji + 148.3 stickers + 148.4 GIFs + 148.5 analytics + 148.6 super thanks)
 - Real-time Messaging Layer (147.1 connection + 147.2 typing + 147.3 read receipts + 147.4 presence + 147.5 delivery + 147.6 group chat + 147.7 DM reactions + 147.8 edit log)
