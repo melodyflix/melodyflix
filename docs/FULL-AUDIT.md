@@ -1236,9 +1236,9 @@ Note: All mutation functions emit RealtimeEvent objects — WebSocket layer hook
 
 ## Section 150 — Live Collaboration
 
-| 150.1 | Screen Share Room | [TODO] |
-| 150.2 | Whiteboard | [TODO] |
-| 150.3 | Remote Guest Invite | [PARTIAL] multicam.service.ts |
-| 150.4 | Scene Switching | [TODO] |
-| 150.5 | Production Chat | [TODO] |
-| 150.6 | Multi-Presenter Stream | [TODO] |
+| 150.1 | Screen Share Room | [DONE] live-collab.service.ts |
+| 150.2 | Whiteboard | [DONE] strokes + sequences |
+| 150.3 | Remote Guest Invite | [DONE] SHA-256 tokens |
+| 150.4 | Scene Switching | [DONE] layouts + activate |
+| 150.5 | Production Chat | [DONE] mentions + pinning |
+| 150.6 | Multi-Presenter Stream | [DONE] stream slots |
