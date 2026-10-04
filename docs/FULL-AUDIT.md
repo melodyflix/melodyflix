@@ -451,14 +451,14 @@ All items [TODO] — mobile apps separately built
 
 ## Section 39 — Content Scheduling and Planning
 
-| 39.1 | Content Calendar | [TODO] |
-| 39.2 | Batch Scheduling | [TODO] |
-| 39.3 | Recurring Upload | [TODO] |
-| 39.4 | Time Zone-Based Publishing | [TODO] |
-| 39.5 | Editorial Calendar | [TODO] |
-| 39.6 | Content Planning Dashboard | [TODO] |
-| 39.7 | Team Task Assignment | [TODO] |
-| 39.8 | Deadline Reminders | [TODO] |
+| 39.1 | Content Calendar | [DONE] content-scheduling.service.ts |
+| 39.2 | Batch Scheduling | [DONE] |
+| 39.3 | Recurring Upload | [DONE] expandRecurring |
+| 39.4 | Time Zone-Based Publishing | [DONE] Intl.DateTimeFormat |
+| 39.5 | Editorial Calendar | [DONE] |
+| 39.6 | Content Planning Dashboard | [DONE] |
+| 39.7 | Team Task Assignment | [DONE] |
+| 39.8 | Deadline Reminders | [DONE] |
 
 ## Section 40 — Live TV Broadcasting
 
