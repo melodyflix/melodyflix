@@ -23,6 +23,7 @@
 
 ## Extra
 - Community Management (25.1 Forum/Threads/Posts + 25.2 Groups + 25.3 Guidelines + 25.4 Reputation)
+- Autoplay Chain (series/playlist/channel + preferences gating)
 - Video Upload (Web + Admin)
 - HLS Player (Quality/Speed/PiP/Mini/Loop/A-B/Sleep)
 - Search backend + Filters
@@ -38,7 +39,4 @@
 
 ## Pending
 - Email Verification admin panel build + push (if unfinished)
-- Advanced Comments (pagination/pinned)
-- Watch Queue
-- Playlist Auto-play
 - Deploy to Oracle Cloud Always Free
