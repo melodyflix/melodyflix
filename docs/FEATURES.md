@@ -23,6 +23,7 @@
 
 ## Extra
 - Community Management (25.1 Forum/Threads/Posts + 25.2 Groups + 25.3 Guidelines + 25.4 Reputation)
+- Download & Offline (21.1 offline download + 21.2 quality + 21.3 auto-delete + 21.4 data saver + 21.5 offline sync)
 - Autoplay Chain (series/playlist/channel + preferences gating)
 - Video Upload (Web + Admin)
 - HLS Player (Quality/Speed/PiP/Mini/Loop/A-B/Sleep)

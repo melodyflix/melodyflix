@@ -272,7 +272,11 @@ All items [TODO] — zero code
 
 ## Section 21 — Download and Offline
 
-All items [TODO] — zero code
+| 21.1 | Offline Download | [DONE] download.service.ts |
+| 21.2 | Download Quality Selection | [DONE] |
+| 21.3 | Auto-Delete Downloaded Content | [DONE] purgeExpiredDownloads |
+| 21.4 | Data Saver Mode | [DONE] preferences + recommendation |
+| 21.5 | Offline Sync | [DONE] syncDownloads |
 
 ## Section 22 — Social Features
 
