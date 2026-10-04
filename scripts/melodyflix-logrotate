@@ -1,0 +1,31 @@
+# melodyflix - logrotate config
+# Install: sudo cp scripts/melodyflix-logrotate /etc/logrotate.d/melodyflix
+#          sudo chmod 644 /etc/logrotate.d/melodyflix
+
+/var/log/melodyflix/*.log {
+    daily
+    rotate 14
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    create 0644 root root
+    sharedscripts
+    postrotate
+        # No need to signal processes since we use copytruncate
+    endscript
+}
+
+/var/log/nginx/*.log {
+    daily
+    rotate 14
+    missingok
+    notifempty
+    compress
+    delaycompress
+    sharedscripts
+    postrotate
+        [ -f /var/run/nginx.pid ] && kill -USR1 $(cat /var/run/nginx.pid)
+    endscript
+}
