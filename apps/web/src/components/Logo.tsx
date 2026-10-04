@@ -1,47 +1,79 @@
-// melodyflix - premium logo component
+// melodyflix - premium logo component (uses official PNG brand mark)
+// The official logo is at /public/logo.png (3264x3264 PNG with transparency).
+
 interface Props {
   size?: number;
   showText?: boolean;
+  showTagline?: boolean;
   variant?: 'light' | 'dark';
 }
 
-export default function Logo({ size = 32, showText = true, variant = 'light' }: Props) {
+export default function Logo({ size = 32, showText = true, showTagline = false, variant = 'light' }: Props) {
   const textColor = variant === 'light' ? '#0f0f0f' : '#fff';
-  const gradId = `mf-grad-${size}`;
+  const taglineColor = variant === 'light' ? '#71717a' : '#a1a1aa';
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: Math.max(8, size * 0.28) }}>
-      <svg width={size} height={size} viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#7c3aed" />
-            <stop offset="55%" stopColor="#a855f7" />
-            <stop offset="100%" stopColor="#ec4899" />
-          </linearGradient>
-        </defs>
-        {/* Squircle background */}
-        <rect width="64" height="64" rx="18" fill={`url(#${gradId})`} />
-        {/* Subtle top highlight */}
-        <rect
-          x="2" y="2" width="60" height="30"
-          rx="16" fill="rgba(255,255,255,0.12)"
-        />
-        {/* Play triangle */}
-        <path d="M25 20 L47 32 L25 44 Z" fill="#fff" strokeLinejoin="round" />
-      </svg>
+    <div style={{ display: 'flex', alignItems: 'center', gap: Math.max(8, size * 0.22) }}>
+      <img
+        src="/logo.png"
+        alt="MelodyFlix"
+        width={size}
+        height={size}
+        style={{
+          objectFit: 'contain',
+          flexShrink: 0,
+          filter: variant === 'dark' ? 'drop-shadow(0 0 8px rgba(168, 85, 247, 0.4))' : 'none',
+        }}
+      />
+
       {showText && (
-        <span
-          style={{
-            fontSize: Math.max(16, size * 0.62),
-            fontWeight: 700,
-            letterSpacing: -0.6,
-            color: textColor,
-            lineHeight: 1,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          melody
-          <span style={{ color: '#a855f7' }}>flix</span>
-        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
+          <span
+            style={{
+              fontSize: Math.max(16, size * 0.58),
+              fontWeight: 800,
+              letterSpacing: -0.6,
+              lineHeight: 1.05,
+              whiteSpace: 'nowrap',
+              background: variant === 'light'
+                ? 'linear-gradient(180deg, #18181b 0%, #3f3f46 45%, #18181b 55%, #52525b 100%)'
+                : 'linear-gradient(180deg, #ffffff 0%, #d4d4d8 45%, #a1a1aa 55%, #e4e4e7 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              textShadow: variant === 'light'
+                ? '0 1px 2px rgba(168, 85, 247, 0.12)'
+                : '0 0 12px rgba(168, 85, 247, 0.35)',
+              color: textColor,
+            }}
+          >
+            Melody
+            <span
+              style={{
+                background: 'linear-gradient(135deg, #c084fc 0%, #a855f7 40%, #ec4899 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}
+            >
+              Flix
+            </span>
+          </span>
+          {showTagline && (
+            <span
+              style={{
+                fontSize: Math.max(8, size * 0.16),
+                fontWeight: 600,
+                letterSpacing: size * 0.06,
+                color: taglineColor,
+                marginTop: size * 0.1,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              CINEMA · DRAMA · MUSIC
+            </span>
+          )}
+        </div>
       )}
     </div>
   );

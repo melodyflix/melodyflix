@@ -12,7 +12,7 @@
   "lang": "en",
   "dir": "ltr",
   "icons": [
-    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/logo.png", "sizes": "any", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-192-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
@@ -23,25 +23,25 @@
       "name": "Live streams",
       "short_name": "Live",
       "url": "/live",
-      "icons": [{ "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "icons": [{ "src": "/logo.png", "sizes": "any", "type": "image/png" }]
     },
     {
       "name": "Shorts",
       "short_name": "Shorts",
       "url": "/shorts",
-      "icons": [{ "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "icons": [{ "src": "/logo.png", "sizes": "any", "type": "image/png" }]
     },
     {
       "name": "Upload video",
       "short_name": "Upload",
       "url": "/upload",
-      "icons": [{ "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "icons": [{ "src": "/logo.png", "sizes": "any", "type": "image/png" }]
     },
     {
       "name": "Buy messages",
       "short_name": "Messages",
       "url": "/buy-messages",
-      "icons": [{ "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "icons": [{ "src": "/logo.png", "sizes": "any", "type": "image/png" }]
     }
   ]
 }

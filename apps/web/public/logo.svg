@@ -1,12 +1,38 @@
-<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+<svg width="512" height="512" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="mf" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#7c3aed"/>
-      <stop offset="55%" stop-color="#a855f7"/>
-      <stop offset="100%" stop-color="#ec4899"/>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c084fc"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
     </linearGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f0abfc"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+    <linearGradient id="g3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ec4899"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="g4" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e879f9"/>
+      <stop offset="100%" stop-color="#c026d3"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="1.1" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
-  <rect width="64" height="64" rx="18" fill="url(#mf)"/>
-  <rect x="2" y="2" width="60" height="30" rx="16" fill="rgba(255,255,255,0.12)"/>
-  <path d="M25 20 L47 32 L25 44 Z" fill="#fff"/>
+  <g filter="url(#glow)">
+    <polygon points="4,46 18,32 32,46 18,60" fill="url(#g1)"/>
+    <polygon points="4,46 18,32 18,60" fill="url(#g2)" opacity="0.75"/>
+    <polygon points="18,32 32,46 18,60" fill="url(#g3)" opacity="0.85"/>
+    <polygon points="10,44 18,36 26,44 18,52" fill="#fff" opacity="0.14"/>
+    <polygon points="14,42 18,38 22,42 18,46" fill="#fff" opacity="0.3"/>
+    <polygon points="26,10 34,8 34,46 26,48" fill="url(#g1)"/>
+    <polygon points="26,10 26,48 30,48 30,10" fill="url(#g4)" opacity="0.7"/>
+    <polygon points="30,10 34,8 34,46 30,48" fill="url(#g3)" opacity="0.55"/>
+    <polygon points="34,8 56,18 42,32 34,22" fill="url(#g2)"/>
+    <polygon points="34,8 56,18 48,13 34,10" fill="url(#g1)" opacity="0.9"/>
+    <polygon points="34,22 42,32 36,34 34,26" fill="url(#g3)" opacity="0.9"/>
+    <polygon points="34,10 48,13 42,16" fill="#fff" opacity="0.18"/>
+  </g>
 </svg>
