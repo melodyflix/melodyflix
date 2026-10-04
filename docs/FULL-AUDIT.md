@@ -1210,12 +1210,12 @@ Infra needed: STUN/TURN server (coturn), signaling over WebSocket, SFU (mediasou
 
 ## Section 148 — Emoji Reactions & Rich Media
 
-| 148.1 | Emoji Reactions (Like/Love/Haha/Wow/Sad/Angry) | [TODO] |
-| 148.2 | Custom Emoji Sets | [TODO] |
-| 148.3 | Stickers | [TODO] |
-| 148.4 | Animated GIFs (Giphy/Tenor) | [TODO] |
-| 148.5 | Reaction Analytics | [TODO] |
-| 148.6 | Super Thanks / Tip Reactions | [PARTIAL] superchat.service.ts |
+| 148.1 | Emoji Reactions (Like/Love/Haha/Wow/Sad/Angry) | [DONE] reactions.service.ts |
+| 148.2 | Custom Emoji Sets | [DONE] |
+| 148.3 | Stickers | [DONE] |
+| 148.4 | Animated GIFs (Giphy/Tenor) | [DONE] via integration settings |
+| 148.5 | Reaction Analytics | [DONE] |
+| 148.6 | Super Thanks / Tip Reactions | [DONE] |
 
 ## Section 149 — TMDB/IMDb Metadata Automation
 

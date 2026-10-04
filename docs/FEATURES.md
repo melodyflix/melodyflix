@@ -34,6 +34,7 @@
 - Auto Content Upload foundation (37.6-37.9 sources + 37.13 dedupe + 37.14 quality + 37.19-37.22 rules/retry)
 - Auto Content Worker (RSS/Atom parser + fetch orchestrator + worker stats)
 - News Management (72.1 breaking alerts + 72.2 ticker + 72.3 reporter portal + 72.4 fact-checking)
+- Emoji Reactions & Rich Media (148.1 reactions + 148.2 custom emoji + 148.3 stickers + 148.4 GIFs + 148.5 analytics + 148.6 super thanks)
 - Autoplay Chain (series/playlist/channel + preferences gating)
 - Video Upload (Web + Admin)
 - HLS Player (Quality/Speed/PiP/Mini/Loop/A-B/Sleep)
