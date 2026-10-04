@@ -822,10 +822,10 @@ All items [TODO] — zero code
 
 ## Section 83 — Wallet and Credits
 
-| 83.1 | User Wallet | [TODO] |
-| 83.2 | Gift Cards | [TODO] |
-| 83.3 | Promotional Credits | [PARTIAL] promo codes |
-| 83.4 | Wallet Transaction History | [TODO] |
+| 83.1 | User Wallet | [DONE] wallet.service.ts |
+| 83.2 | Gift Cards | [DONE] SHA-256 code + redeem |
+| 83.3 | Promotional Credits | [DONE] grant + consume |
+| 83.4 | Wallet Transaction History | [DONE] list + filters + summary |
 
 ## Section 84 — Creator Contracts
 

@@ -28,6 +28,7 @@
 - Social Media Integration (47.1 Facebook + 47.2 X/Twitter + 47.3 Instagram + 47.4 TikTok + 47.5 LinkedIn — share URLs, tracking, OG meta, embed, admin toggle)
 - Family & Parental Profiles (65.1 kids + 65.2 PIN + 65.3 screen-time limit + 65.4 age restriction + 65.5 screen-time report + 65.6 content approval + 65.7 parent-teacher messaging)
 - Social Features (22.1 friend/following + 22.2 direct message + 22.3 activity feed + 22.4 badges & achievements + 22.5 leaderboard)
+- Wallet & Credits (83.1 wallet + 83.2 gift cards + 83.3 promo credits + 83.4 transaction history)
 - Autoplay Chain (series/playlist/channel + preferences gating)
 - Video Upload (Web + Admin)
 - HLS Player (Quality/Speed/PiP/Mini/Loop/A-B/Sleep)
