@@ -37,6 +37,7 @@ const EXPLORE: Item[] = [
   { path: '/podcasts', label: 'Podcasts', icon: '🎙️' },
   { path: '/series', label: 'Series', icon: '📺' },
   { path: '/live-tv', label: 'Live TV', icon: '📺' },
+  { path: '/live-tv/recordings', label: 'DVR Recordings', icon: '🎥' },
 ];
 
 const MORE: Item[] = [

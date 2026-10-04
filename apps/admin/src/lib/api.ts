@@ -969,3 +969,218 @@ export async function getAdBillingReport(filters: { status?: AdStatus; advertise
   return request<{ report: BillingSummary[] }>(`/api/v1/videos/admin/ads/billing${q ? '?' + q : ''}`);
 }
 
+
+
+// ============================================================
+// Auto Content Upload — Section 37
+// ============================================================
+
+export type ContentSourceType = 'rss' | 'atom' | 'tmdb_list' | 'tmdb_search' | 'manual';
+export type ContentKind = 'movie' | 'tv' | 'drama' | 'song' | 'news' | 'web_series' | 'podcast' | 'other';
+export type SourceStatus = 'pending_approval' | 'active' | 'paused' | 'rejected' | 'error';
+export type PublishPolicy = 'auto_publish' | 'draft_only' | 'requires_approval';
+
+export interface ContentSource {
+  id: string;
+  name: string;
+  source_type: ContentSourceType;
+  status: SourceStatus;
+  content_kind: ContentKind;
+  url: string;
+  fetch_interval_minutes: number;
+  publish_policy: PublishPolicy;
+  default_channel_id: string | null;
+  auto_tags: string | null;
+  auto_category: string | null;
+  copyright_check_enabled: number;
+  last_fetched_at: string | null;
+  next_fetch_at: string | null;
+  consecutive_failures: number;
+  total_imports: number;
+  created_by: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  rejection_reason: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FetchJob {
+  id: string;
+  source_id: string;
+  status: 'queued' | 'fetching' | 'importing' | 'completed' | 'failed' | 'skipped_duplicate' | 'rejected';
+  external_id: string | null;
+  source_url: string | null;
+  title: string | null;
+  content_hash: string | null;
+  video_id: string | null;
+  error_message: string | null;
+  retry_count: number;
+  metadata_json: string | null;
+  started_at: string;
+  completed_at: string | null;
+  created_at: string;
+}
+
+export interface WorkerStats {
+  active_sources: number;
+  pending_approval: number;
+  paused_sources: number;
+  error_sources: number;
+  queued_jobs: number;
+  failed_jobs: number;
+  completed_today: number;
+}
+
+export interface IngestStats {
+  completed_today: number;
+  failed_today: number;
+  by_kind: Record<string, number>;
+}
+
+// ============================================================
+// Content Sources API
+// ============================================================
+
+export async function listContentSources(params: { status?: SourceStatus; content_kind?: ContentKind; limit?: number } = {}): Promise<{ sources: ContentSource[] }> {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set('status', params.status);
+  if (params.content_kind) qs.set('content_kind', params.content_kind);
+  if (params.limit) qs.set('limit', String(params.limit));
+  const q = qs.toString();
+  return request<{ sources: ContentSource[] }>(`/api/v1/admin/content-sources${q ? '?' + q : ''}`);
+}
+
+export async function createContentSource(input: {
+  name: string;
+  source_type: ContentSourceType;
+  content_kind: ContentKind;
+  url: string;
+  fetch_interval_minutes?: number;
+  publish_policy?: PublishPolicy;
+  default_channel_id?: string | null;
+  auto_tags?: string[];
+  auto_category?: string | null;
+  copyright_check_enabled?: boolean;
+  notes?: string | null;
+}): Promise<ContentSource> {
+  return request<ContentSource>('/api/v1/admin/content-sources', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getContentSource(id: string): Promise<ContentSource> {
+  return request<ContentSource>(`/api/v1/admin/content-sources/${id}`);
+}
+
+export async function updateContentSource(id: string, patch: {
+  name?: string;
+  fetch_interval_minutes?: number;
+  publish_policy?: PublishPolicy;
+  default_channel_id?: string | null;
+  auto_tags?: string[] | null;
+  auto_category?: string | null;
+  copyright_check_enabled?: boolean;
+  notes?: string | null;
+}): Promise<ContentSource> {
+  return request<ContentSource>(`/api/v1/admin/content-sources/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function approveContentSource(id: string): Promise<ContentSource> {
+  return request<ContentSource>(`/api/v1/admin/content-sources/${id}/approve`, { method: 'POST' });
+}
+
+export async function rejectContentSource(id: string, reason: string): Promise<ContentSource> {
+  return request<ContentSource>(`/api/v1/admin/content-sources/${id}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function pauseContentSource(id: string): Promise<ContentSource> {
+  return request<ContentSource>(`/api/v1/admin/content-sources/${id}/pause`, { method: 'POST' });
+}
+
+export async function resumeContentSource(id: string): Promise<ContentSource> {
+  return request<ContentSource>(`/api/v1/admin/content-sources/${id}/resume`, { method: 'POST' });
+}
+
+export async function deleteContentSource(id: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/admin/content-sources/${id}`, { method: 'DELETE' });
+}
+
+// ============================================================
+// Fetch Jobs API
+// ============================================================
+
+export async function listFetchJobs(params: { source_id?: string; status?: string; limit?: number } = {}): Promise<{ jobs: FetchJob[] }> {
+  const qs = new URLSearchParams();
+  if (params.source_id) qs.set('source_id', params.source_id);
+  if (params.status) qs.set('status', params.status);
+  if (params.limit) qs.set('limit', String(params.limit));
+  const q = qs.toString();
+  return request<{ jobs: FetchJob[] }>(`/api/v1/admin/content-sources/jobs${q ? '?' + q : ''}`);
+}
+
+export async function listRetryableJobs(limit = 50): Promise<{ jobs: FetchJob[] }> {
+  return request<{ jobs: FetchJob[] }>(`/api/v1/admin/content-sources/jobs/retryable?limit=${limit}`);
+}
+
+export async function retryFetchJob(id: string): Promise<FetchJob> {
+  return request<FetchJob>(`/api/v1/admin/content-sources/jobs/${id}/retry`, { method: 'POST' });
+}
+
+export async function deleteFetchJob(id: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/v1/admin/content-sources/jobs/${id}`, { method: 'DELETE' });
+}
+
+export async function pruneOldJobs(olderThanDays = 30): Promise<{ pruned: number }> {
+  return request<{ pruned: number }>('/api/v1/admin/content-sources/jobs/prune', {
+    method: 'POST',
+    body: JSON.stringify({ older_than_days: olderThanDays }),
+  });
+}
+
+// ============================================================
+// Worker API
+// ============================================================
+
+export async function runContentWorker(opts: { max_sources?: number; dry_run?: boolean } = {}): Promise<{
+  started_at: string;
+  finished_at: string;
+  sources_processed: number;
+  jobs_created: number;
+  jobs_deduped: number;
+  jobs_rejected: number;
+  errors: Array<{ source_id: string; error: string }>;
+}> {
+  return request('/api/v1/admin/content-worker/run', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export async function getWorkerStats(): Promise<WorkerStats> {
+  return request<WorkerStats>('/api/v1/admin/content-worker/stats');
+}
+
+export async function getIngestStats(): Promise<IngestStats> {
+  return request<IngestStats>('/api/v1/admin/content-ingest/stats');
+}
+
+export async function ingestQueuedJobs(limit = 20): Promise<{
+  processed: number;
+  completed: number;
+  failed: number;
+  skipped: number;
+}> {
+  return request('/api/v1/admin/content-ingest/batch', {
+    method: 'POST',
+    body: JSON.stringify({ limit }),
+  });
+}

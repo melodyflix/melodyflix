@@ -10,14 +10,14 @@ import AdNetworks from './pages/AdNetworks';
 import AdminPayments from './pages/AdminPayments';
 import AdminSupport from './pages/AdminSupport';
 import EmailSettings from './pages/EmailSettings';
-import AdminEmail from './pages/AdminEmail';
+import ContentUpload from './pages/ContentUpload';
 import VideoChapters from './pages/VideoChapters';
 import AdminCampaigns from './pages/AdminCampaigns';
 import AdminInfluencers from './pages/AdminInfluencers';
 import AdminAdCampaigns from './pages/AdminAdCampaigns';
 import { api, getToken, clearToken, type User } from './lib/api';
 
-type Page = 'dashboard' | 'channels' | 'videos' | 'chapters' | 'users' | 'reports' | 'ads' | 'ad-campaigns' | 'payments' | 'support' | 'email' | 'campaigns' | 'influencers' | 'settings';
+type Page = 'dashboard' | 'channels' | 'videos' | 'chapters' | 'users' | 'reports' | 'ads' | 'ad-campaigns' | 'payments' | 'support' | 'email' | 'content-upload' | 'campaigns' | 'influencers' | 'settings';
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState<boolean>(!!getToken());
@@ -52,7 +52,7 @@ export default function App() {
     { key: 'reports', label: 'Reports', icon: '🚩' },
     { key: 'support', label: 'Support', icon: '🎫' },
     { key: 'email', label: 'Email', icon: '📧' },
-    { key: 'email', label: 'Email', icon: '📧' },
+    { key: 'content-upload', label: 'Auto Upload', icon: '📥' },
     { key: 'campaigns', label: 'Campaigns', icon: '📨' },
     { key: 'influencers', label: 'Influencers', icon: '⭐' },
     { key: 'settings', label: 'Settings', icon: '⚙️' },
@@ -62,18 +62,30 @@ export default function App() {
     <div className="mf-layout">
       <aside className="mf-sidebar">
         <div className="mf-sidebar-logo" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <svg width="24" height="24" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+          <svg width="28" height="28" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
             <defs>
-              <linearGradient id="admin-mf-grad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#7c3aed" />
-                <stop offset="55%" stopColor="#a855f7" />
-                <stop offset="100%" stopColor="#ec4899" />
+              <linearGradient id="adm-g1" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#c084fc" />
+                <stop offset="100%" stopColor="#7c3aed" />
+              </linearGradient>
+              <linearGradient id="adm-g2" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#f0abfc" />
+                <stop offset="100%" stopColor="#a855f7" />
+              </linearGradient>
+              <linearGradient id="adm-g3" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#ec4899" />
+                <stop offset="100%" stopColor="#7c3aed" />
               </linearGradient>
             </defs>
-            <rect width="64" height="64" rx="18" fill="url(#admin-mf-grad)" />
-            <path d="M25 20 L47 32 L25 44 Z" fill="#fff" />
+            <polygon points="4,46 18,32 32,46 18,60" fill="url(#adm-g1)" />
+            <polygon points="18,32 32,46 18,60" fill="url(#adm-g3)" opacity="0.85" />
+            <polygon points="26,10 34,8 34,46 26,48" fill="url(#adm-g1)" />
+            <polygon points="34,8 56,18 42,32 34,22" fill="url(#adm-g2)" />
+            <polygon points="34,10 48,13 42,16" fill="#fff" opacity="0.18" />
           </svg>
-          <span>melody<span style={{ color: '#a855f7' }}>flix</span></span>
+          <span style={{ fontWeight: 800, letterSpacing: -0.4 }}>
+            Melody<span style={{ background: 'linear-gradient(135deg, #c084fc, #ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flix</span>
+          </span>
         </div>
         <ul className="mf-menu">
           {menu.map((m) => (
@@ -113,7 +125,7 @@ export default function App() {
           {page === 'reports' && <Reports />}
           {page === 'support' && <AdminSupport />}
           {page === 'email' && <EmailSettings />}
-          {page === 'email' && <AdminEmail />}
+          {page === 'content-upload' && <ContentUpload />}
           {page === 'campaigns' && <AdminCampaigns />}
           {page === 'influencers' && <AdminInfluencers />}
           {page === 'settings' && <Settings />}
