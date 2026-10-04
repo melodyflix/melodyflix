@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import TopBar from './components/TopBar';
+import Sidebar from './components/Sidebar';
 import PromoBannerDisplay from './components/PromoBannerDisplay';
 import LoginModal from './components/LoginModal';
 import MiniPlayer from './components/MiniPlayer';
@@ -57,6 +58,7 @@ import { api, getCachedUser, getToken, clearAuth, type User } from './lib/api';
 
 function AppInner() {
   const [user, setUser] = useState<User | null>(getCachedUser());
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -126,12 +128,14 @@ function AppInner() {
         onMemberships={() => navigate('/my-memberships')}
         onAnalytics={() => navigate('/analytics')}
         onHelp={() => navigate('/help')}
+        onToggleSidebar={() => setSidebarCollapsed((v) => !v)}
       />
-      <PromoBannerDisplay placement="top" />
-
-      <VerifyEmailBanner />
-
-      <Routes>
+      <div className="mf-layout">
+        <Sidebar collapsed={sidebarCollapsed} user={user} onSignIn={() => setShowLogin(true)} />
+        <main className="mf-content">
+          <PromoBannerDisplay placement="top" />
+          <VerifyEmailBanner />
+          <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/search" element={<Search />} />
         <Route path="/watch/:id" element={<Watch onSignIn={requireSignIn} />} />
@@ -180,7 +184,10 @@ function AppInner() {
         <Route path="/channel/me" element={<MyChannel user={user} onSignIn={() => setShowLogin(true)} />} />
         <Route path="/channel/me/edit" element={<EditChannel user={user} onSignIn={() => setShowLogin(true)} />} />
         <Route path="/channel/:id" element={<Channel />} />
-      </Routes>
+          </Routes>
+        </main>
+      </div>
+
 
       <MiniPlayer />
       <InstallPrompt />

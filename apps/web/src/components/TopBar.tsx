@@ -29,11 +29,12 @@ interface Props {
   onPreferences: () => void;
   onReferrals: () => void;
   onStudio: () => void;
+  onToggleSidebar?: () => void;
 }
 
 export default function TopBar({
   user, onLogoClick, onSearch, onSignIn, onSignOut, onMyChannel, onUpload,
-  onWatchLater, onSubscriptions, onHistory, onPlaylists, onMyVideos, onGoLive, onLive, onSettings, onPreferences, onReferrals, onStudio, onPodcasts, onSeries, onShorts, onMemberships, onAnalytics, onHelp,
+  onWatchLater, onSubscriptions, onHistory, onPlaylists, onMyVideos, onGoLive, onLive, onSettings, onPreferences, onReferrals, onStudio, onPodcasts, onSeries, onShorts, onMemberships, onAnalytics, onHelp, onToggleSidebar,
 }: Props) {
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -47,6 +48,14 @@ export default function TopBar({
 
   return (
     <header className="mf-topbar">
+      <button
+        className="mf-hamburger"
+        onClick={onToggleSidebar}
+        aria-label="Toggle sidebar"
+        title="Menu"
+      >
+        ☰
+      </button>
       <div onClick={onLogoClick} style={{ cursor: 'pointer' }}>
         <Logo size={36} />
       </div>

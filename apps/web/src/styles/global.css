@@ -2240,3 +2240,128 @@ a { color: inherit; text-decoration: none; }
     font-size: 11px;
   }
 }
+
+
+/* ============================================================
+   DESKTOP LAYOUT — Sidebar + Content
+   ============================================================ */
+
+.mf-hamburger {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  line-height: 1;
+  color: var(--mf-text);
+  margin-right: 4px;
+}
+.mf-hamburger:hover {
+  background: var(--mf-bg-hover);
+}
+
+.mf-layout {
+  display: flex;
+  min-height: calc(100vh - var(--mf-topbar-h));
+}
+
+.mf-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--mf-bg);
+  border-right: 1px solid var(--mf-border);
+  overflow-y: auto;
+  transition: width 0.15s ease;
+  position: sticky;
+  top: var(--mf-topbar-h);
+  height: calc(100vh - var(--mf-topbar-h));
+}
+.mf-sidebar.collapsed {
+  width: 72px;
+}
+.mf-sidebar-inner {
+  padding: 12px 8px;
+}
+
+.mf-sb-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--mf-text);
+  font-size: 14px;
+  font-family: inherit;
+  text-align: left;
+  margin-bottom: 2px;
+}
+.mf-sb-item:hover {
+  background: var(--mf-bg-hover);
+}
+.mf-sb-item.active {
+  background: var(--mf-bg-hover);
+  font-weight: 500;
+}
+.mf-sidebar.collapsed .mf-sb-item {
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 4px;
+  font-size: 10px;
+}
+.mf-sb-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+}
+.mf-sb-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mf-sb-divider {
+  height: 1px;
+  background: var(--mf-border);
+  margin: 10px 8px;
+}
+
+.mf-content {
+  flex: 1;
+  min-width: 0;
+  background: var(--mf-bg);
+}
+
+/* Hide sidebar on mobile (small screens) */
+@media (max-width: 900px) {
+  .mf-sidebar {
+    position: fixed;
+    left: 0;
+    top: var(--mf-topbar-h);
+    z-index: 90;
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.08);
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+  }
+  .mf-sidebar:not(.collapsed) {
+    transform: translateX(0);
+    width: 240px;
+  }
+  .mf-sidebar.collapsed {
+    transform: translateX(-100%);
+    width: 240px;
+  }
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .mf-sidebar {
+    background: var(--mf-bg);
+    border-right-color: var(--mf-border);
+  }
+}
