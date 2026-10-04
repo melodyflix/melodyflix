@@ -184,7 +184,14 @@
 
 ## Section 13 — Education and AI Tuition
 
-All items [TODO] — zero code
+| 13.1 | Course | [DONE] education.service.ts (global) |
+| 13.2 | Exam | [PARTIAL] structure ready |
+| 13.3 | Certificate | [TODO] |
+| 13.4 | Help Center | [DONE] support.service.ts |
+| 13.5 | Support Ticket | [DONE] support.service.ts |
+| 13.6-13.27 | AI Tutor / Content Gen / Exam Integrity | [TODO] |
+
+**Scope:** 12 countries, 85 levels, 84 subjects — Class 1 → BCS, US K-12, UK GCSE/A-Level, IB, Cambridge, professional certs.
 
 ## Section 14 — Personalization
 
