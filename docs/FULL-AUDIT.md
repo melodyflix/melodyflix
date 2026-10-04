@@ -280,11 +280,11 @@ All items [TODO] — zero code
 
 ## Section 22 — Social Features
 
-| 22.1 | Friend/Following System | [PARTIAL] subscriptions |
-| 22.2 | Direct Message | [TODO] |
-| 22.3 | Activity Feed | [TODO] |
-| 22.4 | Badges and Achievements | [PARTIAL] verification badge |
-| 22.5 | Leaderboard | [PARTIAL] community reputation |
+| 22.1 | Friend/Following System | [DONE] social.service.ts |
+| 22.2 | Direct Message | [DONE] |
+| 22.3 | Activity Feed | [DONE] |
+| 22.4 | Badges and Achievements | [DONE] |
+| 22.5 | Leaderboard | [DONE] |
 
 ## Section 23 — Events and Ticketing
 
