@@ -1,0 +1,29 @@
+[Unit]
+Description=Melodyflix Auth service
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+PartOf=melodyflix.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/root/melodyflix/services/auth
+Environment=NODE_ENV=production
+EnvironmentFile=-/root/melodyflix/.env
+ExecStart=/usr/bin/env pnpm start
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/melodyflix/auth.log
+StandardError=append:/var/log/melodyflix/auth.error.log
+LimitNOFILE=65536
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/root/melodyflix/services/auth/data /root/melodyflix/data /var/log/melodyflix
+
+[Install]
+WantedBy=multi-user.target

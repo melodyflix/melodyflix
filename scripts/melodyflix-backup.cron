@@ -1,0 +1,12 @@
+# melodyflix backup automation
+# Install: sudo cp scripts/melodyflix-backup.cron /etc/cron.d/melodyflix-backup
+#          sudo chmod 644 /etc/cron.d/melodyflix-backup
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=""
+
+# Daily full backup at 02:00 (keeps last 5 by default)
+0 2 * * * root /root/melodyflix/scripts/backup.sh >> /var/log/melodyflix/backup.log 2>&1
+
+# Health check log rotation every 6 hours
+0 */6 * * * root find /var/log/melodyflix -name "*.log" -size +50M -exec truncate -s 0 {} \;

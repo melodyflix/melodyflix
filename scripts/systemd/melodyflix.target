@@ -1,0 +1,7 @@
+[Unit]
+Description=Melodyflix platform (all services)
+Wants=melodyflix-auth.service melodyflix-channel.service melodyflix-videos.service melodyflix-notifications.service melodyflix-live.service
+After=network-online.target
+
+[Install]
+WantedBy=multi-user.target
