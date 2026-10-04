@@ -688,7 +688,13 @@ All items [TODO] — separate client app
 
 ## Section 65 — Family and Parental Profiles
 
-All items [TODO] — zero code (only Live TV parental exists)
+| 65.1 | Kids Profile | [DONE] profiles.service.ts (is_kids) |
+| 65.2 | PIN Lock | [DONE] profiles.service.ts (setProfilePin) |
+| 65.3 | Screen-Time Limit | [DONE] family.service.ts |
+| 65.4 | Viewing Restrictions | [DONE] profiles.service.ts (max_age_rating) |
+| 65.5 | Screen-Time Report | [DONE] family.service.ts |
+| 65.6 | Content Approval | [DONE] family.service.ts |
+| 65.7 | Parent-Teacher Messaging | [DONE] family.service.ts |
 
 ## Section 66 — Media Asset Management
 
