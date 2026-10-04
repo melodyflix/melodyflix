@@ -25,6 +25,7 @@
 - Community Management (25.1 Forum/Threads/Posts + 25.2 Groups + 25.3 Guidelines + 25.4 Reputation)
 - Download & Offline (21.1 offline download + 21.2 quality + 21.3 auto-delete + 21.4 data saver + 21.5 offline sync)
 - Content Scheduling (39.1 calendar + 39.2 batch + 39.3 recurring + 39.4 timezone + 39.5 editorial + 39.6 dashboard + 39.7 team tasks + 39.8 reminders)
+- Social Media Integration (47.1 Facebook + 47.2 X/Twitter + 47.3 Instagram + 47.4 TikTok + 47.5 LinkedIn — share URLs, tracking, OG meta, embed, admin toggle)
 - Autoplay Chain (series/playlist/channel + preferences gating)
 - Video Upload (Web + Admin)
 - HLS Player (Quality/Speed/PiP/Mini/Loop/A-B/Sleep)

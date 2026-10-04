@@ -537,7 +537,13 @@ All items [TODO] — zero code (this is a builder feature, not in scope)
 
 ## Section 47 — Social Media Integration
 
-All items [TODO] — zero code
+| 47.1 | Facebook Integration | [DONE] social-share.service.ts |
+| 47.2 | X/Twitter Integration | [DONE] |
+| 47.3 | Instagram Integration | [DONE] (via URL share + manual copy) |
+| 47.4 | TikTok Integration | [DONE] (via URL share) |
+| 47.5 | LinkedIn Integration | [DONE] |
+
+Note: Cross-posting (auto-publish to social) already in distribution.service.ts (Section 31). This section focuses on share URLs, tracking, OG meta, embed, and admin-toggleable platform config.
 
 ## Section 48 — Video Preview and Trailer
 
