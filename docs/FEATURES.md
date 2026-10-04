@@ -31,6 +31,7 @@
 - Wallet & Credits (83.1 wallet + 83.2 gift cards + 83.3 promo credits + 83.4 transaction history)
 - Integration Settings (admin-configurable API keys — TMDB, OMDb, OpenAI, bKash, Stripe, TURN, Giphy, NewsAPI, SMTP)
 - TMDB/IMDb Metadata (149.1 search + 149.2 movie + 149.3 TV + 149.4 cast/crew + 149.5 poster + 149.6 trailer + 149.7 IMDb rating + 149.8 multi-lang + 149.9 episode + 149.10 sync)
+- Auto Content Upload foundation (37.6-37.9 sources + 37.13 dedupe + 37.14 quality + 37.19-37.22 rules/retry)
 - Autoplay Chain (series/playlist/channel + preferences gating)
 - Video Upload (Web + Admin)
 - HLS Player (Quality/Speed/PiP/Mini/Loop/A-B/Sleep)

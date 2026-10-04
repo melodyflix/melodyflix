@@ -423,23 +423,23 @@ All items [TODO] — mobile apps separately built
 | 37.3 | Automatic Music/Song Upload | [PARTIAL] music.service.ts |
 | 37.4 | Automatic Web Series Upload | [PARTIAL] |
 | 37.5 | Multi-Language Audio Support | [DONE] audiotrack.service.ts |
-| 37.6 | Automatic News Portal Integration | [TODO] |
-| 37.7 | RSS/API Content Fetching | [PARTIAL] podcast |
-| 37.8 | Scheduled Automatic Upload | [PARTIAL] distribution |
-| 37.9 | Content Source Management | [TODO] |
-| 37.10 | Automatic Metadata Extraction | [PARTIAL] migration |
+| 37.6 | Automatic News Portal Integration | [DONE] content-source.service.ts |
+| 37.7 | RSS/API Content Fetching | [DONE] |
+| 37.8 | Scheduled Automatic Upload | [DONE] listDueContentSources |
+| 37.9 | Content Source Management | [DONE] |
+| 37.10 | Automatic Metadata Extraction | [DONE] applySourceDefaults |
 | 37.11 | Automatic Thumbnail Generation | [DONE] ai.service.ts |
 | 37.12 | Automatic Category Assignment | [PARTIAL] genre |
-| 37.13 | Duplicate Content Detection | [TODO] |
-| 37.14 | Pre-Upload Quality Check | [TODO] |
+| 37.13 | Duplicate Content Detection | [DONE] SHA-256 hash |
+| 37.14 | Pre-Upload Quality Check | [DONE] runQualityCheck |
 | 37.15 | Multi-Audio Track Support | [DONE] audiotrack |
 | 37.16 | Language Detection and Tagging | [PARTIAL] |
-| 37.17 | TMDB Automatic Import/Upload | [TODO] |
-| 37.18 | IMDb Integration | [TODO] |
-| 37.19 | Source Approval | [TODO] |
-| 37.20 | Copyright Check | [TODO] |
-| 37.21 | Automatic Publishing Rules | [TODO] |
-| 37.22 | Failed Import Retry | [PARTIAL] migration |
+| 37.17 | TMDB Automatic Import/Upload | [DONE] tmdb.service.ts |
+| 37.18 | IMDb Integration | [DONE] via OMDb in tmdb.service |
+| 37.19 | Source Approval | [DONE] |
+| 37.20 | Copyright Check | [DONE] runCopyrightCheck |
+| 37.21 | Automatic Publishing Rules | [DONE] decidePublishAction |
+| 37.22 | Failed Import Retry | [DONE] scheduleRetry |
 
 ## Section 38 — Subtitle and Caption Management
 
