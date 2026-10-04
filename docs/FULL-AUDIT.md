@@ -1216,16 +1216,16 @@ Infra needed: STUN/TURN server (coturn), signaling over WebSocket, SFU (mediasou
 
 ## Section 149 — TMDB/IMDb Metadata Automation
 
-| 149.1 | TMDB Search & Match | [TODO] |
-| 149.2 | Movie Metadata Import | [TODO] |
-| 149.3 | TV Series Metadata Import | [TODO] |
-| 149.4 | Cast & Crew Import | [PARTIAL] castcrew.service.ts |
-| 149.5 | Poster/Backdrop Import | [TODO] |
-| 149.6 | Trailer Import | [TODO] |
-| 149.7 | IMDb Rating Integration | [TODO] |
-| 149.8 | Multi-Language Metadata | [TODO] |
-| 149.9 | Auto Season/Episode Mapping | [PARTIAL] series.service.ts |
-| 149.10 | Metadata Sync & Update | [TODO] |
+| 149.1 | TMDB Search & Match | [DONE] tmdb.service.ts |
+| 149.2 | Movie Metadata Import | [DONE] importMovieToVideo |
+| 149.3 | TV Series Metadata Import | [DONE] importTvShowToSeries |
+| 149.4 | Cast & Crew Import | [DONE] normalizeCastCrew |
+| 149.5 | Poster/Backdrop Import | [DONE] |
+| 149.6 | Trailer Import | [DONE] YouTube key |
+| 149.7 | IMDb Rating Integration | [DONE] via OMDb |
+| 149.8 | Multi-Language Metadata | [DONE] getTmdbDetailInLanguage |
+| 149.9 | Auto Season/Episode Mapping | [DONE] importEpisodeToVideo |
+| 149.10 | Metadata Sync & Update | [DONE] resyncImport |
 
 ## Section 150 — Live Collaboration
 

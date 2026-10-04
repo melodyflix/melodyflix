@@ -29,6 +29,8 @@
 - Family & Parental Profiles (65.1 kids + 65.2 PIN + 65.3 screen-time limit + 65.4 age restriction + 65.5 screen-time report + 65.6 content approval + 65.7 parent-teacher messaging)
 - Social Features (22.1 friend/following + 22.2 direct message + 22.3 activity feed + 22.4 badges & achievements + 22.5 leaderboard)
 - Wallet & Credits (83.1 wallet + 83.2 gift cards + 83.3 promo credits + 83.4 transaction history)
+- Integration Settings (admin-configurable API keys — TMDB, OMDb, OpenAI, bKash, Stripe, TURN, Giphy, NewsAPI, SMTP)
+- TMDB/IMDb Metadata (149.1 search + 149.2 movie + 149.3 TV + 149.4 cast/crew + 149.5 poster + 149.6 trailer + 149.7 IMDb rating + 149.8 multi-lang + 149.9 episode + 149.10 sync)
 - Autoplay Chain (series/playlist/channel + preferences gating)
 - Video Upload (Web + Admin)
 - HLS Player (Quality/Speed/PiP/Mini/Loop/A-B/Sleep)
