@@ -139,8 +139,54 @@ IMPORTANT: tmux attach does NOT work in proot — use:
 docs/CHAT-HANDOFF.md ফাইলটা পড়ে নাও — এতে সব context আছে।
 আমরা এখান থেকে শুরু করব: [specific task]"
 
-## LAST KNOWN STATE
+## SESSION 2026-10-05 (New Chat)
 
-- All services STOPPED (pkill was run)
-- Ubuntu proot: no tmux session
-- Uncommitted changes: NONE (working tree clean)
+### Verified: Auto Content Upload E2E ✅
+- All 6 services running in tmux `melodyflix` session (proot-safe)
+- Health check: ports 4001-4004, 5173-5174 → all 200
+- Content pipeline test (BBC News RSS):
+  - Create source → pending_approval ✅
+  - Approve → active ✅
+  - Worker run → 33 jobs created from RSS ✅
+  - Ingest batch(20) → 20 news_items rows ✅
+  - Stats verified (worker + ingest endpoints) ✅
+- Admin UI: http://localhost:5173 → Auto Upload page renders correctly
+  - Stats cards, Sources table, Actions, Tabs all working
+
+### Key learnings
+- **Ingest routing by content_kind**:
+  - `news` → news_items table
+  - `movie`/`tv`/`drama`/`song`/etc → videos table
+- **Auth**: POST /api/v1/auth/login with {email, password}
+  - Admin: admin@melodyflix.com / admin12345
+- **DB**: SQLite at services/videos/data/melodyflix.db
+  - services/auth/data/melodyflix.db (users table)
+- **`.env`**: only contains `UV_USE_IO_URING=0`
+- **termux-wake-lock**: broken (Android 14 restriction on app_process)
+  - Use Termux Battery: No restrictions + Recent lock instead
+
+### tmux pattern (proot-safe, working)
+    cd /root/melodyflix
+    tmux kill-session -t melodyflix 2>/dev/null || true
+    tmux new-session -d -s melodyflix -c /root/melodyflix
+    tmux send-keys -t melodyflix "export UV_USE_IO_URING=0 && bash scripts/start-all.sh" Enter
+    tmux capture-pane -p -t melodyflix | tail -40
+
+### Commits this session
+- f501d94 chore(dev): io_uring fix cleanup + admin proxy for content upload
+
+### Test data in DB (cleanup before production)
+- content_sources: BBC News Test (id=4189b157-ec82-41d9-96a0-abec1bb52b96)
+- news_items: 20 rows (source_id matches above)
+- content_fetch_jobs: 20 completed + 13 queued
+
+## PENDING WORK (priority order)
+1. Cleanup test data (SQL above)
+2. Mobile Bottom Nav (deferred)
+3. H1: PostgreSQL migration
+4. H2: Redis for sessions/cache
+5. H8: Video transcoding E2E test
+
+## LAST KNOWN STATE
+- All services RUNNING in tmux `melodyflix` session (Ubuntu proot)
+- Working tree: check `git status` before next session
