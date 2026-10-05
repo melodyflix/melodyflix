@@ -187,6 +187,71 @@ docs/CHAT-HANDOFF.md ফাইলটা পড়ে নাও — এতে স
 4. H2: Redis for sessions/cache
 5. H8: Video transcoding E2E test
 
-## LAST KNOWN STATE
-- All services RUNNING in tmux `melodyflix` session (Ubuntu proot)
-- Working tree: check `git status` before next session
+## SESSION 2026-10-05 (Part 2 — Infra + Branding + Audit)
+
+### Achievements
+- FULL-AUDIT.md synced: actual 150 sections (not 145), 762 items total
+  - DONE 426 (55%) | PARTIAL 70 (9%) | TODO 266 (34%)
+  - Auto-generated summary table + counts added
+- Auto Content Upload E2E verified (BBC RSS → 33 jobs → 20 news_items)
+- Admin UI verified: stats, Sources/Jobs/Worker tabs, actions all working
+- Branding cleanup: removed YouTube/WordPress references from comments
+  - External platform refs (YouTube as publish target, migration source) kept
+- Section folder scaffold created:
+  - services/videos/src/sections/section-11-security-privacy/
+  - services/videos/src/sections/_shared/
+
+### CRITICAL: Termux-level tmux (SIGKILL fix)
+Root cause: Android LMK kills Termux foreground → proot + tmux + services die.
+
+SOLUTION (verified working): tmux at TERMUX level (not inside Ubuntu proot).
+Scripts live in Termux home: ~/mf-scripts/ and ~/.termux/boot/
+
+Scripts created:
+- ~/mf-scripts/melodyflix-start.sh  (starts tmux session mf, launches proot+start-all)
+- ~/mf-scripts/watchdog.sh          (checks session mf alive)
+- ~/mf-scripts/watchdog-loop.sh     (loops watchdog every 120s)
+- ~/.termux/boot/melodyflix.sh      (Termux:Boot entry — deferred install)
+
+Usage:
+- Start:    ~ $ bash ~/mf-scripts/melodyflix-start.sh
+- Inspect:  ~ $ tmux capture-pane -p -t mf | tail -20
+- Session:  ~ $ tmux ls   # should show "mf: 1 windows"
+- Watchdog: ~ $ nohup bash ~/mf-scripts/watchdog-loop.sh > /dev/null 2>&1 &
+
+Prompt rules (re-enforced):
+- ~ $              = Termux (run mf-scripts, proot-distro, tmux)
+- root@localhost   = Ubuntu proot (run git, code, services IN tmux mf)
+
+### Deferred
+- Termux:Boot app: F-Droid APK signature mismatch with installed Termux
+  → Alternate: GitHub Releases APK, or MacroDroid boot trigger
+- Not blocking: manual restart is 1 command (~/mf-scripts/melodyflix-start.sh)
+
+### Admin credentials (dev only)
+- URL: http://localhost:5173
+- Email: admin@melodyflix.com
+- Password: admin12345  (CHANGE before production!)
+
+### Commits this session
+- f501d94 chore(dev): io_uring fix cleanup + admin proxy for content upload
+- 30482f0 docs: update handoff with Auto Upload E2E verification
+- ee567f4 docs: sync FULL-AUDIT with 150 sections + auto-generated summary
+- ae728c3 chore(brand): remove YouTube/WordPress references from comments
+
+### Integration settings (already exists!)
+- services/videos/src/services/integration-settings.service.ts
+- services/videos/src/routes/integration-settings.route.ts
+- DB-backed API keys, masked on read, health check, admin-only
+- 19 integrations defined (tmdb, omdb, openai, anthropic, gemini, smtp,
+  bkash, nagad, sslcommerz, stripe, paypal, razorpay, etc.)
+- To add a new integration: add entry to DEFAULTS array → auto-seeds on boot
+
+### NEXT SESSION START
+1. Read docs/CHAT-HANDOFF.md
+2. Read docs/FULL-AUDIT.md (150 sections, summary table at top)
+3. Start Section 11.5 — Geo-blocking
+   - Create: services/videos/src/sections/section-11-security-privacy/geo-blocking.service.ts
+   - Create: .../geo-blocking.route.ts
+   - Add MaxMind integration to integration-settings DEFAULTS
+   - Register route in services/videos/src/index.ts
