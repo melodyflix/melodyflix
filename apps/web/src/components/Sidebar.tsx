@@ -1,4 +1,4 @@
-// melodyflix - desktop left sidebar (YouTube-style)
+// melodyflix - desktop left sidebar navigation
 import { useLocation, useNavigate } from 'react-router-dom';
 
 interface Props {

@@ -45,7 +45,7 @@ export function parseChaptersFromDescription(description: string | null | undefi
     if (!title) continue;
     results.push({ start_seconds: seconds, title });
   }
-  // Must start at 0 (YouTube rule) OR we allow anywhere; keep it simple: allow anywhere
+  // Chapters may start anywhere (MelodyFlix choice); keep simple
   return results;
 }
 
