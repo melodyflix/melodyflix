@@ -1,5 +1,8 @@
 #!/bin/bash
 # melodyflix - start all services (frontend + backend)
+# Fix: proot + Node.js io_uring incompatibility causes SIGKILL
+# (uv__io_poll: Assertion 'errno == EINTR' failed)
+export UV_USE_IO_URING=0
 echo "🚀 Starting melodyflix platform..."
 echo ""
 
