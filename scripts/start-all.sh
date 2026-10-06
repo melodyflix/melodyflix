@@ -45,10 +45,21 @@ echo "  ✓ admin         (port 5173)"
 sleep 12
 
 echo ""
-echo "Health check:"
+echo "Health check (waiting up to 60s for services to bind):"
 for p in 4001 4002 4003 4004; do
-  result=$(curl -s --max-time 2 http://127.0.0.1:$p/health || echo "FAILED")
-  echo "  $p: $result"
+  ok=0
+  for i in $(seq 1 30); do
+    result=$(curl -s --max-time 2 http://127.0.0.1:$p/health 2>/dev/null || echo "")
+    if [ -n "$result" ] && echo "$result" | grep -q '"status":"ok"'; then
+      echo "  $p: $result"
+      ok=1
+      break
+    fi
+    sleep 2
+  done
+  if [ "$ok" = "0" ]; then
+    echo "  $p: FAILED (after 60s)"
+  fi
 done
 
 echo ""
