@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MelodyFlix — Homepage Mockup v3</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --mf-purple: #7c3aed;
+    --mf-purple-dark: #6d28d9;
+    --mf-purple-light: #a78bfa;
+    --mf-purple-bg: #faf7ff;
+    --mf-purple-bg-2: #f3e8ff;
+    --mf-bg: #ffffff;
+    --mf-bg-2: #f4f4f6;
+    --mf-hover: #eae7f0;
+    --mf-border: #ebe8f0;
+    --mf-text: #0f0f0f;
+    --mf-text-2: #606060;
+    --mf-header-h: 48px;
+    --mf-subheader-h: 32px;
+    --mf-sidebar-collapsed: 72px;
+    --mf-sidebar-expanded: 240px;
+  }
+  html, body { min-height: 100%; }
+  body {
+    font-family: 'Roboto', -apple-system, 'Segoe UI', Arial, sans-serif;
+    font-size: 14px;
+    color: var(--mf-text);
+    background: var(--mf-purple-bg);
+    line-height: 1.4;
+  }
+  a { color: inherit; text-decoration: none; }
+
+  /* ===== SEARCH OVERLAY ===== */
+  .mf-search-overlay {
+    position: fixed; top: 0; left: 0; right: 0;
+    background: #fff; z-index: 300;
+    padding: 8px 16px;
+    display: none; align-items: center; gap: 10px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    border-bottom: 1px solid var(--mf-border);
+    height: var(--mf-header-h);
+  }
+  .mf-search-overlay.open { display: flex; }
+  .mf-search-overlay input {
+    flex: 1; height: 34px;
+    padding: 0 16px;
+    border: 1px solid var(--mf-border);
+    border-radius: 17px;
+    font-size: 14px; outline: none; font-family: inherit;
+  }
+  .mf-search-overlay input:focus { border-color: var(--mf-purple); }
+
+  /* ===== MAIN HEADER ===== */
+  .mf-main-header {
+    position: sticky; top: 0; z-index: 100;
+    height: var(--mf-header-h);
+    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+    display: flex; align-items: center;
+    padding: 0 12px;
+    border-bottom: none;
+    box-shadow: 0 2px 12px rgba(124, 58, 237, 0.3);
+  }
+  .mf-hamburger, .mf-icon-btn {
+    width: 36px; height: 36px;
+    border: none; background: transparent;
+    border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .mf-icon-btn[title="Search"] {
+    margin-right: 0;
+  }
+  #dotsBtn {
+    background: rgba(255, 255, 255, 0.15);
+    font-size: 20px;
+    font-weight: 700;
+  }
+  #dotsBtn:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+  #bellBtn, #createBtn {
+    background: rgba(255, 255, 255, 0.15);
+    font-size: 18px;
+  }
+  #bellBtn:hover, #createBtn:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+  .mf-hamburger:hover, .mf-icon-btn:hover { background: var(--mf-bg-2); }
+  .mf-logo {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 18px; font-weight: 800;
+    color: #ffffff;
+    padding: 0 8px;
+    white-space: nowrap;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .mf-logo-mark { font-size: 20px; color: #ffffff; }
+
+  .mf-nav-icons {
+    display: flex;
+    flex: 1;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    margin: 0 16px;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .mf-nav-icon {
+    display: flex; align-items: center; gap: 5px;
+    padding: 6px 12px;
+    border: none; background: transparent;
+    border-radius: 18px; cursor: pointer;
+    font-size: 13px; font-weight: 500;
+    white-space: nowrap;
+    font-family: inherit;
+    color: #ffffff;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .mf-nav-icon:hover { background: rgba(255, 255, 255, 0.15); }
+  .mf-nav-icon.active {
+    background: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+  .mf-nav-icon .emoji { font-size: 15px; }
+
+  .mf-signin {
+    display: flex; align-items: center; gap: 5px;
+    padding: 6px 16px;
+    border: none;
+    color: var(--mf-purple-dark);
+    background: #ffffff;
+    border-radius: 17px; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+    flex-shrink: 0;
+    margin-left: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: box-shadow 0.15s, transform 0.15s;
+  }
+  .mf-signin:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transform: translateY(-1px);
+  }
+
+  /* ===== LAYOUT ===== */
+  .mf-layout {
+    display: flex;
+    align-items: flex-start;
+    padding-left: var(--mf-sidebar-collapsed);
+    transition: padding-left 0.2s ease;
+  }
+  body.sidebar-expanded .mf-layout {
+    padding-left: var(--mf-sidebar-expanded);
+  }
+
+  /* Sidebar — sticky, so it stays put */
+  .mf-sidebar-wrap {
+    position: fixed;
+    top: var(--mf-header-h);
+    left: 0;
+    bottom: 0;
+    width: var(--mf-sidebar-collapsed);
+    transition: width 0.2s ease;
+    z-index: 60;
+    background: var(--mf-bg);
+  }
+  .mf-sidebar-wrap.expanded { width: var(--mf-sidebar-expanded); }
+  .mf-sidebar {
+    width: 100%;
+    height: 100%;
+    background: #ffffff;
+    border-right: 1px solid var(--mf-border);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px 4px;
+  }
+  .mf-sidebar::-webkit-scrollbar { width: 4px; }
+  .mf-sidebar::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
+
+  .mf-sb-item {
+    display: flex; align-items: center; gap: 14px;
+    width: 100%; padding: 9px 10px;
+    border: none; background: transparent;
+    border-radius: 10px; cursor: pointer;
+    color: var(--mf-text); font-size: 13px;
+    font-family: inherit; text-align: left;
+    margin-bottom: 1px;
+    white-space: nowrap;
+  }
+  .mf-sb-item:hover {
+    background: var(--mf-purple-bg-2);
+    color: var(--mf-purple-dark);
+  }
+  .mf-sb-item.active {
+    background: linear-gradient(135deg, var(--mf-purple-bg-2) 0%, #ede9fe 100%);
+    color: var(--mf-purple-dark);
+    font-weight: 600;
+    border-left: 3px solid var(--mf-purple);
+  }
+  .mf-sidebar-wrap:not(.expanded) .mf-sb-item {
+    flex-direction: column; gap: 3px;
+    padding: 12px 2px; font-size: 9.5px;
+    text-align: center;
+    border-radius: 8px;
+  }
+  .mf-sb-icon {
+    font-size: 20px; line-height: 1; flex-shrink: 0;
+    width: 24px; text-align: center;
+  }
+  .mf-sidebar-wrap:not(.expanded) .mf-sb-icon { width: auto; font-size: 20px; }
+  .mf-sb-label {
+    white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; flex: 1;
+  }
+  .mf-sidebar-wrap:not(.expanded) .mf-sb-label {
+    font-size: 9.5px; width: 100%;
+    text-align: center; flex: none; line-height: 1.1;
+  }
+  .mf-sb-divider {
+    height: 1px; background: var(--mf-border);
+    margin: 8px 8px;
+  }
+  .mf-sb-section-title {
+    font-size: 12px; font-weight: 700;
+    padding: 10px 12px 6px;
+    color: var(--mf-purple-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+  .mf-sidebar-wrap:not(.expanded) .mf-sb-section-title { display: none; }
+  .mf-sb-footer {
+    padding: 12px 12px 20px;
+    font-size: 11.5px;
+    color: var(--mf-text-2);
+    line-height: 1.9;
+  }
+  .mf-sidebar-wrap:not(.expanded) .mf-sb-footer { display: none; }
+  .mf-sb-footer a { display: inline; margin-right: 6px; cursor: pointer; }
+  .mf-sb-footer a:hover { color: var(--mf-text); }
+  .mf-sb-copyright {
+    margin-top: 10px; font-size: 11px;
+    padding-top: 10px;
+    border-top: 1px solid var(--mf-border);
+  }
+
+  /* Main column (chips + content + footer) */
+  .mf-main-col {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Sub header — sticky inside main-col */
+  .mf-sub-header {
+    position: sticky;
+    top: var(--mf-header-h);
+    z-index: 90;
+    height: var(--mf-subheader-h);
+    background: #ffffff;
+    border-bottom: 1px solid var(--mf-border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    box-shadow: 0 2px 6px rgba(124, 58, 237, 0.04);
+  }
+  .mf-chip-fixed {
+    flex-shrink: 0;
+    padding: 0 14px;
+    height: 24px;
+    border: none;
+    background: linear-gradient(135deg, var(--mf-purple) 0%, var(--mf-purple-dark) 100%);
+    color: #fff;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 2px 6px rgba(124, 58, 237, 0.25);
+  }
+  .mf-chips-scroll {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+  .mf-chips-track {
+    display: flex;
+    gap: 6px;
+    animation: mf-scroll 80s linear infinite;
+    white-space: nowrap;
+    width: max-content;
+  }
+  .mf-chips-track:hover { animation-play-state: paused; }
+  @keyframes mf-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .mf-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 12px;
+    height: 24px;
+    border: 1px solid transparent;
+    background: var(--mf-bg-2);
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--mf-text);
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .mf-chip:hover {
+    background: var(--mf-purple-bg-2);
+    color: var(--mf-purple-dark);
+    border-color: var(--mf-purple-light);
+  }
+
+  /* Content */
+  .mf-content {
+    padding: 14px 20px;
+    flex: 1;
+    background: var(--mf-purple-bg);
+  }
+
+  /* Hero */
+  .mf-hero {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 21 / 8;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 22px;
+    background: #1a1a2e;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    perspective: 1200px;
+  }
+  .mf-hero-slide {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: #fff; font-size: 28px; font-weight: 700;
+    opacity: 0; transform: rotateY(90deg);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+    backface-visibility: hidden;
+    gap: 8px;
+  }
+  .mf-hero-slide.active {
+    opacity: 1; transform: rotateY(0deg);
+  }
+  .mf-hero-slide .sub { font-size: 13px; font-weight: 400; opacity: 0.85; }
+  .mf-hero-slide.s1 { background: linear-gradient(135deg, #7c3aed, #a78bfa); }
+  .mf-hero-slide.s2 { background: linear-gradient(135deg, #dc2626, #f87171); }
+  .mf-hero-slide.s3 { background: linear-gradient(135deg, #0891b2, #06b6d4); }
+  .mf-hero-slide.s4 { background: linear-gradient(135deg, #059669, #34d399); }
+  .mf-hero-controls {
+    position: absolute; bottom: 12px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 6px; z-index: 5;
+  }
+  .mf-hero-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: rgba(255,255,255,0.5);
+    cursor: pointer; border: none;
+  }
+  .mf-hero-dot.active { background: #fff; }
+
+  /* Video grid */
+  .mf-grid-section-title {
+    font-size: 18px; font-weight: 700;
+    margin: 16px 0 12px;
+    padding-left: 12px;
+    border-left: 4px solid var(--mf-purple);
+    line-height: 1.2;
+  }
+  .mf-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px 14px;
+  }
+  .mf-vcard {
+    cursor: pointer;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .mf-thumb {
+    width: 100%; aspect-ratio: 16 / 9;
+    background: linear-gradient(135deg, #f0ebfa 0%, #e8dffa 100%);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px; color: var(--mf-purple-light);
+    position: relative;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    overflow: hidden;
+  }
+  .mf-vcard:hover .mf-thumb {
+    transform: scale(1.02);
+    box-shadow: 0 8px 24px rgba(124, 58, 237, 0.2);
+    background: linear-gradient(135deg, #ede4ff 0%, #ddd0fa 100%);
+  }
+  .mf-dur {
+    position: absolute; bottom: 6px; right: 6px;
+    background: rgba(0,0,0,0.85); color: #fff;
+    font-size: 11px; padding: 2px 5px;
+    border-radius: 3px; font-weight: 500;
+  }
+  .mf-vmeta { display: flex; gap: 10px; }
+  .mf-vavatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--mf-purple) 0%, var(--mf-purple-dark) 100%);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; flex-shrink: 0; font-size: 13px;
+    box-shadow: 0 2px 6px rgba(124, 58, 237, 0.2);
+  }
+  .mf-vtitle {
+    font-size: 13.5px; font-weight: 500;
+    line-height: 1.3; margin-bottom: 3px;
+    display: -webkit-box; -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden;
+    transition: color 0.15s;
+  }
+  .mf-vcard:hover .mf-vtitle { color: var(--mf-purple-dark); }
+  .mf-vchannel, .mf-vstats {
+    font-size: 12px; color: var(--mf-text-2);
+  }
+
+  /* Highlight card */
+  .mf-highlight-card {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+    border: 1px solid #d8b4fe;
+    border-radius: 12px;
+    padding: 18px 22px;
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.1);
+  }
+  .mf-highlight-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(124, 58, 237, 0.2);
+  }
+  .mf-highlight-content { display: flex; align-items: center; gap: 16px; }
+  .mf-highlight-icon { font-size: 40px; }
+  .mf-highlight-title {
+    font-size: 18px; font-weight: 700;
+    color: var(--mf-purple);
+  }
+  .mf-highlight-sub {
+    font-size: 13px; color: var(--mf-text-2);
+    margin-top: 3px;
+  }
+  .mf-highlight-cta {
+    padding: 8px 18px;
+    background: var(--mf-purple); color: #fff;
+    border-radius: 20px;
+    font-size: 13px; font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* Footer */
+  .mf-footer {
+    background: linear-gradient(180deg, #ffffff 0%, #faf7ff 100%);
+    border-top: 2px solid var(--mf-purple-light);
+    padding: 32px 40px 16px;
+  }
+  .mf-footer-cols {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 32px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .mf-footer-col h4 {
+    font-size: 13px; font-weight: 700;
+    margin-bottom: 10px;
+    color: var(--mf-purple-dark);
+  }
+  .mf-footer-col p, .mf-footer-col a {
+    display: block;
+    font-size: 12.5px;
+    color: var(--mf-text-2);
+    line-height: 1.9;
+    cursor: pointer;
+  }
+  .mf-footer-col a:hover { color: var(--mf-text); }
+  .mf-footer-copyright {
+    text-align: center;
+    font-size: 12px; color: var(--mf-text-2);
+    margin-top: 30px; padding-top: 16px;
+    border-top: 1px solid var(--mf-border);
+    max-width: 1200px;
+    margin-left: auto; margin-right: auto;
+  }
+
+  /* Back to top */
+  .mf-back-top {
+    position: fixed; bottom: 24px; right: 24px;
+    width: 46px; height: 46px;
+    border-radius: 50%; border: none;
+    background: linear-gradient(135deg, var(--mf-purple) 0%, var(--mf-purple-dark) 100%);
+    color: #fff;
+    font-size: 20px; cursor: pointer;
+    box-shadow: 0 6px 18px rgba(124, 58, 237, 0.45);
+    display: none;
+    z-index: 200;
+  }
+  .mf-back-top.visible { display: flex; align-items: center; justify-content: center; }
+
+  /* Demo toggle */
+  .mf-demo-toggle {
+    position: fixed; bottom: 24px; left: 24px;
+    background: #0f0f0f; color: #fff;
+    border: none; padding: 8px 14px;
+    border-radius: 20px; font-size: 12px;
+    cursor: pointer; z-index: 200;
+    font-family: inherit;
+  }
+</style>
+</head>
+<body>
+
+<!-- SEARCH OVERLAY -->
+<div class="mf-search-overlay" id="searchOverlay">
+  <button class="mf-icon-btn" onclick="toggleSearch()" style="font-size:16px;">←</button>
+  <input type="text" id="searchInput" placeholder="Search MelodyFlix..." autofocus>
+  <button class="mf-icon-btn">🎤</button>
+  <button style="padding:0 18px;height:34px;border:none;border-radius:17px;background:var(--mf-purple);color:#fff;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;">🔍 Search</button>
+</div>
+
+<!-- MAIN HEADER -->
+<header class="mf-main-header">
+  <button class="mf-hamburger" onclick="toggleSidebar()">☰</button>
+  <div class="mf-logo">
+    <span class="mf-logo-mark">♪</span>
+    <span>MelodyFlix</span>
+  </div>
+  <button class="mf-icon-btn" onclick="toggleSearch()" title="Search" style="font-size:18px;">🔍</button>
+
+  <nav class="mf-nav-icons">
+    <button class="mf-nav-icon active"><span class="emoji">🎓</span><span class="lbl">Study</span></button>
+    <button class="mf-nav-icon"><span class="emoji">🎬</span><span class="lbl">Movies</span></button>
+    <button class="mf-nav-icon"><span class="emoji">🎭</span><span class="lbl">Drama</span></button>
+    <button class="mf-nav-icon"><span class="emoji">🎵</span><span class="lbl">Music</span></button>
+    <button class="mf-nav-icon"><span class="emoji">📻</span><span class="lbl">Radio</span></button>
+    <button class="mf-nav-icon"><span class="emoji">📺</span><span class="lbl">Live TV</span></button>
+    <button class="mf-nav-icon"><span class="emoji">📡</span><span class="lbl">Go Live</span></button>
+  </nav>
+
+  <button class="mf-icon-btn" id="dotsBtn">⋮</button>
+  <button class="mf-icon-btn" id="bellBtn" style="display:none;">🔔</button>
+  <button class="mf-icon-btn" id="createBtn" style="display:none;">➕</button>
+  <button class="mf-signin" id="signinBtn">👤 Sign in</button>
+</header>
+
+<!-- LAYOUT -->
+<div class="mf-layout">
+  <aside class="mf-sidebar-wrap" id="sidebarWrap">
+    <div class="mf-sidebar">
+      <button class="mf-sb-item active"><span class="mf-sb-icon">🏠</span><span class="mf-sb-label">Home</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">⚡</span><span class="mf-sb-label">Shorts</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">📬</span><span class="mf-sb-label">Subscriptions</span></button>
+      <div class="mf-sb-divider"></div>
+
+      <div class="mf-sb-section-title">You</div>
+      <button class="mf-sb-item"><span class="mf-sb-icon">👤</span><span class="mf-sb-label">You</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">📺</span><span class="mf-sb-label">Your channel</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">🕐</span><span class="mf-sb-label">History</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">📁</span><span class="mf-sb-label">Playlists</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">🔖</span><span class="mf-sb-label">Watch later</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">👍</span><span class="mf-sb-label">Liked videos</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">🎬</span><span class="mf-sb-label">Your videos</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">⬇️</span><span class="mf-sb-label">Downloads</span></button>
+      <div class="mf-sb-divider"></div>
+
+      <div class="mf-sb-section-title">Explore</div>
+      <button class="mf-sb-item"><span class="mf-sb-icon">🎓</span><span class="mf-sb-label">Study</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">🎬</span><span class="mf-sb-label">Movies</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">🎭</span><span class="mf-sb-label">Drama</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">📺</span><span class="mf-sb-label">Web Series</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">🎵</span><span class="mf-sb-label">Video Song</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">🎧</span><span class="mf-sb-label">Audio Song</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">📡</span><span class="mf-sb-label">Live TV</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">📻</span><span class="mf-sb-label">Radio</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">🔴</span><span class="mf-sb-label">Live Streaming</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">📰</span><span class="mf-sb-label">Article</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">🎵</span><span class="mf-sb-label">Music</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">⚽</span><span class="mf-sb-label">Sports</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">🎮</span><span class="mf-sb-label">Gaming</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">🎮</span><span class="mf-sb-label">Playables</span></button>
+      <div class="mf-sb-divider"></div>
+
+      <div class="mf-sb-section-title">More from MelodyFlix</div>
+      <button class="mf-sb-item"><span class="mf-sb-icon">💎</span><span class="mf-sb-label">MelodyFlix Premium</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">🎵</span><span class="mf-sb-label">MelodyFlix Music</span></button>
+      <button class="mf-sb-item"><span class="mf-sb-icon">👶</span><span class="mf-sb-label">MelodyFlix Kids</span></button>
+      <div class="mf-sb-divider"></div>
+
+      <button class="mf-sb-item"><span class="mf-sb-icon">📊</span><span class="mf-sb-label">Report history</span></button>
+
+      <div class="mf-sb-footer">
+        <div>
+          <a>About</a><a>Press</a><a>Copyright</a>
+          <a>Contact us</a><a>Creators</a>
+          <a>Advertise</a><a>Developers</a>
+        </div>
+        <div style="margin-top:10px;">
+          <a>Terms</a><a>Privacy</a>
+          <a>Policy &amp; Safety</a>
+          <a>How MelodyFlix works</a>
+        </div>
+        <div class="mf-sb-copyright">© Melodyflix Technologies 2026</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="mf-main-col">
+    <!-- SUB HEADER -->
+    <div class="mf-sub-header">
+      <button class="mf-chip-fixed">All</button>
+      <div class="mf-chips-scroll">
+        <div class="mf-chips-track">
+          <button class="mf-chip">🎓 Study</button>
+          <button class="mf-chip">🎬 Movies</button>
+          <button class="mf-chip">🎭 Drama</button>
+          <button class="mf-chip">📺 Web Series</button>
+          <button class="mf-chip">🎵 Video Song</button>
+          <button class="mf-chip">🎧 Audio Song</button>
+          <button class="mf-chip">📡 Live TV</button>
+          <button class="mf-chip">📻 Radio</button>
+          <button class="mf-chip">🔴 Live Streaming</button>
+          <button class="mf-chip">📰 Article</button>
+          <button class="mf-chip">🎵 Music</button>
+          <button class="mf-chip">⚽ Sports</button>
+          <button class="mf-chip">🎮 Gaming</button>
+          <button class="mf-chip">💎 Memberships</button>
+          <button class="mf-chip">🎓 Study</button>
+          <button class="mf-chip">🎬 Movies</button>
+          <button class="mf-chip">🎭 Drama</button>
+          <button class="mf-chip">📺 Web Series</button>
+          <button class="mf-chip">🎵 Video Song</button>
+          <button class="mf-chip">🎧 Audio Song</button>
+          <button class="mf-chip">📡 Live TV</button>
+          <button class="mf-chip">📻 Radio</button>
+          <button class="mf-chip">🔴 Live Streaming</button>
+          <button class="mf-chip">📰 Article</button>
+          <button class="mf-chip">🎵 Music</button>
+          <button class="mf-chip">⚽ Sports</button>
+          <button class="mf-chip">🎮 Gaming</button>
+          <button class="mf-chip">💎 Memberships</button>
+        </div>
+      </div>
+    </div>
+
+    <main class="mf-content">
+      <div class="mf-hero">
+        <div class="mf-hero-slide s1 active">🎓 Study Room<span class="sub">Featured course</span></div>
+        <div class="mf-hero-slide s2">🎬 Movies<span class="sub">Now trending</span></div>
+        <div class="mf-hero-slide s3">📻 Radio<span class="sub">Listen live</span></div>
+        <div class="mf-hero-slide s4">📺 Live TV<span class="sub">Broadcasting now</span></div>
+        <div class="mf-hero-controls">
+          <button class="mf-hero-dot active" onclick="showSlide(0)"></button>
+          <button class="mf-hero-dot" onclick="showSlide(1)"></button>
+          <button class="mf-hero-dot" onclick="showSlide(2)"></button>
+          <button class="mf-hero-dot" onclick="showSlide(3)"></button>
+        </div>
+      </div>
+
+      <h2 class="mf-grid-section-title">Trending</h2>
+      <div class="mf-grid">
+        <div class="mf-vcard">
+          <div class="mf-thumb">🎬<span class="mf-dur">12:34</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">V</div><div>
+            <div class="mf-vtitle">Sample Video Title That Spans Two Lines</div>
+            <div class="mf-vchannel">Channel Name</div>
+            <div class="mf-vstats">125K views · 2 days ago</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb">🎵<span class="mf-dur">3:45</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">M</div><div>
+            <div class="mf-vtitle">Music Video Title</div>
+            <div class="mf-vchannel">Music Label</div>
+            <div class="mf-vstats">1.2M views · 1 week ago</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb">🎭<span class="mf-dur">24:10</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">D</div><div>
+            <div class="mf-vtitle">Drama Episode Title</div>
+            <div class="mf-vchannel">Drama Channel</div>
+            <div class="mf-vstats">500K views · 3 days ago</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb">📡<span class="mf-dur">LIVE</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">L</div><div>
+            <div class="mf-vtitle">Live Streaming Now</div>
+            <div class="mf-vchannel">Live Channel</div>
+            <div class="mf-vstats">3.4K watching</div>
+          </div></div>
+        </div>
+
+        <div class="mf-highlight-card">
+          <div class="mf-highlight-content">
+            <div class="mf-highlight-icon">🎓</div>
+            <div>
+              <div class="mf-highlight-title">Study Room — Explore More</div>
+              <div class="mf-highlight-sub">1000+ free courses, tutorials, and classes</div>
+            </div>
+          </div>
+          <div class="mf-highlight-cta">Explore →</div>
+        </div>
+
+        <div class="mf-vcard">
+          <div class="mf-thumb">📻<span class="mf-dur">—</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">R</div><div>
+            <div class="mf-vtitle">Radio Station Live</div>
+            <div class="mf-vchannel">Radio FM</div>
+            <div class="mf-vstats">Now playing</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb">📰<span class="mf-dur">5:00</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">N</div><div>
+            <div class="mf-vtitle">Breaking News Headlines</div>
+            <div class="mf-vchannel">News Channel</div>
+            <div class="mf-vstats">50K views · 1 hour ago</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb">⚽<span class="mf-dur">1:45:30</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">S</div><div>
+            <div class="mf-vtitle">Match Highlights</div>
+            <div class="mf-vchannel">Sports Network</div>
+            <div class="mf-vstats">800K views · 5 days ago</div>
+          </div></div>
+        </div>
+      </div>
+
+      <h2 class="mf-grid-section-title">Shorts</h2>
+      <div class="mf-grid">
+        <div class="mf-vcard">
+          <div class="mf-thumb" style="aspect-ratio:9/16;">⚡<span class="mf-dur">0:45</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">S</div><div>
+            <div class="mf-vtitle">Funny short clip</div>
+            <div class="mf-vchannel">Shorts Channel</div>
+            <div class="mf-vstats">1.5M views</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb" style="aspect-ratio:9/16;">⚡<span class="mf-dur">0:30</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">S</div><div>
+            <div class="mf-vtitle">Viral moment</div>
+            <div class="mf-vchannel">Trending</div>
+            <div class="mf-vstats">800K views</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb" style="aspect-ratio:9/16;">⚡<span class="mf-dur">1:00</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">S</div><div>
+            <div class="mf-vtitle">Quick tip</div>
+            <div class="mf-vchannel">Tips</div>
+            <div class="mf-vstats">2.1M views</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb" style="aspect-ratio:9/16;">⚡<span class="mf-dur">0:50</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">S</div><div>
+            <div class="mf-vtitle">Cute animal</div>
+            <div class="mf-vchannel">Pets</div>
+            <div class="mf-vstats">5M views</div>
+          </div></div>
+        </div>
+      </div>
+
+      <h2 class="mf-grid-section-title">Live Now</h2>
+      <div class="mf-grid">
+        <div class="mf-vcard">
+          <div class="mf-thumb" style="background:linear-gradient(135deg,#dc2626,#f87171);color:#fff;">🔴<span class="mf-dur">LIVE</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">L</div><div>
+            <div class="mf-vtitle">Breaking News Live</div>
+            <div class="mf-vchannel">News24</div>
+            <div class="mf-vstats">12K watching</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb" style="background:linear-gradient(135deg,#dc2626,#f87171);color:#fff;">🔴<span class="mf-dur">LIVE</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">L</div><div>
+            <div class="mf-vtitle">Cricket Match Live</div>
+            <div class="mf-vchannel">Sports Live</div>
+            <div class="mf-vstats">45K watching</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb" style="background:linear-gradient(135deg,#dc2626,#f87171);color:#fff;">🔴<span class="mf-dur">LIVE</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">L</div><div>
+            <div class="mf-vtitle">Q&A Session</div>
+            <div class="mf-vchannel">Creator Live</div>
+            <div class="mf-vstats">2.3K watching</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb" style="background:linear-gradient(135deg,#dc2626,#f87171);color:#fff;">🔴<span class="mf-dur">LIVE</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">L</div><div>
+            <div class="mf-vtitle">Music Concert</div>
+            <div class="mf-vchannel">Music Live</div>
+            <div class="mf-vstats">8.5K watching</div>
+          </div></div>
+        </div>
+      </div>
+
+      <h2 class="mf-grid-section-title">Study Room — Recommended</h2>
+      <div class="mf-grid">
+        <div class="mf-vcard">
+          <div class="mf-thumb">🎓<span class="mf-dur">45:20</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">E</div><div>
+            <div class="mf-vtitle">Physics — Newton's Laws</div>
+            <div class="mf-vchannel">Study Room</div>
+            <div class="mf-vstats">120K views</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb">🎓<span class="mf-dur">1:20:00</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">E</div><div>
+            <div class="mf-vtitle">Math — Calculus Basics</div>
+            <div class="mf-vchannel">Study Room</div>
+            <div class="mf-vstats">85K views</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb">🎓<span class="mf-dur">30:10</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">E</div><div>
+            <div class="mf-vtitle">English Grammar Lesson</div>
+            <div class="mf-vchannel">Study Room</div>
+            <div class="mf-vstats">200K views</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb">🎓<span class="mf-dur">55:00</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">E</div><div>
+            <div class="mf-vtitle">Chemistry — Organic Basics</div>
+            <div class="mf-vchannel">Study Room</div>
+            <div class="mf-vstats">60K views</div>
+          </div></div>
+        </div>
+      </div>
+
+      <h2 class="mf-grid-section-title">Music Videos</h2>
+      <div class="mf-grid">
+        <div class="mf-vcard">
+          <div class="mf-thumb">🎵<span class="mf-dur">4:12</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">M</div><div>
+            <div class="mf-vtitle">Bengali Song — New Release</div>
+            <div class="mf-vchannel">Music Label</div>
+            <div class="mf-vstats">2M views</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb">🎵<span class="mf-dur">3:45</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">M</div><div>
+            <div class="mf-vtitle">Band Performance</div>
+            <div class="mf-vchannel">Live Music</div>
+            <div class="mf-vstats">800K views</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb">🎵<span class="mf-dur">5:30</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">M</div><div>
+            <div class="mf-vtitle">Folk Music Collection</div>
+            <div class="mf-vchannel">Folk BD</div>
+            <div class="mf-vstats">1.5M views</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb">🎵<span class="mf-dur">3:20</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">M</div><div>
+            <div class="mf-vtitle">Pop Song Trending</div>
+            <div class="mf-vchannel">Pop Hits</div>
+            <div class="mf-vstats">4M views</div>
+          </div></div>
+        </div>
+      </div>
+
+      <h2 class="mf-grid-section-title">Sports</h2>
+      <div class="mf-grid">
+        <div class="mf-vcard">
+          <div class="mf-thumb">⚽<span class="mf-dur">10:22</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">S</div><div>
+            <div class="mf-vtitle">Football Match Highlights</div>
+            <div class="mf-vchannel">Sports</div>
+            <div class="mf-vstats">500K views</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb">🏏<span class="mf-dur">15:45</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">S</div><div>
+            <div class="mf-vtitle">Cricket Match Summary</div>
+            <div class="mf-vchannel">Cricket</div>
+            <div class="mf-vstats">1.2M views</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb">🏀<span class="mf-dur">8:30</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">S</div><div>
+            <div class="mf-vtitle">Basketball Best Plays</div>
+            <div class="mf-vchannel">Sports</div>
+            <div class="mf-vstats">300K views</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb">🎾<span class="mf-dur">12:00</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">S</div><div>
+            <div class="mf-vtitle">Tennis Finals Highlights</div>
+            <div class="mf-vchannel">Tennis</div>
+            <div class="mf-vstats">250K views</div>
+          </div></div>
+        </div>
+      </div>
+
+      <h2 class="mf-grid-section-title">News &amp; Articles</h2>
+      <div class="mf-grid">
+        <div class="mf-vcard">
+          <div class="mf-thumb">📰<span class="mf-dur">5:00</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">N</div><div>
+            <div class="mf-vtitle">Today's Top Stories</div>
+            <div class="mf-vchannel">News24</div>
+            <div class="mf-vstats">80K views</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb">📰<span class="mf-dur">3:15</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">N</div><div>
+            <div class="mf-vtitle">Politics Update</div>
+            <div class="mf-vchannel">News24</div>
+            <div class="mf-vstats">45K views</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb">📰<span class="mf-dur">7:00</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">N</div><div>
+            <div class="mf-vtitle">Technology Weekly</div>
+            <div class="mf-vchannel">Tech News</div>
+            <div class="mf-vstats">30K views</div>
+          </div></div>
+        </div>
+        <div class="mf-vcard">
+          <div class="mf-thumb">📰<span class="mf-dur">4:30</span></div>
+          <div class="mf-vmeta"><div class="mf-vavatar">N</div><div>
+            <div class="mf-vtitle">Business Report</div>
+            <div class="mf-vchannel">Business</div>
+            <div class="mf-vstats">25K views</div>
+          </div></div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="mf-footer">
+      <div class="mf-footer-cols">
+        <div class="mf-footer-col">
+          <h4>Melodyflix Technologies</h4>
+          <p>[ঠিকানা — পেলে পরে যোগ হবে]</p>
+          <a>melodyflix.com</a>
+          <a>melodyflixbd@gmail.com</a>
+          <p style="margin-top:8px;font-size:11.5px;">IT Enabled Services (ITES) / Digital Content &amp; Streaming Services</p>
+        </div>
+        <div class="mf-footer-col">
+          <h4>Company</h4>
+          <a>About</a><a>Press</a><a>Careers</a><a>Contact</a>
+        </div>
+        <div class="mf-footer-col">
+          <h4>Legal</h4>
+          <a>Terms</a><a>Privacy</a><a>Cookie Policy</a><a>DMCA</a>
+        </div>
+        <div class="mf-footer-col">
+          <h4>Support</h4>
+          <a>Help Center</a><a>Send Feedback</a><a>Status</a><a>Developers</a>
+        </div>
+      </div>
+      <div class="mf-footer-copyright">© Melodyflix Technologies 2026</div>
+    </footer>
+  </div><!-- /.mf-main-col -->
+</div>
+
+<button class="mf-back-top" id="backTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+<button class="mf-demo-toggle" onclick="toggleSignIn()" id="demoBtn">Demo: Guest Mode</button>
+
+<script>
+  function toggleSidebar() {
+    document.getElementById('sidebarWrap').classList.toggle('expanded');
+    document.body.classList.toggle('sidebar-expanded');
+  }
+  function toggleSearch() {
+    const o = document.getElementById('searchOverlay');
+    o.classList.toggle('open');
+    if (o.classList.contains('open')) setTimeout(() => document.getElementById('searchInput').focus(), 100);
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') document.getElementById('searchOverlay').classList.remove('open');
+  });
+
+  let currentSlide = 0;
+  const slides = document.querySelectorAll('.mf-hero-slide');
+  const dots = document.querySelectorAll('.mf-hero-dot');
+  function showSlide(i) {
+    slides[currentSlide].classList.remove('active');
+    dots[currentSlide].classList.remove('active');
+    currentSlide = i;
+    slides[currentSlide].classList.add('active');
+    dots[currentSlide].classList.add('active');
+  }
+  setInterval(() => showSlide((currentSlide + 1) % slides.length), 4000);
+
+  window.addEventListener('scroll', () => {
+    document.getElementById('backTop').classList.toggle('visible', window.scrollY > 300);
+  });
+
+  let signedIn = false;
+  function toggleSignIn() {
+    signedIn = !signedIn;
+    document.getElementById('dotsBtn').style.display = signedIn ? 'none' : 'flex';
+    document.getElementById('bellBtn').style.display = signedIn ? 'flex' : 'none';
+    document.getElementById('createBtn').style.display = signedIn ? 'flex' : 'none';
+    document.getElementById('signinBtn').innerHTML = signedIn ? '👤' : '👤 Sign in';
+    document.getElementById('demoBtn').textContent = signedIn ? 'Demo: Signed In' : 'Demo: Guest Mode';
+  }
+</script>
+
+</body>
+</html>
