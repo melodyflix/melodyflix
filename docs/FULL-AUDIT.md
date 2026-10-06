@@ -322,7 +322,7 @@
 | 11.10 | Data Export/Delete | [DONE] sections/section-11-security-privacy/ |
 | 11.11 | Age Verification | [DONE] sections/section-11-security-privacy/ |
 | 11.12 | IP Blocking | [DONE] sections/section-11-security-privacy/ |
-| 11.13 | VPN Detection | [TODO] |
+| 11.13 | VPN Detection | [DONE] sections/section-11-security-privacy/ |
 | 11.14 | Fraud Detection | [TODO] |
 | 11.15 | Rate Limiting | [PARTIAL] shared-auth |
 | 11.16 | Passkey Login | [TODO] |
