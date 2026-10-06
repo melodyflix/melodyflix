@@ -318,7 +318,7 @@
 | 11.6 | Bot Detection | [DONE] sections/section-11-security-privacy/ |
 | 11.7 | Appeal System | [DONE] sections/section-11-security-privacy/ |
 | 11.8 | Device/Session Management | [DONE] sections/section-11-security-privacy/ |
-| 11.9 | Suspicious Login Alert | [TODO] |
+| 11.9 | Suspicious Login Alert | [DONE] sections/section-11-security-privacy/ |
 | 11.10 | Data Export/Delete | [TODO] |
 | 11.11 | Age Verification | [PARTIAL] livetv parental |
 | 11.12 | IP Blocking | [TODO] |
