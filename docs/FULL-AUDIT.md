@@ -321,7 +321,7 @@
 | 11.9 | Suspicious Login Alert | [DONE] sections/section-11-security-privacy/ |
 | 11.10 | Data Export/Delete | [DONE] sections/section-11-security-privacy/ |
 | 11.11 | Age Verification | [DONE] sections/section-11-security-privacy/ |
-| 11.12 | IP Blocking | [TODO] |
+| 11.12 | IP Blocking | [DONE] sections/section-11-security-privacy/ |
 | 11.13 | VPN Detection | [TODO] |
 | 11.14 | Fraud Detection | [TODO] |
 | 11.15 | Rate Limiting | [PARTIAL] shared-auth |
