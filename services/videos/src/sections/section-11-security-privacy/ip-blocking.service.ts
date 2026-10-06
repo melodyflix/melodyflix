@@ -141,7 +141,8 @@ export function parseCidr(cidr: string): ParsedCidr {
     if (prefix < 0 || prefix > 32) throw new Error('IPv4 prefix must be 0-32');
     const net = ipv4ToInt(ip);
     const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
-    return { ip_version: 4, network_int: BigInt(net & mask), mask_int: BigInt(mask), prefix };
+    const networkUnsigned = (net & mask) >>> 0;
+    return { ip_version: 4, network_int: BigInt(networkUnsigned), mask_int: BigInt(mask), prefix };
   }
   if (isIPv6(ip)) {
     if (prefix < 0 || prefix > 128) throw new Error('IPv6 prefix must be 0-128');
