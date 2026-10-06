@@ -316,7 +316,7 @@
 | 11.4 | Parental Control | [DONE] livetv.service.ts |
 | 11.5 | Geo-blocking | [DONE] sections/section-11-security-privacy/ |
 | 11.6 | Bot Detection | [DONE] sections/section-11-security-privacy/ |
-| 11.7 | Appeal System | [TODO] |
+| 11.7 | Appeal System | [DONE] sections/section-11-security-privacy/ |
 | 11.8 | Device/Session Management | [PARTIAL] sync.service.ts |
 | 11.9 | Suspicious Login Alert | [TODO] |
 | 11.10 | Data Export/Delete | [TODO] |
