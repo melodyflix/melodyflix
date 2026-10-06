@@ -8,7 +8,8 @@ export type IntegrationId =
   | 'tmdb' | 'omdb' | 'giphy' | 'tenor' | 'newsapi' | 'rss_generic'
   | 'openai' | 'anthropic' | 'gemini' | 'azure_tts' | 'elevenlabs'
   | 'turn_server' | 'smtp' | 'bkash' | 'nagad' | 'sslcommerz'
-  | 'stripe' | 'paypal' | 'razorpay';
+  | 'stripe' | 'paypal' | 'razorpay'
+  | 'maxmind';
 
 export interface IntegrationSetting {
   id: IntegrationId;
@@ -76,6 +77,9 @@ const DEFAULTS: IntegrationDefault[] = [
     config: { client_id: '', client_secret: '', mode: 'sandbox' } },
   { id: 'razorpay', label: 'Razorpay', category: 'payment',
     config: { key_id: '', key_secret: '' } },
+  // Security / Geo (Section 11)
+  { id: 'maxmind', label: 'MaxMind GeoIP2', category: 'security',
+    config: { account_id: '', license_key: '', db_path: '' } },
 ];
 
 // Keys considered sensitive → mask on read
