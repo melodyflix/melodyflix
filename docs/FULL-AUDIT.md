@@ -315,7 +315,7 @@
 | 11.3 | Copyright Detection | [PARTIAL] migration.service.ts |
 | 11.4 | Parental Control | [DONE] livetv.service.ts |
 | 11.5 | Geo-blocking | [DONE] sections/section-11-security-privacy/ |
-| 11.6 | Bot Detection | [PARTIAL] ai-safety.service.ts |
+| 11.6 | Bot Detection | [DONE] sections/section-11-security-privacy/ |
 | 11.7 | Appeal System | [TODO] |
 | 11.8 | Device/Session Management | [PARTIAL] sync.service.ts |
 | 11.9 | Suspicious Login Alert | [TODO] |
