@@ -458,13 +458,13 @@ All 12 items [DONE] accessibility.service (16.1–16.12)
 
 | 20.1 | Push Notification | [DONE] push.service.ts |
 | 20.2 | Email Alert | [DONE] email.service.ts |
-| 20.3 | SMS Notification | [TODO] |
+| 20.3 | SMS Notification | [DONE] notification-extra |
 | 20.4 | In-App Notification | [DONE] notification.service.ts |
-| 20.5 | Notification Preferences | [TODO] |
-| 20.6 | AI-Based Notification Timing | [TODO] |
-| 20.7 | Personalized Alerts | [PARTIAL] |
-| 20.8 | Digest Notifications | [TODO] |
-| 20.9 | Do Not Disturb Schedule | [TODO] |
+| 20.5 | Notification Preferences | [DONE] notification-extra |
+| 20.6 | AI-Based Notification Timing | [DONE] notification-extra |
+| 20.7 | Personalized Alerts | [DONE] notification-extra |
+| 20.8 | Digest Notifications | [DONE] notification-extra |
+| 20.9 | Do Not Disturb Schedule | [DONE] notification-extra |
 
 ## Section 21 — Download and Offline
 
