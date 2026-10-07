@@ -6,6 +6,10 @@ import {
   createTier, listTiersByChannel, getTierById, updateTier, deleteTier,
   createMembership, getMembership, listMyMemberships, cancelMembership,
   listChannelMembers, getMembershipStats,
+  setEarlyAccess, getEarlyAccess, removeEarlyAccess,
+  listEarlyAccessForChannel, listUpcomingEarlyAccess, canAccessEarly,
+  grantAdFree, revokeAdFree, getAdFreeGrant, isAdFree,
+  listAdFreeUsers, getAdFreeStats,
 } from '../services/membership.service.js';
 import { getDb } from '@melodyflix/shared-db';
 
@@ -25,6 +29,19 @@ const CreateMembershipSchema = z.object({
   tier_id: z.string().min(1),
   transaction_id: z.string().min(1),
   duration_days: z.number().int().min(1).max(365).optional(),
+});
+
+const SetEarlyAccessSchema = z.object({
+  video_id: z.string().min(1).max(100),
+  channel_id: z.string().min(1).max(100),
+  tier_id: z.string().min(1).max(100).nullable().optional(),
+  public_at: z.string().min(4).max(40),
+  hours_before_public: z.number().int().min(0).max(8760).optional(),
+});
+
+const GrantAdFreeSchema = z.object({
+  source: z.enum(['membership','premium','admin','promo','manual']).optional(),
+  expires_at: z.string().min(4).max(40).nullable().optional(),
 });
 
 export async function membershipRoutes(app: FastifyInstance) {
@@ -194,5 +211,141 @@ export async function membershipRoutes(app: FastifyInstance) {
     try { requireRole(req.headers.authorization, ['admin']); }
     catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
     return reply.send({ success: true, data: getMembershipStats() });
+  });
+
+  // ============ 57.1 EARLY ACCESS ============
+
+  // POST /memberships/early-access  (creator sets window for own video)
+  app.post('/memberships/early-access', async (req, reply) => {
+    let uid: string;
+    try { uid = requireAuth(req.headers.authorization).sub as string; }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const parsed = SetEarlyAccessSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', errors: parsed.error.issues });
+    try {
+      const entry = setEarlyAccess(parsed.data, uid);
+      return reply.code(201).send({ success: true, data: entry });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // GET /memberships/early-access/upcoming
+  app.get('/memberships/early-access/upcoming', async (req, reply) => {
+    const q = req.query as { limit?: string };
+    const limit = Math.min(Math.max(Number(q.limit ?? 50), 1), 200);
+    return reply.send({ success: true, data: { items: listUpcomingEarlyAccess(limit) } });
+  });
+
+  // GET /memberships/early-access/channel/:channelId
+  app.get('/memberships/early-access/channel/:channelId', async (req, reply) => {
+    const { channelId } = req.params as { channelId: string };
+    return reply.send({ success: true, data: { items: listEarlyAccessForChannel(channelId) } });
+  });
+
+  // GET /memberships/early-access/:videoId
+  app.get('/memberships/early-access/:videoId', async (req, reply) => {
+    const { videoId } = req.params as { videoId: string };
+    const entry = getEarlyAccess(videoId);
+    if (!entry) return reply.code(404).send({ success: false, error: 'Not found' });
+    return reply.send({ success: true, data: entry });
+  });
+
+  // DELETE /memberships/early-access/:videoId
+  app.delete('/memberships/early-access/:videoId', async (req, reply) => {
+    try { requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { videoId } = req.params as { videoId: string };
+    const ok = removeEarlyAccess(videoId);
+    return ok
+      ? reply.send({ success: true, data: { removed: true } })
+      : reply.code(404).send({ success: false, error: 'Not found' });
+  });
+
+  // GET /memberships/early-access/:videoId/check  (can current user watch now?)
+  app.get('/memberships/early-access/:videoId/check', async (req, reply) => {
+    const { videoId } = req.params as { videoId: string };
+    let uid: string | null = null;
+    try { uid = requireAuth(req.headers.authorization).sub as string; } catch { /* public */ }
+    return reply.send({ success: true, data: canAccessEarly(uid, videoId) });
+  });
+
+  // ============ 57.3 AD-FREE ============
+
+  // GET /memberships/ad-free/me
+  app.get('/memberships/ad-free/me', async (req, reply) => {
+    let uid: string;
+    try { uid = requireAuth(req.headers.authorization).sub as string; }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    return reply.send({ success: true, data: isAdFree(uid) });
+  });
+
+  // POST /memberships/ad-free/me  (self-grant, e.g. after premium purchase webhook)
+  app.post('/memberships/ad-free/me', async (req, reply) => {
+    let uid: string;
+    try { uid = requireAuth(req.headers.authorization).sub as string; }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const parsed = GrantAdFreeSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body' });
+    const row = grantAdFree(uid, parsed.data);
+    return reply.code(201).send({ success: true, data: row });
+  });
+
+  // DELETE /memberships/ad-free/me
+  app.delete('/memberships/ad-free/me', async (req, reply) => {
+    let uid: string;
+    try { uid = requireAuth(req.headers.authorization).sub as string; }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const ok = revokeAdFree(uid);
+    return ok
+      ? reply.send({ success: true, data: { revoked: true } })
+      : reply.code(404).send({ success: false, error: 'Not found' });
+  });
+
+  // GET /memberships/ad-free/user/:userId  (admin)
+  app.get('/memberships/ad-free/user/:userId', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { userId } = req.params as { userId: string };
+    return reply.send({ success: true, data: { status: isAdFree(userId), grant: getAdFreeGrant(userId) } });
+  });
+
+  // POST /memberships/ad-free/user/:userId  (admin grant)
+  app.post('/memberships/ad-free/user/:userId', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { userId } = req.params as { userId: string };
+    const parsed = GrantAdFreeSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body' });
+    const row = grantAdFree(userId, { ...parsed.data, source: parsed.data.source ?? 'admin' });
+    return reply.code(201).send({ success: true, data: row });
+  });
+
+  // DELETE /memberships/ad-free/user/:userId  (admin revoke)
+  app.delete('/memberships/ad-free/user/:userId', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { userId } = req.params as { userId: string };
+    const ok = revokeAdFree(userId);
+    return ok
+      ? reply.send({ success: true, data: { revoked: true } })
+      : reply.code(404).send({ success: false, error: 'Not found' });
+  });
+
+  // GET /memberships/ad-free/list  (admin)
+  app.get('/memberships/ad-free/list', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const q = req.query as { active_only?: string; limit?: string };
+    const activeOnly = q.active_only !== 'false';
+    const limit = Math.min(Math.max(Number(q.limit ?? 500), 1), 2000);
+    return reply.send({ success: true, data: { items: listAdFreeUsers(activeOnly, limit) } });
+  });
+
+  // GET /memberships/ad-free/stats  (admin)
+  app.get('/memberships/ad-free/stats', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    return reply.send({ success: true, data: getAdFreeStats() });
   });
 }

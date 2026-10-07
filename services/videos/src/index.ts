@@ -180,6 +180,7 @@ import { ensureAdAdvancedSchema } from './services/adadvanced.service.js';
 import { ensurePaymentSchema } from './services/payment.service.js';
 import { ensureChatLimitsSchema } from './services/chatlimits.service.js';
 import { ensureMembershipSchema } from './services/membership.service.js';
+import { membershipRoutes } from './routes/membership.route.js';
 import { ensureSupportSchema } from './services/support.service.js';
 import { ensurePushSchema } from './services/push.service.js';
 
@@ -351,6 +352,7 @@ await app.register(contentIngestRoutes, { prefix: '/api/v1/admin' });
 await app.register(educationRoutes, { prefix: '/api/v1/videos' });
 await app.register(aiTutorRoutes, { prefix: '/api/v1/videos' });
 await app.register(seriesRoutes, { prefix: '/api/v1/videos' });
+await app.register(membershipRoutes, { prefix: '/api/v1/videos' });
 await app.register(aiContentGenRoutes, { prefix: '/api/v1/videos' });
 await app.register(examCertificateRoutes, { prefix: '/api/v1/videos' });
 await app.register(communityRoutes, { prefix: '/api/v1/community' });
