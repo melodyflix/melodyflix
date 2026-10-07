@@ -491,10 +491,10 @@ All items [TODO] — zero code
 
 ## Section 24 — Video Interactivity
 
-| 24.1 | Clickable Hotspots | [TODO] |
-| 24.2 | Branching Video | [TODO] |
-| 24.3 | Interactive Cards | [TODO] |
-| 24.4 | Shoppable Video | [TODO] |
+| 24.1 | Clickable Hotspots | [DONE] video-interactivity.service.ts |
+| 24.2 | Branching Video | [DONE] video-interactivity.service.ts |
+| 24.3 | Interactive Cards | [DONE] video-interactivity.service.ts |
+| 24.4 | Shoppable Video | [DONE] video-interactivity.service.ts |
 
 ## Section 25 — Community Management
 
