@@ -406,7 +406,7 @@
 
 ## Section 16 — Accessibility
 
-All items [TODO] — zero code
+All 12 items [DONE] accessibility.service (16.1–16.12)
 
 ## Section 17 — Administration and Automation
 
