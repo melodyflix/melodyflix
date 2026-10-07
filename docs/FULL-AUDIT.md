@@ -401,7 +401,7 @@
 | 15.4 | Creator Marketplace | [DONE] marketplace.service |
 | 15.5 | Multi-User Video Editing | [DONE] multi-edit.service |
 | 15.6 | Comment on Timeline | [DONE] timeline-comment.service |
-| 15.7 | Version Comparison | [PARTIAL] versions.service.ts |
+| 15.7 | Version Comparison | [DONE] version-compare.service |
 | 15.8 | Approval Workflow | [TODO] |
 
 ## Section 16 — Accessibility
