@@ -344,7 +344,7 @@
 | 12.6 | Status Monitoring | [DONE] health service |
 | 12.7 | GDPR/Cookie Consent | [TODO] |
 | 12.8 | Centralized Logging | [DONE] shared-logger |
-| 12.9 | Error Alerting | [PARTIAL] telemetry |
+| 12.9 | Error Alerting | [DONE] error-alerting.service |
 | 12.10 | Auto Scaling | [TODO] |
 | 12.11 | Deployment Rollback | [TODO] |
 | 12.12 | Multi-Region Replication | [TODO] |
