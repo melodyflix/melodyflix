@@ -750,11 +750,11 @@ Note: Cross-posting (auto-publish to social) already in distribution.service.ts 
 
 ## Section 49 — Cloud Storage Management
 
-| 49.1 | AWS S3 Integration | [TODO] |
-| 49.2 | Google Cloud Storage | [TODO] |
-| 49.3 | Azure Storage | [TODO] |
-| 49.4 | Storage Analytics | [PARTIAL] storage.service.ts |
-| 49.5 | Automatic Archiving | [TODO] |
+| 49.1 | AWS S3 Integration | [DONE] cloud-storage.service.ts |
+| 49.2 | Google Cloud Storage | [DONE] cloud-storage.service.ts |
+| 49.3 | Azure Storage | [DONE] cloud-storage.service.ts |
+| 49.4 | Storage Analytics | [DONE] cloud-storage.service.ts |
+| 49.5 | Automatic Archiving | [DONE] cloud-storage.service.ts |
 
 ## Section 50 — Video Compliance
 
