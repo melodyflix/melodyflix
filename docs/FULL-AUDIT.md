@@ -342,7 +342,7 @@
 | 12.4 | RSS Feed | [DONE] podcast.route.ts |
 | 12.5 | Smart TV Support | [DONE] smart-tv.service |
 | 12.6 | Status Monitoring | [DONE] health service |
-| 12.7 | GDPR/Cookie Consent | [TODO] |
+| 12.7 | GDPR/Cookie Consent | [DONE] cookie-consent.service |
 | 12.8 | Centralized Logging | [DONE] shared-logger |
 | 12.9 | Error Alerting | [DONE] error-alerting.service |
 | 12.10 | Auto Scaling | [TODO] |
