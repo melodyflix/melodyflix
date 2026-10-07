@@ -328,7 +328,7 @@
 | 11.16 | Passkey Login | [DONE] sections/section-11-security-privacy/ |
 | 11.17 | DDoS Protection | [DONE] scripts/nginx/ddos-protection.conf + sysctl-ddos.conf |
 | 11.18 | Web Application Firewall | [DONE] sections/section-11-security-privacy/ |
-| 11.19 | Secret/Key Management | [TODO] |
+| 11.19 | Secret/Key Management | [DONE] sections/section-11-security-privacy/ |
 | 11.20 | Incident Detection | [TODO] |
 | 11.21 | Response Workflow | [TODO] |
 | 11.22 | Breach Notification | [TODO] |
