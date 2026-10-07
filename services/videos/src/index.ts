@@ -186,6 +186,7 @@ import { ensureVideoInteractivitySchema } from './services/video-interactivity.s
 import { ensureGamificationSchema } from './services/gamification.service.js';
 import { ensureCloudStorageSchema } from './services/cloud-storage.service.js';
 import { ensureCdnSchema } from './services/cdn.service.js';
+import { ensureErrorAlertingSchema } from './services/error-alerting.service.js';
 import { membershipRoutes } from './routes/membership.route.js';
 import { screenRecorderRoutes } from './routes/screen-recorder.route.js';
 import { moderationAppealRoutes } from './routes/moderation-appeal.route.js';
@@ -193,6 +194,7 @@ import { videoInteractivityRoutes } from './routes/video-interactivity.route.js'
 import { gamificationRoutes } from './routes/gamification.route.js';
 import { cloudStorageRoutes } from './routes/cloud-storage.route.js';
 import { cdnRoutes } from './routes/cdn.route.js';
+import { errorAlertingRoutes } from './routes/error-alerting.route.js';
 import { ensureSupportSchema } from './services/support.service.js';
 import { ensurePushSchema } from './services/push.service.js';
 
@@ -292,6 +294,7 @@ ensureVideoInteractivitySchema();
 ensureGamificationSchema();
 ensureCloudStorageSchema();
 ensureCdnSchema();
+ensureErrorAlertingSchema();
 ensureSupportSchema();
 ensurePushSchema();
 ensureLiveTvSchema();
@@ -377,6 +380,7 @@ await app.register(videoInteractivityRoutes, { prefix: '/api/v1/videos' });
 await app.register(gamificationRoutes, { prefix: '/api/v1/videos' });
 await app.register(cloudStorageRoutes, { prefix: '/api/v1/videos' });
 await app.register(cdnRoutes, { prefix: '/api/v1/videos' });
+await app.register(errorAlertingRoutes, { prefix: '/api/v1/videos' });
 await app.register(aiContentGenRoutes, { prefix: '/api/v1/videos' });
 await app.register(examCertificateRoutes, { prefix: '/api/v1/videos' });
 await app.register(communityRoutes, { prefix: '/api/v1/community' });
