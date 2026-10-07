@@ -126,6 +126,44 @@ export function ensureCallingSchema(): void {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS webrtc_signals (
+      id TEXT PRIMARY KEY,
+      call_id TEXT NOT NULL,
+      from_user TEXT NOT NULL,
+      to_user TEXT NOT NULL,
+      signal_type TEXT NOT NULL
+        CHECK (signal_type IN ('webrtc.offer','webrtc.answer','webrtc.ice')),
+      payload TEXT NOT NULL,
+      delivered_at TEXT,
+      consumed_at TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_wsig_to ON webrtc_signals(to_user, consumed_at, created_at);
+    CREATE INDEX IF NOT EXISTS idx_wsig_call ON webrtc_signals(call_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS webrtc_peers (
+      id TEXT PRIMARY KEY,
+      call_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      connection_state TEXT NOT NULL DEFAULT 'new'
+        CHECK (connection_state IN ('new','connecting','connected','disconnected','failed','closed')),
+      sdp_state TEXT NOT NULL DEFAULT 'idle'
+        CHECK (sdp_state IN ('idle','have_local_offer','have_remote_offer','stable','failed')),
+      ice_gathering_state TEXT NOT NULL DEFAULT 'new'
+        CHECK (ice_gathering_state IN ('new','gathering','complete','closed')),
+      ice_candidate_count INTEGER NOT NULL DEFAULT 0,
+      last_connected_at TEXT,
+      last_signal_at TEXT,
+      rtt_ms INTEGER,
+      packet_loss_pct REAL,
+      bitrate_kbps INTEGER,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (call_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_wp_call ON webrtc_peers(call_id);
+    CREATE INDEX IF NOT EXISTS idx_wp_user ON webrtc_peers(user_id);
+
     CREATE TABLE IF NOT EXISTS call_recordings (
       id TEXT PRIMARY KEY,
       call_id TEXT NOT NULL,
@@ -593,4 +631,219 @@ export function buildCallSignal(input: {
     payload: input.payload ?? {},
     created_at: new Date().toISOString(),
   };
+}
+
+// ============================================================
+// 42.11 WebRTC — signaling persistence + peer state
+// Reliable offer/answer/ICE exchange across WS reconnects, plus
+// per-participant connection state for negotiation tracking.
+// ============================================================
+
+export type WebrtcSignalType = 'webrtc.offer' | 'webrtc.answer' | 'webrtc.ice';
+export type WebrtcConnectionState = 'new' | 'connecting' | 'connected' | 'disconnected' | 'failed' | 'closed';
+export type WebrtcSdpState = 'idle' | 'have_local_offer' | 'have_remote_offer' | 'stable' | 'failed';
+export type WebrtcIceGatheringState = 'new' | 'gathering' | 'complete' | 'closed';
+
+export interface WebrtcSignalRow {
+  id: string;
+  call_id: string;
+  from_user: string;
+  to_user: string;
+  signal_type: WebrtcSignalType;
+  payload: string;
+  delivered_at: string | null;
+  consumed_at: string | null;
+  created_at: string;
+}
+
+export interface WebrtcPeer {
+  id: string;
+  call_id: string;
+  user_id: string;
+  connection_state: WebrtcConnectionState;
+  sdp_state: WebrtcSdpState;
+  ice_gathering_state: WebrtcIceGatheringState;
+  ice_candidate_count: number;
+  last_connected_at: string | null;
+  last_signal_at: string | null;
+  rtt_ms: number | null;
+  packet_loss_pct: number | null;
+  bitrate_kbps: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PersistSignalInput {
+  call_id: string;
+  from_user: string;
+  to_user: string;
+  signal_type: WebrtcSignalType;
+  payload: Record<string, unknown>;
+}
+
+const SIGNAL_RETENTION_HOURS = 6;
+
+export function persistSignal(input: PersistSignalInput): WebrtcSignalRow {
+  const db = getDb();
+  // ensure peer rows exist
+  ensurePeer(input.call_id, input.from_user);
+  ensurePeer(input.call_id, input.to_user);
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO webrtc_signals
+    (id, call_id, from_user, to_user, signal_type, payload, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, input.call_id, input.from_user, input.to_user, input.signal_type, JSON.stringify(input.payload ?? {}), now);
+  // bump counters
+  if (input.signal_type === 'webrtc.ice') {
+    db.prepare('UPDATE webrtc_peers SET ice_candidate_count = ice_candidate_count + 1, last_signal_at = ?, updated_at = ? WHERE call_id = ? AND user_id = ?')
+      .run(now, now, input.call_id, input.from_user);
+  } else {
+    const nextSdp = input.signal_type === 'webrtc.offer' ? 'have_local_offer' : 'have_remote_offer';
+    db.prepare('UPDATE webrtc_peers SET sdp_state = ?, last_signal_at = ?, updated_at = ? WHERE call_id = ? AND user_id = ?')
+      .run(nextSdp, now, now, input.call_id, input.from_user);
+    const remoteSdp = input.signal_type === 'webrtc.offer' ? 'have_remote_offer' : 'have_local_offer';
+    db.prepare('UPDATE webrtc_peers SET sdp_state = ?, last_signal_at = ?, updated_at = ? WHERE call_id = ? AND user_id = ?')
+      .run(remoteSdp, now, now, input.call_id, input.to_user);
+  }
+  return db.prepare('SELECT * FROM webrtc_signals WHERE id = ?').get(id) as WebrtcSignalRow;
+}
+
+export function ensurePeer(callId: string, userId: string): WebrtcPeer {
+  const db = getDb();
+  const existing = db.prepare('SELECT * FROM webrtc_peers WHERE call_id = ? AND user_id = ?')
+    .get(callId, userId) as WebrtcPeer | undefined;
+  if (existing) return existing;
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO webrtc_peers (id, call_id, user_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(id, callId, userId, now, now);
+  return db.prepare('SELECT * FROM webrtc_peers WHERE id = ?').get(id) as WebrtcPeer;
+}
+
+export function getPeer(callId: string, userId: string): WebrtcPeer | null {
+  const db = getDb();
+  return (db.prepare('SELECT * FROM webrtc_peers WHERE call_id = ? AND user_id = ?')
+    .get(callId, userId) as WebrtcPeer | undefined) ?? null;
+}
+
+export function listCallPeers(callId: string): WebrtcPeer[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM webrtc_peers WHERE call_id = ? ORDER BY created_at ASC')
+    .all(callId) as WebrtcPeer[];
+}
+
+export interface UpdatePeerStateInput {
+  connection_state?: WebrtcConnectionState;
+  sdp_state?: WebrtcSdpState;
+  ice_gathering_state?: WebrtcIceGatheringState;
+  rtt_ms?: number | null;
+  packet_loss_pct?: number | null;
+  bitrate_kbps?: number | null;
+}
+
+export function updatePeerState(callId: string, userId: string, patch: UpdatePeerStateInput): WebrtcPeer {
+  const db = getDb();
+  ensurePeer(callId, userId);
+  const fields: string[] = [];
+  const vals: unknown[] = [];
+  for (const k of ['connection_state','sdp_state','ice_gathering_state','rtt_ms','packet_loss_pct','bitrate_kbps'] as const) {
+    if (patch[k] !== undefined) { fields.push(`${k} = ?`); vals.push(patch[k]); }
+  }
+  const now = new Date().toISOString();
+  if (patch.connection_state === 'connected') {
+    fields.push('last_connected_at = ?'); vals.push(now);
+  }
+  if (fields.length === 0) return getPeer(callId, userId)!;
+  fields.push('updated_at = ?'); vals.push(now);
+  vals.push(callId, userId);
+  db.prepare(`UPDATE webrtc_peers SET ${fields.join(', ')} WHERE call_id = ? AND user_id = ?`).run(...vals);
+  return getPeer(callId, userId)!;
+}
+
+export interface FetchSignalsOpts {
+  call_id: string;
+  user_id: string;
+  limit?: number;
+  mark_consumed?: boolean;
+}
+
+export function fetchPendingSignals(opts: FetchSignalsOpts): WebrtcSignalRow[] {
+  const db = getDb();
+  const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500);
+  const rows = db.prepare(`
+    SELECT * FROM webrtc_signals
+    WHERE call_id = ? AND to_user = ? AND consumed_at IS NULL
+    ORDER BY created_at ASC LIMIT ?
+  `).all(opts.call_id, opts.user_id, limit) as WebrtcSignalRow[];
+  if (rows.length > 0 && opts.mark_consumed !== false) {
+    const now = new Date().toISOString();
+    const ids = rows.map(r => r.id);
+    const placeholders = ids.map(() => '?').join(',');
+    db.prepare(`UPDATE webrtc_signals SET consumed_at = ?, delivered_at = COALESCE(delivered_at, ?) WHERE id IN (${placeholders})`)
+      .run(now, now, ...ids);
+  }
+  return rows;
+}
+
+export function getSignalHistory(callId: string, limit = 200): WebrtcSignalRow[] {
+  const db = getDb();
+  return db.prepare(
+    'SELECT * FROM webrtc_signals WHERE call_id = ? ORDER BY created_at DESC LIMIT ?'
+  ).all(callId, Math.min(Math.max(limit, 1), 500)) as WebrtcSignalRow[];
+}
+
+export function pruneOldSignals(olderThanHours = SIGNAL_RETENTION_HOURS): { pruned: number } {
+  const db = getDb();
+  const cutoff = new Date(Date.now() - olderThanHours * 3_600_000).toISOString();
+  const r = db.prepare('DELETE FROM webrtc_signals WHERE created_at < ?').run(cutoff);
+  return { pruned: r.changes };
+}
+
+export interface WebrtcPeerSummary {
+  call_id: string;
+  peers: WebrtcPeer[];
+  total: number;
+  connected: number;
+  failed: number;
+  negotiating: number;
+  avg_rtt_ms: number | null;
+}
+
+export function getWebrtcCallSummary(callId: string): WebrtcPeerSummary {
+  const peers = listCallPeers(callId);
+  const rtts = peers.map(p => p.rtt_ms).filter((v): v is number => typeof v === 'number');
+  return {
+    call_id: callId,
+    peers,
+    total: peers.length,
+    connected: peers.filter(p => p.connection_state === 'connected').length,
+    failed: peers.filter(p => p.connection_state === 'failed').length,
+    negotiating: peers.filter(p => p.connection_state === 'connecting' || p.connection_state === 'new').length,
+    avg_rtt_ms: rtts.length > 0 ? Math.round(rtts.reduce((a, b) => a + b, 0) / rtts.length) : null,
+  };
+}
+
+export interface WebrtcGlobalStats {
+  signals_total: number;
+  signals_pending: number;
+  peers_total: number;
+  by_connection_state: Record<string, number>;
+  window_hours: number;
+}
+
+export function getWebrtcGlobalStats(windowHours = 24): WebrtcGlobalStats {
+  const db = getDb();
+  const since = new Date(Date.now() - windowHours * 3_600_000).toISOString();
+  const total = (db.prepare('SELECT COUNT(*) AS c FROM webrtc_signals WHERE created_at >= ?').get(since) as { c: number }).c;
+  const pending = (db.prepare('SELECT COUNT(*) AS c FROM webrtc_signals WHERE consumed_at IS NULL').get() as { c: number }).c;
+  const peersTotal = (db.prepare('SELECT COUNT(*) AS c FROM webrtc_peers').get() as { c: number }).c;
+  const byState = db.prepare('SELECT connection_state, COUNT(*) AS c FROM webrtc_peers GROUP BY connection_state')
+    .all() as Array<{ connection_state: string; c: number }>;
+  const by_connection_state: Record<string, number> = {};
+  for (const r of byState) by_connection_state[r.connection_state] = r.c;
+  return { signals_total: total, signals_pending: pending, peers_total: peersTotal, by_connection_state, window_hours: windowHours };
 }

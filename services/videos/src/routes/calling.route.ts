@@ -11,6 +11,9 @@ import {
   isBlocked, blockUserFromCalls, unblockUserFromCalls, listCallBlocks,
   setDnd, getDnd, canRingUser,
   getIceServers, buildCallSignal,
+  persistSignal, fetchPendingSignals, getSignalHistory, pruneOldSignals,
+  ensurePeer, getPeer, listCallPeers, updatePeerState,
+  getWebrtcCallSummary, getWebrtcGlobalStats,
 } from '../services/calling.service.js';
 
 const CreateCallSchema = z.object({
@@ -38,6 +41,22 @@ const DndSchema = z.object({
   is_enabled: z.boolean(),
   scope: z.enum(['all', 'unknown_only', 'nobody']).optional(),
   allow_from: z.array(z.string().uuid()).max(500).optional(),
+});
+
+const SignalSchema = z.object({
+  call_id: z.string().min(1).max(100),
+  to_user: z.string().min(1).max(100),
+  signal_type: z.enum(['webrtc.offer','webrtc.answer','webrtc.ice']),
+  payload: z.record(z.string(), z.any()),
+});
+
+const PeerStateSchema = z.object({
+  connection_state: z.enum(['new','connecting','connected','disconnected','failed','closed']).optional(),
+  sdp_state: z.enum(['idle','have_local_offer','have_remote_offer','stable','failed']).optional(),
+  ice_gathering_state: z.enum(['new','gathering','complete','closed']).optional(),
+  rtt_ms: z.number().int().min(0).max(60000).nullable().optional(),
+  packet_loss_pct: z.number().min(0).max(100).nullable().optional(),
+  bitrate_kbps: z.number().int().min(0).max(10_000_000).nullable().optional(),
 });
 
 function requireAuthPayload(auth: string | undefined): { sub: string; role: string } {
@@ -383,5 +402,124 @@ export async function callingRoutes(app: FastifyInstance) {
     const { userId } = req.params as { userId: string };
     const blocked = isBlocked(payload.sub, userId);
     return reply.send({ success: true, data: { blocked } });
+  });
+
+  // ============================================================
+  // 42.11 WebRTC — signaling persistence + peer state
+  // ============================================================
+
+  // POST /calls/webrtc/signals  (persist an offer/answer/ICE)
+  app.post('/calls/webrtc/signals', async (req, reply) => {
+    let payload: { sub: string };
+    try { payload = requireAuthPayload(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const parsed = SignalSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', errors: parsed.error.issues });
+    const sig = persistSignal({ ...parsed.data, from_user: payload.sub });
+    // strip payload serialization back to object for client
+    let decoded: Record<string, unknown> = {};
+    try { decoded = JSON.parse(sig.payload); } catch { /* keep {} */ }
+    return reply.code(201).send({ success: true, data: { signal: { ...sig, payload: decoded } } });
+  });
+
+  // GET /calls/webrtc/signals/pending?call_id=X&limit=100
+  app.get('/calls/webrtc/signals/pending', async (req, reply) => {
+    let payload: { sub: string };
+    try { payload = requireAuthPayload(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const q = req.query as { call_id?: string; limit?: string; mark_consumed?: string };
+    if (!q.call_id) return reply.code(400).send({ success: false, error: 'call_id_required' });
+    const rows = fetchPendingSignals({
+      call_id: q.call_id,
+      user_id: payload.sub,
+      limit: q.limit ? Number(q.limit) : 100,
+      mark_consumed: q.mark_consumed !== 'false',
+    });
+    return reply.send({
+      success: true,
+      data: {
+        signals: rows.map(r => {
+          let decoded: Record<string, unknown> = {};
+          try { decoded = JSON.parse(r.payload); } catch { /* */ }
+          return { ...r, payload: decoded };
+        }),
+        total: rows.length,
+      },
+    });
+  });
+
+  // GET /calls/:id/webrtc/signals/history
+  app.get('/calls/:id/webrtc/signals/history', async (req, reply) => {
+    let payload: { sub: string };
+    try { payload = requireAuthPayload(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const q = req.query as { limit?: string };
+    const rows = getSignalHistory(id, q.limit ? Number(q.limit) : 200);
+    return reply.send({
+      success: true,
+      data: {
+        signals: rows.map(r => {
+          let decoded: Record<string, unknown> = {};
+          try { decoded = JSON.parse(r.payload); } catch { /* */ }
+          return { ...r, payload: decoded };
+        }),
+        total: rows.length,
+      },
+    });
+  });
+
+  // POST /calls/webrtc/signals/prune
+  app.post('/calls/webrtc/signals/prune', async (req, reply) => {
+    let payload: { sub: string };
+    try { payload = requireAuthPayload(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const q = req.query as { hours?: string };
+    const r = pruneOldSignals(q.hours ? Number(q.hours) : 6);
+    return reply.send({ success: true, data: r });
+  });
+
+  // GET /calls/:id/webrtc/peers
+  app.get('/calls/:id/webrtc/peers', async (req, reply) => {
+    let payload: { sub: string };
+    try { payload = requireAuthPayload(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    return reply.send({ success: true, data: getWebrtcCallSummary(id) });
+  });
+
+  // GET /calls/:id/webrtc/peers/me
+  app.get('/calls/:id/webrtc/peers/me', async (req, reply) => {
+    let payload: { sub: string };
+    try { payload = requireAuthPayload(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const peer = ensurePeer(id, payload.sub);
+    return reply.send({ success: true, data: { peer } });
+  });
+
+  // PATCH /calls/:id/webrtc/peers/me
+  app.patch('/calls/:id/webrtc/peers/me', async (req, reply) => {
+    let payload: { sub: string };
+    try { payload = requireAuthPayload(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const parsed = PeerStateSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', errors: parsed.error.issues });
+    const peer = updatePeerState(id, payload.sub, parsed.data);
+    return reply.send({ success: true, data: { peer } });
+  });
+
+  // GET /calls/webrtc/stats  (global admin)
+  app.get('/calls/webrtc/stats', async (req, reply) => {
+    let payload: { sub: string; role: string };
+    try { payload = requireAuthPayload(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    if (payload.role !== 'admin' && payload.role !== 'superadmin') {
+      return reply.code(403).send({ success: false, error: 'admin_required' });
+    }
+    const q = req.query as { window_hours?: string };
+    const hours = q.window_hours ? Math.min(Math.max(Number(q.window_hours), 1), 720) : 24;
+    return reply.send({ success: true, data: getWebrtcGlobalStats(hours) });
   });
 }
