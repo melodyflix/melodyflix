@@ -144,6 +144,31 @@ export function ensureAdCampaignSchema(): void {
     CREATE INDEX IF NOT EXISTS idx_ad_impressions_campaign ON ad_impressions(campaign_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_ad_impressions_user ON ad_impressions(user_id, campaign_id, created_at DESC);
 
+    CREATE TABLE IF NOT EXISTS ad_consent_log (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      purpose TEXT NOT NULL,
+      allowed INTEGER NOT NULL,
+      policy_version TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'user',
+      reason TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_consent_log_user ON ad_consent_log(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_consent_log_purpose ON ad_consent_log(purpose, allowed);
+
+    CREATE TABLE IF NOT EXISTS ad_consent_purposes (
+      user_id TEXT NOT NULL,
+      purpose TEXT NOT NULL,
+      allowed INTEGER NOT NULL DEFAULT 0,
+      policy_version TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, purpose)
+    );
+    CREATE INDEX IF NOT EXISTS idx_consent_purposes_user ON ad_consent_purposes(user_id);
+
     CREATE TABLE IF NOT EXISTS ad_user_consents (
       user_id TEXT PRIMARY KEY,
       personalized_allowed INTEGER NOT NULL DEFAULT 0,
@@ -736,4 +761,216 @@ export function getBillingLedger(campaignId: string, limit = 200): BillingLedger
   return db.prepare(
     'SELECT * FROM ad_billing_ledger WHERE campaign_id = ? ORDER BY created_at DESC LIMIT ?'
   ).all(campaignId, Math.max(1, Math.min(1000, limit))) as BillingLedgerEntry[];
+}
+
+// ============================================================
+// 51.19 Consent-Based Ads (extended)
+// Per-purpose consent with versioning + audit log + withdrawal.
+// Purposes: personalized, profiling, third_party, measurement.
+// ============================================================
+
+export const CONSENT_POLICY_VERSION = '2026-10-01';
+export type ConsentPurpose = 'personalized' | 'profiling' | 'third_party' | 'measurement';
+export const CONSENT_PURPOSES: ConsentPurpose[] = ['personalized', 'profiling', 'third_party', 'measurement'];
+
+export interface ConsentLogEntry {
+  id: string;
+  user_id: string;
+  purpose: string;
+  allowed: number;
+  policy_version: string;
+  source: string;
+  reason: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+}
+
+export interface PurposeConsent {
+  purpose: ConsentPurpose;
+  allowed: boolean;
+  policy_version: string;
+  updated_at: string;
+}
+
+export interface FullConsentSnapshot {
+  user_id: string;
+  purposes: PurposeConsent[];
+  personalized_allowed: boolean;
+  policy_version: string;
+  last_updated_at: string | null;
+}
+
+function logConsentChange(
+  userId: string, purpose: string, allowed: boolean,
+  source: string, reason: string | null,
+  ip: string | null, ua: string | null,
+): ConsentLogEntry {
+  const db = getDb();
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO ad_consent_log
+    (id, user_id, purpose, allowed, policy_version, source, reason, ip_address, user_agent, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, userId, purpose, allowed ? 1 : 0, CONSENT_POLICY_VERSION, source,
+    reason, ip, ua, now);
+  return db.prepare('SELECT * FROM ad_consent_log WHERE id = ?').get(id) as ConsentLogEntry;
+}
+
+export interface SetPurposeConsentInput {
+  purpose: ConsentPurpose;
+  allowed: boolean;
+  source?: 'user' | 'admin' | 'import' | 'withdrawal' | 'default';
+  reason?: string | null;
+  ip_address?: string | null;
+  user_agent?: string | null;
+}
+
+export function setPurposeConsent(userId: string, input: SetPurposeConsentInput): PurposeConsent {
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO ad_consent_purposes (user_id, purpose, allowed, policy_version, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(user_id, purpose) DO UPDATE SET
+      allowed = excluded.allowed,
+      policy_version = excluded.policy_version,
+      updated_at = excluded.updated_at
+  `).run(userId, input.purpose, input.allowed ? 1 : 0, CONSENT_POLICY_VERSION, now);
+  logConsentChange(userId, input.purpose, input.allowed,
+    input.source ?? 'user', input.reason ?? null,
+    input.ip_address ?? null, input.user_agent ?? null);
+  // keep legacy single-boolean in sync
+  if (input.purpose === 'personalized') {
+    db.prepare(`
+      INSERT INTO ad_user_consents (user_id, personalized_allowed, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET
+        personalized_allowed = excluded.personalized_allowed,
+        updated_at = excluded.updated_at
+    `).run(userId, input.allowed ? 1 : 0, now);
+  }
+  return { purpose: input.purpose, allowed: input.allowed, policy_version: CONSENT_POLICY_VERSION, updated_at: now };
+}
+
+export function getPurposeConsent(userId: string, purpose: ConsentPurpose): PurposeConsent {
+  const db = getDb();
+  const row = db.prepare(
+    'SELECT purpose, allowed, policy_version, updated_at FROM ad_consent_purposes WHERE user_id = ? AND purpose = ?'
+  ).get(userId, purpose) as { purpose: ConsentPurpose; allowed: number; policy_version: string; updated_at: string } | undefined;
+  if (row) {
+    return { purpose: row.purpose, allowed: row.allowed === 1, policy_version: row.policy_version, updated_at: row.updated_at };
+  }
+  return { purpose, allowed: false, policy_version: CONSENT_POLICY_VERSION, updated_at: '' };
+}
+
+export function getFullConsentSnapshot(userId: string): FullConsentSnapshot {
+  const db = getDb();
+  const rows = db.prepare(
+    'SELECT purpose, allowed, policy_version, updated_at FROM ad_consent_purposes WHERE user_id = ?'
+  ).all(userId) as Array<{ purpose: ConsentPurpose; allowed: number; policy_version: string; updated_at: string }>;
+  const map = new Map(rows.map(r => [r.purpose, r]));
+  const purposes: PurposeConsent[] = CONSENT_PURPOSES.map(p => {
+    const r = map.get(p);
+    return r
+      ? { purpose: p, allowed: r.allowed === 1, policy_version: r.policy_version, updated_at: r.updated_at }
+      : { purpose: p, allowed: false, policy_version: CONSENT_POLICY_VERSION, updated_at: '' };
+  });
+  const legacy = getUserConsent(userId);
+  const lastUpdated = rows.map(r => r.updated_at).sort().pop() ?? null;
+  return {
+    user_id: userId,
+    purposes,
+    personalized_allowed: legacy.personalized_allowed === 1,
+    policy_version: CONSENT_POLICY_VERSION,
+    last_updated_at: lastUpdated,
+  };
+}
+
+export interface BulkSetConsentInput {
+  purposes: Partial<Record<ConsentPurpose, boolean>>;
+  source?: 'user' | 'admin' | 'import' | 'withdrawal' | 'default';
+  reason?: string | null;
+  ip_address?: string | null;
+  user_agent?: string | null;
+}
+
+export function setBulkConsent(userId: string, input: BulkSetConsentInput): FullConsentSnapshot {
+  for (const p of CONSENT_PURPOSES) {
+    const v = input.purposes[p];
+    if (v === undefined) continue;
+    setPurposeConsent(userId, {
+      purpose: p, allowed: v,
+      source: input.source ?? 'user', reason: input.reason ?? null,
+      ip_address: input.ip_address ?? null, user_agent: input.user_agent ?? null,
+    });
+  }
+  return getFullConsentSnapshot(userId);
+}
+
+export function withdrawAllConsent(userId: string, reason: string | null = 'user_withdrawal'): FullConsentSnapshot {
+  return setBulkConsent(userId, {
+    purposes: { personalized: false, profiling: false, third_party: false, measurement: false },
+    source: 'withdrawal',
+    reason,
+  });
+}
+
+export function getConsentLog(userId: string, limit = 100): ConsentLogEntry[] {
+  const db = getDb();
+  return db.prepare(
+    'SELECT * FROM ad_consent_log WHERE user_id = ? ORDER BY created_at DESC LIMIT ?'
+  ).all(userId, Math.min(Math.max(limit, 1), 500)) as ConsentLogEntry[];
+}
+
+export function getConsentLogForPurpose(purpose: string, allowed?: boolean, limit = 200): ConsentLogEntry[] {
+  const db = getDb();
+  if (typeof allowed === 'boolean') {
+    return db.prepare(
+      'SELECT * FROM ad_consent_log WHERE purpose = ? AND allowed = ? ORDER BY created_at DESC LIMIT ?'
+    ).all(purpose, allowed ? 1 : 0, Math.min(Math.max(limit, 1), 500)) as ConsentLogEntry[];
+  }
+  return db.prepare(
+    'SELECT * FROM ad_consent_log WHERE purpose = ? ORDER BY created_at DESC LIMIT ?'
+  ).all(purpose, Math.min(Math.max(limit, 1), 500)) as ConsentLogEntry[];
+}
+
+export function isPurposeAllowed(userId: string | null, purpose: ConsentPurpose): boolean {
+  if (!userId) return false;
+  const db = getDb();
+  const row = db.prepare(
+    'SELECT allowed FROM ad_consent_purposes WHERE user_id = ? AND purpose = ?'
+  ).get(userId, purpose) as { allowed: number } | undefined;
+  return row?.allowed === 1;
+}
+
+export interface ConsentStats {
+  total_users_with_purpose_consent: number;
+  by_purpose: Record<string, { granted: number; denied: number }>;
+  changes_last_7d: number;
+  withdrawals_last_30d: number;
+  policy_version: string;
+}
+
+export function getConsentStats(): ConsentStats {
+  const db = getDb();
+  const total = (db.prepare('SELECT COUNT(DISTINCT user_id) AS c FROM ad_consent_purposes').get() as { c: number }).c;
+  const by_purpose: Record<string, { granted: number; denied: number }> = {};
+  for (const p of CONSENT_PURPOSES) {
+    const g = (db.prepare('SELECT COUNT(*) AS c FROM ad_consent_purposes WHERE purpose = ? AND allowed = 1').get(p) as { c: number }).c;
+    const d = (db.prepare('SELECT COUNT(*) AS c FROM ad_consent_purposes WHERE purpose = ? AND allowed = 0').get(p) as { c: number }).c;
+    by_purpose[p] = { granted: g, denied: d };
+  }
+  const since7 = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const changes7 = (db.prepare('SELECT COUNT(*) AS c FROM ad_consent_log WHERE created_at >= ?').get(since7) as { c: number }).c;
+  const since30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const withdrawals30 = (db.prepare("SELECT COUNT(*) AS c FROM ad_consent_log WHERE created_at >= ? AND source = 'withdrawal'").get(since30) as { c: number }).c;
+  return {
+    total_users_with_purpose_consent: total,
+    by_purpose,
+    changes_last_7d: changes7,
+    withdrawals_last_30d: withdrawals30,
+    policy_version: CONSENT_POLICY_VERSION,
+  };
 }

@@ -11,7 +11,22 @@ import {
   getCampaignAnalytics, getCampaignDaily,
   getBillingReport, getBillingLedger,
   getUserConsent, setUserConsent,
+  CONSENT_PURPOSES, CONSENT_POLICY_VERSION,
+  setPurposeConsent, getPurposeConsent, getFullConsentSnapshot,
+  setBulkConsent, withdrawAllConsent, getConsentLog,
+  getConsentLogForPurpose, isPurposeAllowed, getConsentStats,
 } from '../services/adcampaign.service.js';
+
+// Fastify preHandler wrapper for shared-auth requireAuth
+function authGuard(req: any, reply: any, done: (err?: Error) => void): void {
+  try {
+    const payload = requireAuth(req.headers.authorization);
+    req.user = payload;
+    done();
+  } catch (err) {
+    reply.code(401).send({ success: false, error: (err as Error).message });
+  }
+}
 
 const FormatEnum = z.enum(['banner', 'overlay', 'pre-roll', 'mid-roll', 'post-roll', 'native', 'sponsored-card']);
 const StatusEnum = z.enum(['draft', 'pending_review', 'approved', 'rejected', 'active', 'paused', 'completed', 'archived']);
@@ -289,17 +304,115 @@ export async function adCampaignRoutes(app: FastifyInstance) {
   });
 
   // ============ Consent (51.19) ============
-  app.get('/ads/consent', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/ads/consent', { preHandler: [authGuard] }, async (req, reply) => {
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     return reply.send({ success: true, data: getUserConsent(userId) });
   });
 
-  app.put('/ads/consent', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/ads/consent', { preHandler: [authGuard] }, async (req, reply) => {
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = z.object({ personalized_allowed: z.boolean() }).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body' });
     return reply.send({ success: true, data: setUserConsent(userId, parsed.data.personalized_allowed) });
+  });
+
+  // ============ 51.19 EXTENDED CONSENT ============
+
+  // GET /ads/consent/full — per-purpose snapshot
+  app.get('/ads/consent/full', { preHandler: [authGuard] }, async (req, reply) => {
+    const userId = (req as any).user?.sub;
+    if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    return reply.send({ success: true, data: getFullConsentSnapshot(userId) });
+  });
+
+  // PUT /ads/consent/purpose — set single purpose
+  app.put('/ads/consent/purpose', { preHandler: [authGuard] }, async (req, reply) => {
+    const userId = (req as any).user?.sub;
+    if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const parsed = z.object({
+      purpose: z.enum(CONSENT_PURPOSES as [string, ...string[]]),
+      allowed: z.boolean(),
+      reason: z.string().max(500).nullable().optional(),
+    }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', errors: parsed.error.issues });
+    const result = setPurposeConsent(userId, {
+      purpose: parsed.data.purpose as any,
+      allowed: parsed.data.allowed,
+      reason: parsed.data.reason ?? null,
+      source: 'user',
+      ip_address: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.ip ?? null,
+      user_agent: req.headers['user-agent'] ?? null,
+    });
+    return reply.send({ success: true, data: result });
+  });
+
+  // PUT /ads/consent/bulk — set multiple purposes at once
+  app.put('/ads/consent/bulk', { preHandler: [authGuard] }, async (req, reply) => {
+    const userId = (req as any).user?.sub;
+    if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const parsed = z.object({
+      purposes: z.record(z.string(), z.boolean()),
+      reason: z.string().max(500).nullable().optional(),
+    }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body' });
+    const snapshot = setBulkConsent(userId, {
+      purposes: parsed.data.purposes as any,
+      source: 'user',
+      reason: parsed.data.reason ?? null,
+      ip_address: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.ip ?? null,
+      user_agent: req.headers['user-agent'] ?? null,
+    });
+    return reply.send({ success: true, data: snapshot });
+  });
+
+  // POST /ads/consent/withdraw-all — GDPR withdrawal
+  app.post('/ads/consent/withdraw-all', { preHandler: [authGuard] }, async (req, reply) => {
+    const userId = (req as any).user?.sub;
+    if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const parsed = z.object({ reason: z.string().max(500).nullable().optional() }).safeParse(req.body ?? {});
+    const snapshot = withdrawAllConsent(userId, parsed.success ? (parsed.data.reason ?? null) : null);
+    return reply.send({ success: true, data: snapshot });
+  });
+
+  // GET /ads/consent/log — audit log
+  app.get('/ads/consent/log', { preHandler: [authGuard] }, async (req, reply) => {
+    const userId = (req as any).user?.sub;
+    if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const q = req.query as { limit?: string };
+    const limit = q.limit ? Math.min(Math.max(Number(q.limit), 1), 500) : 100;
+    return reply.send({ success: true, data: { log: getConsentLog(userId, limit) } });
+  });
+
+  // GET /ads/consent/check/:purpose — quick check for a purpose
+  app.get('/ads/consent/check/:purpose', { preHandler: [authGuard] }, async (req, reply) => {
+    const userId = (req as any).user?.sub;
+    if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const { purpose } = req.params as { purpose: string };
+    if (!CONSENT_PURPOSES.includes(purpose as any)) {
+      return reply.code(400).send({ success: false, error: 'invalid_purpose' });
+    }
+    return reply.send({ success: true, data: { purpose, allowed: isPurposeAllowed(userId, purpose as any) } });
+  });
+
+  // GET /ads/consent/stats — admin
+  app.get('/ads/consent/stats', { preHandler: [authGuard] }, async (req, reply) => {
+    const role = (req as any).user?.role;
+    if (role !== 'admin' && role !== 'superadmin') {
+      return reply.code(403).send({ success: false, error: 'admin_required' });
+    }
+    return reply.send({ success: true, data: getConsentStats() });
+  });
+
+  // GET /ads/consent/policy — public policy version + purpose list
+  app.get('/ads/consent/policy', async (_req, reply) => {
+    return reply.send({
+      success: true,
+      data: {
+        policy_version: CONSENT_POLICY_VERSION,
+        purposes: CONSENT_PURPOSES,
+      },
+    });
   });
 }
