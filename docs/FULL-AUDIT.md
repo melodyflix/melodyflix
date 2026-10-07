@@ -326,7 +326,7 @@
 | 11.14 | Fraud Detection | [DONE] sections/section-11-security-privacy/ |
 | 11.15 | Rate Limiting | [DONE] sections/section-11-security-privacy/ |
 | 11.16 | Passkey Login | [DONE] sections/section-11-security-privacy/ |
-| 11.17 | DDoS Protection | [TODO] Nginx level |
+| 11.17 | DDoS Protection | [DONE] scripts/nginx/ddos-protection.conf + sysctl-ddos.conf |
 | 11.18 | Web Application Firewall | [TODO] |
 | 11.19 | Secret/Key Management | [TODO] |
 | 11.20 | Incident Detection | [TODO] |
