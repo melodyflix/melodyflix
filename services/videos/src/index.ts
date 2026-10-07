@@ -350,6 +350,7 @@ await app.register(liveCollabRoutes, { prefix: '/api/v1/videos' });
 await app.register(contentIngestRoutes, { prefix: '/api/v1/admin' });
 await app.register(educationRoutes, { prefix: '/api/v1/videos' });
 await app.register(aiTutorRoutes, { prefix: '/api/v1/videos' });
+await app.register(seriesRoutes, { prefix: '/api/v1/videos' });
 await app.register(aiContentGenRoutes, { prefix: '/api/v1/videos' });
 await app.register(examCertificateRoutes, { prefix: '/api/v1/videos' });
 await app.register(communityRoutes, { prefix: '/api/v1/community' });

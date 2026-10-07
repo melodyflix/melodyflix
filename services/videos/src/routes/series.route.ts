@@ -9,6 +9,9 @@ import {
   createEpisode, listEpisodes, listAllEpisodesForSeries,
   getEpisodeByVideo, updateEpisode, deleteEpisode,
   getNextEpisode, getSeriesWithSeasons,
+  scheduleRelease, updateRelease, deleteRelease,
+  listReleaseCalendar, listUpcomingReleases, listOverdueReleases,
+  detectMissingEpisodes, detectAllMissingEpisodes,
 } from '../services/series.service.js';
 import { getDb } from '@melodyflix/shared-db';
 
@@ -59,6 +62,22 @@ const UpdateEpisodeSchema = z.object({
   skip_recap_seconds: z.number().min(0).max(600).optional(),
   skip_credits_seconds: z.number().min(0).max(600).optional(),
   air_date: z.string().optional(),
+});
+
+const ScheduleReleaseSchema = z.object({
+  season_id: z.string().min(1),
+  episode_number: z.number().int().min(1).max(10000),
+  title: z.string().min(1).max(200),
+  planned_air_date: z.string().min(4).max(40),
+  note: z.string().max(1000).nullable().optional(),
+});
+
+const UpdateReleaseSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  planned_air_date: z.string().min(4).max(40).optional(),
+  status: z.enum(['planned','released','delayed','cancelled']).optional(),
+  note: z.string().max(1000).nullable().optional(),
+  episode_id: z.string().max(100).nullable().optional(),
 });
 
 export async function seriesRoutes(app: FastifyInstance) {
@@ -290,5 +309,103 @@ export async function seriesRoutes(app: FastifyInstance) {
         next_video: next.video,
       },
     });
+  });
+
+  // ============ 75.3 RELEASE CALENDAR ============
+
+  // POST /api/v1/videos/series/:id/releases
+  app.post('/series/:id/releases', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const parsed = ScheduleReleaseSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+    const db = getDb();
+    const channel = db.prepare('SELECT id FROM channels WHERE owner_id = ?').get(user.sub) as { id: string } | undefined;
+    if (!channel) return reply.code(400).send({ success: false, error: 'No channel' });
+    try {
+      const { id } = req.params as { id: string };
+      const entry = scheduleRelease({ series_id: id, ...parsed.data }, channel.id);
+      return reply.code(201).send({ success: true, data: entry });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // GET /api/v1/videos/series/:id/releases
+  app.get('/series/:id/releases', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const releases = listReleaseCalendar(id);
+    return reply.send({ success: true, data: { releases } });
+  });
+
+  // PATCH /api/v1/videos/releases/:releaseId
+  app.patch('/releases/:releaseId', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const parsed = UpdateReleaseSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+    const db = getDb();
+    const channel = db.prepare('SELECT id FROM channels WHERE owner_id = ?').get(user.sub) as { id: string } | undefined;
+    if (!channel) return reply.code(400).send({ success: false, error: 'No channel' });
+    try {
+      const { releaseId } = req.params as { releaseId: string };
+      const updated = updateRelease(releaseId, channel.id, parsed.data);
+      return reply.send({ success: true, data: updated });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // DELETE /api/v1/videos/releases/:releaseId
+  app.delete('/releases/:releaseId', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const db = getDb();
+    const channel = db.prepare('SELECT id FROM channels WHERE owner_id = ?').get(user.sub) as { id: string } | undefined;
+    if (!channel) return reply.code(400).send({ success: false, error: 'No channel' });
+    try {
+      const { releaseId } = req.params as { releaseId: string };
+      deleteRelease(releaseId, channel.id);
+      return reply.send({ success: true, data: { deleted: true } });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // GET /api/v1/videos/releases/upcoming?days=90
+  app.get('/releases/upcoming', async (req, reply) => {
+    const q = req.query as { days?: string; limit?: string };
+    const days = Math.min(Math.max(Number(q.days ?? 90), 1), 730);
+    const limit = Math.min(Math.max(Number(q.limit ?? 100), 1), 500);
+    const releases = listUpcomingReleases(days, limit);
+    return reply.send({ success: true, data: { releases } });
+  });
+
+  // GET /api/v1/videos/releases/overdue
+  app.get('/releases/overdue', async (req, reply) => {
+    const releases = listOverdueReleases();
+    return reply.send({ success: true, data: { releases } });
+  });
+
+  // ============ 75.4 MISSING EPISODE DETECTION ============
+
+  // GET /api/v1/videos/series/:id/missing-episodes
+  app.get('/series/:id/missing-episodes', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    try {
+      const report = detectMissingEpisodes(id);
+      return reply.send({ success: true, data: report });
+    } catch (err) {
+      return reply.code(404).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // GET /api/v1/videos/releases/missing-all
+  app.get('/releases/missing-all', async (req, reply) => {
+    const reports = detectAllMissingEpisodes();
+    return reply.send({ success: true, data: { reports, total: reports.length } });
   });
 }

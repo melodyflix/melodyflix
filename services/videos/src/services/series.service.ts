@@ -92,6 +92,24 @@ export function ensureSeriesSchema(): void {
     );
     CREATE INDEX IF NOT EXISTS idx_episodes_series ON episodes(series_id);
     CREATE INDEX IF NOT EXISTS idx_episodes_video ON episodes(video_id);
+
+    CREATE TABLE IF NOT EXISTS series_release_calendar (
+      id TEXT PRIMARY KEY,
+      series_id TEXT NOT NULL,
+      season_id TEXT NOT NULL,
+      episode_number INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      planned_air_date TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'planned'
+        CHECK (status IN ('planned','released','delayed','cancelled')),
+      note TEXT,
+      episode_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (series_id, season_id, episode_number)
+    );
+    CREATE INDEX IF NOT EXISTS idx_release_series ON series_release_calendar(series_id, planned_air_date);
+    CREATE INDEX IF NOT EXISTS idx_release_status ON series_release_calendar(status, planned_air_date);
   `);
 }
 
@@ -411,4 +429,187 @@ export function getSeriesWithSeasons(seriesId: string): {
     episodes: listEpisodes(s.id),
   }));
   return { series, seasons };
+}
+
+// ---------- 75.3 Release Calendar ----------
+
+export interface ReleaseEntry {
+  id: string;
+  series_id: string;
+  season_id: string;
+  episode_number: number;
+  title: string;
+  planned_air_date: string;
+  status: 'planned' | 'released' | 'delayed' | 'cancelled';
+  note: string | null;
+  episode_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScheduleReleaseInput {
+  series_id: string;
+  season_id: string;
+  episode_number: number;
+  title: string;
+  planned_air_date: string;
+  note?: string | null;
+}
+
+export function scheduleRelease(input: ScheduleReleaseInput, channelId: string): ReleaseEntry {
+  const db = getDb();
+  const series = getSeriesById(input.series_id);
+  if (!series) throw new Error('Series not found');
+  if (series.channel_id !== channelId) throw new Error('Not authorized');
+  const season = getSeasonById(input.season_id);
+  if (!season || season.series_id !== input.series_id) throw new Error('Invalid season');
+  const now = new Date().toISOString();
+  const id = randomUUID();
+  db.prepare(`
+    INSERT INTO series_release_calendar
+    (id, series_id, season_id, episode_number, title, planned_air_date, status, note, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, 'planned', ?, ?, ?)
+  `).run(id, input.series_id, input.season_id, input.episode_number, input.title.trim(),
+    input.planned_air_date, input.note ?? null, now, now);
+  return db.prepare('SELECT * FROM series_release_calendar WHERE id = ?').get(id) as ReleaseEntry;
+}
+
+export interface UpdateReleaseInput {
+  title?: string;
+  planned_air_date?: string;
+  status?: 'planned' | 'released' | 'delayed' | 'cancelled';
+  note?: string | null;
+  episode_id?: string | null;
+}
+
+export function updateRelease(id: string, channelId: string, patch: UpdateReleaseInput): ReleaseEntry {
+  const db = getDb();
+  const existing = db.prepare('SELECT * FROM series_release_calendar WHERE id = ?').get(id) as ReleaseEntry | undefined;
+  if (!existing) throw new Error('Release entry not found');
+  const series = getSeriesById(existing.series_id);
+  if (!series || series.channel_id !== channelId) throw new Error('Not authorized');
+  const f: string[] = [];
+  const v: unknown[] = [];
+  for (const k of ['title','planned_air_date','status','note','episode_id'] as const) {
+    if (patch[k] !== undefined) { f.push(`${k} = ?`); v.push(patch[k]); }
+  }
+  if (!f.length) return existing;
+  f.push('updated_at = ?'); v.push(new Date().toISOString());
+  v.push(id);
+  db.prepare(`UPDATE series_release_calendar SET ${f.join(', ')} WHERE id = ?`).run(...v);
+  return db.prepare('SELECT * FROM series_release_calendar WHERE id = ?').get(id) as ReleaseEntry;
+}
+
+export function deleteRelease(id: string, channelId: string): void {
+  const db = getDb();
+  const existing = db.prepare('SELECT * FROM series_release_calendar WHERE id = ?').get(id) as ReleaseEntry | undefined;
+  if (!existing) return;
+  const series = getSeriesById(existing.series_id);
+  if (!series || series.channel_id !== channelId) throw new Error('Not authorized');
+  db.prepare('DELETE FROM series_release_calendar WHERE id = ?').run(id);
+}
+
+export function listReleaseCalendar(seriesId: string): ReleaseEntry[] {
+  const db = getDb();
+  return db.prepare(
+    'SELECT * FROM series_release_calendar WHERE series_id = ? ORDER BY planned_air_date ASC'
+  ).all(seriesId) as ReleaseEntry[];
+}
+
+export interface UpcomingRelease extends ReleaseEntry {
+  series_title: string;
+}
+
+export function listUpcomingReleases(daysAhead = 90, limit = 100): UpcomingRelease[] {
+  const db = getDb();
+  const now = new Date();
+  const until = new Date(now.getTime() + daysAhead * 86_400_000).toISOString();
+  return db.prepare(`
+    SELECT r.*, s.title AS series_title
+    FROM series_release_calendar r
+    JOIN series s ON s.id = r.series_id
+    WHERE r.status IN ('planned','delayed')
+      AND r.planned_air_date >= ?
+      AND r.planned_air_date <= ?
+    ORDER BY r.planned_air_date ASC
+    LIMIT ?
+  `).all(now.toISOString(), until, limit) as UpcomingRelease[];
+}
+
+export function listOverdueReleases(): UpcomingRelease[] {
+  const db = getDb();
+  const now = new Date().toISOString();
+  return db.prepare(`
+    SELECT r.*, s.title AS series_title
+    FROM series_release_calendar r
+    JOIN series s ON s.id = r.series_id
+    WHERE r.status = 'planned' AND r.planned_air_date < ?
+    ORDER BY r.planned_air_date ASC
+  `).all(now) as UpcomingRelease[];
+}
+
+// ---------- 75.4 Missing Episode Detection ----------
+
+export interface EpisodeGap {
+  season_id: string;
+  season_number: number;
+  expected_from: number;
+  expected_to: number;
+  missing: number[];
+  present_count: number;
+  max_episode_number: number;
+}
+
+export interface MissingEpisodesReport {
+  series_id: string;
+  series_title: string;
+  seasons: EpisodeGap[];
+  total_missing: number;
+}
+
+export function detectMissingEpisodes(seriesId: string): MissingEpisodesReport {
+  const db = getDb();
+  const series = getSeriesById(seriesId);
+  if (!series) throw new Error('Series not found');
+  const seasons = listSeasons(seriesId);
+  const gaps: EpisodeGap[] = [];
+  for (const s of seasons) {
+    const eps = listEpisodes(s.id);
+    if (eps.length === 0) continue;
+    const numbers = eps.map(e => e.episode_number).sort((a, b) => a - b);
+    const maxNum = numbers[numbers.length - 1];
+    const present = new Set(numbers);
+    const missing: number[] = [];
+    for (let i = 1; i <= maxNum; i++) {
+      if (!present.has(i)) missing.push(i);
+    }
+    if (missing.length > 0) {
+      gaps.push({
+        season_id: s.id,
+        season_number: s.season_number,
+        expected_from: 1,
+        expected_to: maxNum,
+        missing,
+        present_count: numbers.length,
+        max_episode_number: maxNum,
+      });
+    }
+  }
+  return {
+    series_id: seriesId,
+    series_title: series.title,
+    seasons: gaps,
+    total_missing: gaps.reduce((sum, g) => sum + g.missing.length, 0),
+  };
+}
+
+export function detectAllMissingEpisodes(): MissingEpisodesReport[] {
+  const db = getDb();
+  const all = db.prepare('SELECT id FROM series').all() as { id: string }[];
+  const out: MissingEpisodesReport[] = [];
+  for (const s of all) {
+    const r = detectMissingEpisodes(s.id);
+    if (r.total_missing > 0) out.push(r);
+  }
+  return out;
 }
