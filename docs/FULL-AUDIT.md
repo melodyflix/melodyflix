@@ -353,8 +353,8 @@
 ## Section 13 — Education and AI Tuition
 
 | 13.1 | Course | [DONE] education.service.ts (global) |
-| 13.2 | Exam | [PARTIAL] structure ready |
-| 13.3 | Certificate | [TODO] |
+| 13.2 | Exam | [DONE] exam.service.ts (13.20-13.23) |
+| 13.3 | Certificate | [DONE] certificate.service.ts (13.24-13.27) |
 | 13.4 | Help Center | [DONE] support.service.ts |
 | 13.5 | Support Ticket | [DONE] support.service.ts |
 | 13.6 | Student Question Submission | [DONE] ai-tutor.service.ts |
