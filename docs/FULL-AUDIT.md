@@ -285,7 +285,7 @@
 | 9.3 | Heatmap | [DONE] |
 | 9.4 | A/B Testing | [DONE] |
 | 9.5 | Online Editor | [DONE] editor.service.ts |
-| 9.6 | Screen Recorder | [TODO] |
+| 9.6 | Screen Recorder | [DONE] screen-recorder.service.ts |
 | 9.7 | End Screen/Cards | [DONE] overlays.service.ts |
 | 9.8 | Channel Analytics Dashboard | [DONE] |
 | 9.9 | Subscriber Milestones | [DONE] |
