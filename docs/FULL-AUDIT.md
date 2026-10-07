@@ -385,8 +385,8 @@
 ## Section 14 — Personalization
 
 | 14.1 | Custom Feed | [DONE] discovery |
-| 14.2 | Interest Profile | [PARTIAL] discovery |
-| 14.3 | Keyword/Channel Block | [TODO] |
+| 14.2 | Interest Profile | [DONE] preferences.service.ts |
+| 14.3 | Keyword/Channel Block | [DONE] preferences.service.ts |
 | 14.4 | Reminder | [DONE] events.service.ts |
 | 14.5 | Default Quality Settings | [DONE] preferences.service.ts |
 | 14.6 | Autoplay Preferences | [DONE] preferences.service.ts |
