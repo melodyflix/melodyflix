@@ -851,8 +851,8 @@ All items [TODO] — separate client app
 
 | 61.1 | Thumbnail A/B Testing | [DONE] creatorstudio |
 | 61.2 | Title Testing | [DONE] |
-| 61.3 | Description Testing | [PARTIAL] |
-| 61.4 | Publishing-Time Testing | [TODO] |
+| 61.3 | Description Testing | [DONE] creatorstudio.service.ts |
+| 61.4 | Publishing-Time Testing | [DONE] creatorstudio.service.ts |
 
 ## Section 62 — API Management
 
