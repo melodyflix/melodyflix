@@ -346,7 +346,7 @@
 | 12.8 | Centralized Logging | [DONE] shared-logger |
 | 12.9 | Error Alerting | [DONE] error-alerting.service |
 | 12.10 | Auto Scaling | [DONE] autoscaling.service |
-| 12.11 | Deployment Rollback | [TODO] |
+| 12.11 | Deployment Rollback | [DONE] rollback.service |
 | 12.12 | Multi-Region Replication | [TODO] |
 | 12.13 | Automated Failover | [DONE] failover.service |
 
