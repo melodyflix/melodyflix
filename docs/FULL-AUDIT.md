@@ -509,19 +509,19 @@ All 12 items [DONE] accessibility.service (16.1–16.12)
 | 26.2 | Audience Demographics | [DONE] |
 | 26.3 | Traffic Source Tracking | [DONE] |
 | 26.4 | Revenue Reports | [DONE] |
-| 26.5 | Report Export (PDF/CSV) | [TODO] |
-| 26.6 | Predictive Analytics | [TODO] |
-| 26.7 | Churn Rate Analysis | [TODO] |
-| 26.8 | Lifetime Value (LTV) | [TODO] |
-| 26.9 | Cohort Analysis | [TODO] |
-| 26.10 | Funnel Analysis | [TODO] |
+| 26.5 | Report Export (PDF/CSV) | [DONE] analytics-core |
+| 26.6 | Predictive Analytics | [DONE] analytics-core |
+| 26.7 | Churn Rate Analysis | [DONE] analytics-core |
+| 26.8 | Lifetime Value (LTV) | [DONE] analytics-core |
+| 26.9 | Cohort Analysis | [DONE] analytics-advanced |
+| 26.10 | Funnel Analysis | [DONE] analytics-advanced |
 | 26.11 | Watch Time Tracking | [DONE] |
 | 26.12 | Completion Rate | [DONE] |
-| 26.13 | Re-watch Analytics | [PARTIAL] |
+| 26.13 | Re-watch Analytics | [DONE] analytics-advanced |
 | 26.14 | Drop-off Points | [DONE] |
 | 26.15 | Click Tracking | [DONE] |
-| 26.16 | Scroll Depth Analysis | [TODO] |
-| 26.17 | Session Recording | [TODO] |
+| 26.16 | Scroll Depth Analysis | [DONE] analytics-advanced |
+| 26.17 | Session Recording | [DONE] analytics-advanced |
 | 26.18 | Heatmap Analysis | [DONE] creatorstudio |
 
 ## Section 27 — Marketing Tools
