@@ -845,7 +845,7 @@ All items [TODO] — separate client app
 | 60.1 | Manual Review Queue | [DONE] admin |
 | 60.2 | Flagged Content Dashboard | [DONE] |
 | 60.3 | Moderator Notes | [DONE] |
-| 60.4 | Appeal Review | [TODO] |
+| 60.4 | Appeal Review | [DONE] moderation-appeal.service.ts |
 
 ## Section 61 — Content Experiments
 
