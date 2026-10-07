@@ -348,7 +348,7 @@
 | 12.10 | Auto Scaling | [TODO] |
 | 12.11 | Deployment Rollback | [TODO] |
 | 12.12 | Multi-Region Replication | [TODO] |
-| 12.13 | Automated Failover | [PARTIAL] multicam failover |
+| 12.13 | Automated Failover | [DONE] failover.service |
 
 ## Section 13 — Education and AI Tuition
 
