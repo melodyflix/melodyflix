@@ -607,10 +607,10 @@ All items [TODO] — mobile apps separately built
 
 ## Section 36 — Gamification
 
-| 36.1 | Points System | [TODO] |
-| 36.2 | Challenges/Missions | [TODO] |
-| 36.3 | Rewards Program | [TODO] |
-| 36.4 | Streak Tracking | [TODO] |
+| 36.1 | Points System | [DONE] gamification.service.ts |
+| 36.2 | Challenges/Missions | [DONE] gamification.service.ts |
+| 36.3 | Rewards Program | [DONE] gamification.service.ts |
+| 36.4 | Streak Tracking | [DONE] gamification.service.ts |
 
 ## Section 37 — Auto Content Upload System
 
