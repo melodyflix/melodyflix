@@ -1,8 +1,10 @@
 # MelodyFlix — Chat Handoff Context
 
-> Session ended: 2026-10-05
-> Last commit: b6a034e (main, origin/main)
+> Session ended: 2026-10-07
+> Last commit: fd7d769 (main, origin/main)
 > Purpose: Context for continuing work in a new chat
+>
+> Latest section: Tier 1 = 100% COMPLETE (10 sections, 15 items)
 
 ---
 
@@ -255,3 +257,156 @@ Prompt rules (re-enforced):
    - Create: .../geo-blocking.route.ts
    - Add MaxMind integration to integration-settings DEFAULTS
    - Register route in services/videos/src/index.ts
+
+---
+
+## SESSION 2026-10-07 (Tier 1 Complete — 10 sections)
+
+> Session ended: 2026-10-07
+> Last commit: fd7d769 (main, origin/main)
+
+### Goal
+Finish all Tier 1 backlog sections (small TODO count, mostly already
+partial). Deliverable: 10 sections → 100%, marked DONE in FULL-AUDIT.md.
+
+### Sections completed (15 items, 20 commits)
+
+| Section | Items | Feature commit | Audit commit |
+|---|---|---|---|
+| 75 Series Management | 75.3, 75.4 | 8f5ef29 | 0cd55b2 |
+| 13 Education | 13.2, 13.3 | — (audit-only) | ced28e3 |
+| 14 Personalization | 14.2, 14.3 | f6770e3 | 998cad9 |
+| 57 Premium Features | 57.1, 57.3 | 45db320 | df9b27a |
+| 61 Content Experiments | 61.3, 61.4 | f0d77be | fb0bfaf |
+| 90 Message Delivery | 90.2, 90.3 | ddacff5 | 19e62d5 |
+| 9 Creator Tools | 9.6 | 53664ce | c677a73 |
+| 42 Streaming Performance | 42.11 | 1eca048 | 4e522df |
+| 51 Ad Management | 51.19 | 196824b | acdb915 |
+| 60 Content Moderation | 60.4 | 5bb96d0 | fd7d769 |
+
+### What was built
+
+**75.3 Release Calendar + 75.4 Missing Episode Detection** — series.service.ts
+gains series_release_calendar table, scheduleRelease/update/delete,
+listUpcoming/listOverdue, detectMissingEpisodes (per-season gap finder),
+detectAllMissingEpisodes. Fixed pre-existing bug: seriesRoutes was
+imported but never registered.
+
+**13.2 Exam + 13.3 Certificate** — audit-only. Both were already fully
+implemented inside exam.service.ts (covers 13.20-13.23) and
+certificate.service.ts (covers 13.24-13.27). Marked DONE.
+
+**14.2 Interest Profile + 14.3 Keyword/Channel Block** —
+preferences.service.ts gains user_interest_profile (weighted topics,
+30-day half-life decay on read, rebuild from video_views genres) and
+user_blocked_keywords + user_blocked_channels (isContentBlocked,
+filterBlockedContent batch helper).
+
+**57.1 Early Access + 57.3 Ad-Free** — membership.service.ts gains
+content_early_access (per-video early window; canAccessEarly 4-state
+decision) and premium_ad_free (grant/revoke/isAdFree with membership
+fallback). Fixed pre-existing bug: membershipRoutes was never imported
+or registered.
+
+**61.3 Description Testing + 61.4 Publishing-Time Testing** —
+creatorstudio.service.ts ABTestType extended to 'description' with
+winner-apply branch; new publish_time_tests + publish_time_slots
+(multi-slot experiments, score = 24h_views + 5*likes + 3*comments,
+getBestPublishHours heatmap). Fixed 18 broken preHandler:[requireAuth]
+in creatorstudio.route.ts + checkChannelOwner channels-table fallback.
+
+**90.2 Retry Rules + 90.3 Delivery Tracking** — notification.service.ts
+gains delivery_retry_rules (wildcard '*' supported; 4 defaults seeded;
+exponential backoff) and delivery_attempts (per-attempt status, retry
+scheduling, success_rate stats). Confirms audit "queue.service.ts"
+reference was wrong — that's watch_queue in videos.
+
+**9.6 Screen Recorder** — new screen-recorder.service.ts +
+screen-recorder.route.ts. Session lifecycle: recording -> paused ->
+uploading -> ready. Chunk-level idempotency; finishSession optionally
+creates a draft video row. 12 routes.
+
+**42.11 WebRTC** — calling.service.ts gains webrtc_signals (offer/
+answer/ICE persistence with consumed_at, survives WS reconnect) and
+webrtc_peers (per call+user negotiation state, RTT, bitrate). Fixed
+pre-existing bug: calling.route.ts used preHandler:[requireAuth].
+
+**51.19 Consent-Based Ads** — adcampaign.service.ts gains
+ad_consent_log (append-only audit), ad_consent_purposes (per-purpose:
+personalized, profiling, third_party, measurement, versioned,
+withdrawable). Fixed pre-existing bug: /ads/consent GET/PUT used
+preHandler:[requireAuth].
+
+**60.4 Appeal Review** — new moderation-appeal.service.ts +
+moderation-appeal.route.ts. Bridges Section 11.7 (appeal system) and
+Section 60 (moderation). overturn auto-restores comments/videos and
+dismisses the original report; uphold keeps content deleted.
+
+### Pre-existing bugs found & fixed (IMPORTANT for future sessions)
+
+1. **seriesRoutes, membershipRoutes never registered** in
+   services/videos/src/index.ts despite imports. Always grep index.ts
+   when a route returns 404 for a feature you know exists.
+
+2. **creatorstudio.route.ts (18x) + adcampaign.route.ts (2x) +
+   calling.route.ts** used `{ preHandler: [requireAuth] }`. But
+   @melodyflix/shared-auth `requireAuth(authorization)` is a plain
+   helper, NOT a Fastify preHandler. Fix pattern:
+
+       function authGuard(req, reply, done) {
+         try { req.user = requireAuth(req.headers.authorization); done(); }
+         catch (err) { reply.code(401).send({...}); }
+       }
+       // then: { preHandler: [authGuard] }
+
+   Many other routes across the codebase may still have this bug —
+   always test the endpoint, not just the code.
+
+3. **node:sqlite has NO `.transaction()` method** (that's
+   better-sqlite3). Use manual db.exec('BEGIN')/COMMIT/ROLLBACK.
+
+4. **videos DB has no `channels` table**. creatorstudio.route.ts and
+   series.route.ts's checkChannelOwner/`SELECT id FROM channels` will
+   throw ERRSQLITE. Pattern: try/catch fallback + optional admin-role
+   check.
+
+5. **tmux session `mf` was missing at session start**; services ran
+   orphan (parent=pts/1). Restart with `bash scripts/start-all.sh`
+   (nohup-based, no tmux needed for dev).
+
+6. **Admin login response shape**: `{"success":true,"data":{
+   "user":..., "token":"..."}}` — token is at `.data.token`, not
+   `access_token` or top-level `token`.
+
+### Environment notes
+
+- Start services: `bash scripts/start-all.sh` (uses nohup, exports
+  UV_USE_IO_URING=0)
+- tsx watch auto-reloads on file save, but new FILES require restart
+  (or touch index.ts)
+- io_uring crashes appear as `uv__io_poll: Assertion ... failed`
+  → just re-run start-all.sh
+- Health check one-liner:
+  `for p in 4001 4002 4003 4004 5173 5174; do curl -s -o /dev/null
+  -w "$p:%{http_code} " http://127.0.0.1:$p/health; done; echo`
+- Admin token: `POST http://127.0.0.1:4001/api/v1/auth/login` with
+  `{"email":"admin@melodyflix.com","password":"admin12345"}` →
+  `.data.token`; save to `/tmp/mf_admin_token.txt`
+
+### Next steps (unchanged priority)
+
+1. **Tier 2 sections** — 18 sections with heavy TODO:
+   12, 15, 17, 18, 19, 20, 24, 26, 29, 36, 45, 49, 50, 62, 67, 77,
+   93, 94
+2. **Audit gap** — raw grep shows 852 items but parser extracts 702
+   (150 missing) — likely empty sections with no item table, or
+   different row format. Worth reconciling.
+3. **H1 PostgreSQL migration**, **H2 Redis sessions**, **H8 FFmpeg E2E**
+   (long-standing HIGH backlog)
+4. Full end-to-end frontend verification for the new endpoints
+   (each Tier 1 feature has curl-verified APIs, no UI yet)
+
+### Recommended first message for next chat
+
+"নতুন চ্যাটে এসেছি। docs/CHAT-HANDOFF.md পড়ো (সর্বশেষ section:
+2026-10-07 Tier 1)। পরের কাজ: [Tier 2 / audit gap / UI]"
