@@ -336,7 +336,7 @@
 
 ## Section 12 — System and Integration
 
-| 12.1 | CDN | [PARTIAL] telemetry |
+| 12.1 | CDN | [DONE] cdn.service |
 | 12.2 | Cloud Backup | [DONE] mf-backup |
 | 12.3 | Webhook | [DONE] shared-events |
 | 12.4 | RSS Feed | [DONE] podcast.route.ts |
