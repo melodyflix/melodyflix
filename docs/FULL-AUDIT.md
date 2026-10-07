@@ -398,7 +398,7 @@
 | 15.1 | Watch Party | [DONE] watch-party.service |
 | 15.2 | Co-Publishing | [DONE] co-publish.service |
 | 15.3 | Collaborative Playlist | [DONE] collab-playlist.service |
-| 15.4 | Creator Marketplace | [TODO] |
+| 15.4 | Creator Marketplace | [DONE] marketplace.service |
 | 15.5 | Multi-User Video Editing | [TODO] |
 | 15.6 | Comment on Timeline | [TODO] |
 | 15.7 | Version Comparison | [PARTIAL] versions.service.ts |
