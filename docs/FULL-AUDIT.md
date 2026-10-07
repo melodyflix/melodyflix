@@ -965,8 +965,8 @@ All items [TODO] — zero code
 
 | 75.1 | Season and Episode Manager | [DONE] series.service.ts |
 | 75.2 | Episode Ordering | [DONE] |
-| 75.3 | Release Calendar | [PARTIAL] |
-| 75.4 | Missing Episode Detection | [TODO] |
+| 75.3 | Release Calendar | [DONE] |
+| 75.4 | Missing Episode Detection | [DONE] |
 | 75.5 | Skip Intro | [DONE] |
 | 75.6 | Skip Recap | [DONE] |
 | 75.7 | Skip Credits | [DONE] |
