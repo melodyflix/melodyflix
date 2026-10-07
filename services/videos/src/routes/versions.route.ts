@@ -10,8 +10,11 @@ import {
 
 const KINDS = ['original','directors_cut','extended','theatrical','theatrical_cut','unrated','remastered','custom'] as const;
 
-function userId(req: any): string | null {
-  return req.user?.id ?? req.user?.sub ?? null;
+function authUserId(req: any): string | null {
+  try {
+    const payload = requireAuth(req.headers?.authorization);
+    return (payload as any).sub ?? (payload as any).id ?? null;
+  } catch { return null; }
 }
 
 export async function versionsRoutes(app: FastifyInstance) {
@@ -49,8 +52,8 @@ export async function versionsRoutes(app: FastifyInstance) {
   });
 
   // POST /videos/:videoId/versions — attach a new version
-  app.post('/videos/:videoId/versions', { preHandler: [requireAuth] }, async (req, reply) => {
-    const me = userId(req as any);
+  app.post('/videos/:videoId/versions', async (req, reply) => {
+    const me = authUserId(req);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { videoId } = req.params as { videoId: string };
     const parsed = AttachSchema.safeParse(req.body);
@@ -83,8 +86,8 @@ export async function versionsRoutes(app: FastifyInstance) {
   });
 
   // PATCH /versions/:id — update version metadata
-  app.patch('/versions/:id', { preHandler: [requireAuth] }, async (req, reply) => {
-    const me = userId(req as any);
+  app.patch('/versions/:id', async (req, reply) => {
+    const me = authUserId(req);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
     const parsed = UpdateSchema.safeParse(req.body);
@@ -101,8 +104,8 @@ export async function versionsRoutes(app: FastifyInstance) {
   });
 
   // DELETE /versions/:id — detach version
-  app.delete('/versions/:id', { preHandler: [requireAuth] }, async (req, reply) => {
-    const me = userId(req as any);
+  app.delete('/versions/:id', async (req, reply) => {
+    const me = authUserId(req);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
     try {
@@ -129,8 +132,8 @@ export async function versionsRoutes(app: FastifyInstance) {
   });
 
   // POST /videos/:videoId/versions/clear-default — reset default
-  app.post('/videos/:videoId/versions/clear-default', { preHandler: [requireAuth] }, async (req, reply) => {
-    const me = userId(req as any);
+  app.post('/videos/:videoId/versions/clear-default', async (req, reply) => {
+    const me = authUserId(req);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { videoId } = req.params as { videoId: string };
     try {

@@ -219,6 +219,7 @@ import { collabPlaylistRoutes } from './routes/collab-playlist.route.js';
 import { marketplaceRoutes } from './routes/marketplace.route.js';
 import { multiEditRoutes } from './routes/multi-edit.route.js';
 import { timelineCommentRoutes } from './routes/timeline-comment.route.js';
+import { versionCompareRoutes } from './routes/version-compare.route.js';
 import { ensureSupportSchema } from './services/support.service.js';
 import { ensurePushSchema } from './services/push.service.js';
 
@@ -429,6 +430,7 @@ await app.register(collabPlaylistRoutes, { prefix: '/api/v1/videos' });
 await app.register(marketplaceRoutes, { prefix: '/api/v1/videos' });
 await app.register(multiEditRoutes, { prefix: '/api/v1/videos' });
 await app.register(timelineCommentRoutes, { prefix: '/api/v1/videos' });
+await app.register(versionCompareRoutes, { prefix: '/api/v1/videos' });
 await app.register(aiContentGenRoutes, { prefix: '/api/v1/videos' });
 await app.register(examCertificateRoutes, { prefix: '/api/v1/videos' });
 await app.register(communityRoutes, { prefix: '/api/v1/community' });
