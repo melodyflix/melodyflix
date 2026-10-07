@@ -411,12 +411,12 @@ All 12 items [DONE] accessibility.service (16.1–16.12)
 ## Section 17 — Administration and Automation
 
 | 17.1 | Roles and Permissions | [DONE] shared-auth |
-| 17.2 | Audit Log | [TODO] |
-| 17.3 | Announcement | [TODO] |
-| 17.4 | Rule-Based Actions | [TODO] |
-| 17.5 | Scheduled Maintenance | [TODO] |
-| 17.6 | Bulk User Actions | [TODO] |
-| 17.7 | Automated Reports | [TODO] |
+| 17.2 | Audit Log | [DONE] admin-automation |
+| 17.3 | Announcement | [DONE] admin-automation |
+| 17.4 | Rule-Based Actions | [DONE] admin-automation |
+| 17.5 | Scheduled Maintenance | [DONE] admin-automation |
+| 17.6 | Bulk User Actions | [DONE] admin-automation |
+| 17.7 | Automated Reports | [DONE] admin-automation |
 
 ## Section 18 — Video Management
 
