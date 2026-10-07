@@ -821,9 +821,9 @@ All items [TODO] — separate client app
 
 ## Section 57 — Premium Features
 
-| 57.1 | Early Access Content | [TODO] |
+| 57.1 | Early Access Content | [DONE] membership.service.ts |
 | 57.2 | Exclusive Member Content | [DONE] membership.service.ts |
-| 57.3 | Ad-Free Experience | [PARTIAL] |
+| 57.3 | Ad-Free Experience | [DONE] membership.service.ts |
 | 57.4 | Premium Badges | [DONE] verification badge |
 
 ## Section 58 — Audience Segmentation
