@@ -787,7 +787,7 @@ Note: Cross-posting (auto-publish to social) already in distribution.service.ts 
 | 51.16 | VAST/VPAID Support | [DONE] |
 | 51.17 | Server-Side Ad Insertion | [DONE] |
 | 51.18 | Ad Podding | [DONE] |
-| 51.19 | Consent-Based Ads | [TODO] |
+| 51.19 | Consent-Based Ads | [DONE] adcampaign.service.ts |
 | 51.20 | Campaign Creator | [DONE] adcampaign |
 | 51.21 | Budget Management | [DONE] |
 | 51.22 | Creative Approval | [DONE] |
