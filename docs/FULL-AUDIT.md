@@ -340,7 +340,7 @@
 | 12.2 | Cloud Backup | [DONE] mf-backup |
 | 12.3 | Webhook | [DONE] shared-events |
 | 12.4 | RSS Feed | [DONE] podcast.route.ts |
-| 12.5 | Smart TV Support | [TODO] |
+| 12.5 | Smart TV Support | [DONE] smart-tv.service |
 | 12.6 | Status Monitoring | [DONE] health service |
 | 12.7 | GDPR/Cookie Consent | [TODO] |
 | 12.8 | Centralized Logging | [DONE] shared-logger |
