@@ -396,7 +396,7 @@
 ## Section 15 — Collaboration
 
 | 15.1 | Watch Party | [DONE] watch-party.service |
-| 15.2 | Co-Publishing | [TODO] |
+| 15.2 | Co-Publishing | [DONE] co-publish.service |
 | 15.3 | Collaborative Playlist | [TODO] |
 | 15.4 | Creator Marketplace | [TODO] |
 | 15.5 | Multi-User Video Editing | [TODO] |
