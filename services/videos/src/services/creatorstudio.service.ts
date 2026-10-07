@@ -49,6 +49,38 @@ export function ensureCreatorStudioSchema(): void {
     );
     CREATE INDEX IF NOT EXISTS idx_ab_variants_test ON ab_test_variants(test_id);
 
+    CREATE TABLE IF NOT EXISTS publish_time_tests (
+      id TEXT PRIMARY KEY,
+      channel_id TEXT NOT NULL,
+      video_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'running'
+        CHECK (status IN ('running','completed','cancelled')),
+      winner_slot_id TEXT,
+      created_by TEXT NOT NULL,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_ptt_video ON publish_time_tests(video_id, status);
+    CREATE INDEX IF NOT EXISTS idx_ptt_channel ON publish_time_tests(channel_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS publish_time_slots (
+      id TEXT PRIMARY KEY,
+      test_id TEXT NOT NULL,
+      label TEXT NOT NULL,
+      planned_at TEXT NOT NULL,
+      published_at TEXT,
+      views_1h INTEGER NOT NULL DEFAULT 0,
+      views_24h INTEGER NOT NULL DEFAULT 0,
+      likes INTEGER NOT NULL DEFAULT 0,
+      comments INTEGER NOT NULL DEFAULT 0,
+      score REAL NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (test_id, planned_at)
+    );
+    CREATE INDEX IF NOT EXISTS idx_pts_test ON publish_time_slots(test_id);
+
     -- 9.7 End Screen / Cards
     CREATE TABLE IF NOT EXISTS video_end_screens (
       video_id TEXT PRIMARY KEY,
@@ -648,7 +680,7 @@ export function getCompetitorAnalysis(channelId: string, competitorChannelId: st
 // ============ 9.4 — A/B Testing ============
 
 export type ABTestStatus = 'running' | 'completed' | 'cancelled';
-export type ABTestType = 'thumbnail' | 'title';
+export type ABTestType = 'thumbnail' | 'title' | 'description';
 
 export interface ABTestVariant {
   id: string;
@@ -831,6 +863,13 @@ export function completeABTest(testId: string, force = false): ABTest | null {
         db.prepare('UPDATE videos SET title = ? WHERE id = ?').run(v.content, test.video_id);
       } catch {}
     }
+  } else if (winner && test.test_type === 'description') {
+    const v = test.variants.find((x) => x.id === winner.variant_id);
+    if (v) {
+      try {
+        db.prepare('UPDATE videos SET description = ? WHERE id = ?').run(v.content, test.video_id);
+      } catch {}
+    }
   }
 
   return getABTest(testId);
@@ -843,4 +882,220 @@ export function cancelABTest(testId: string): ABTest | null {
   const now = new Date().toISOString();
   db.prepare("UPDATE ab_tests SET status = 'cancelled', ends_at = ?, updated_at = ? WHERE id = ?").run(now, now, testId);
   return getABTest(testId);
+}
+
+// ============================================================
+// 61.4 Publishing-Time Testing
+// Test multiple candidate publish times for the same video
+// (typically used to learn best slot for a channel), record
+// performance per slot, and pick a winner.
+// ============================================================
+
+export type PublishTimeStatus = 'running' | 'completed' | 'cancelled';
+
+export interface PublishTimeSlot {
+  id: string;
+  test_id: string;
+  label: string;
+  planned_at: string;
+  published_at: string | null;
+  views_1h: number;
+  views_24h: number;
+  likes: number;
+  comments: number;
+  score: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PublishTimeTest {
+  id: string;
+  channel_id: string;
+  video_id: string;
+  status: PublishTimeStatus;
+  winner_slot_id: string | null;
+  created_by: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  slots: PublishTimeSlot[];
+}
+
+export interface CreatePublishTimeTestInput {
+  video_id: string;
+  slots: Array<{ label: string; planned_at: string }>;
+  notes?: string | null;
+}
+
+export function createPublishTimeTest(
+  channelId: string, input: CreatePublishTimeTestInput, createdBy: string
+): PublishTimeTest {
+  if (!input.slots || input.slots.length < 2 || input.slots.length > 8) {
+    throw new Error('Publish-time test requires 2-8 slots');
+  }
+  const db = getDb();
+  const now = new Date().toISOString();
+  // Cancel any running test for same video
+  const running = db.prepare(
+    "SELECT id FROM publish_time_tests WHERE video_id = ? AND status = 'running'"
+  ).get(input.video_id) as { id: string } | undefined;
+  if (running) {
+    db.prepare("UPDATE publish_time_tests SET status = 'cancelled', updated_at = ? WHERE id = ?")
+      .run(now, running.id);
+  }
+  const id = randomUUID();
+  db.exec('BEGIN');
+  try {
+    db.prepare(
+      `INSERT INTO publish_time_tests (id, channel_id, video_id, status, created_by, notes, created_at, updated_at)
+       VALUES (?, ?, ?, 'running', ?, ?, ?, ?)`
+    ).run(id, channelId, input.video_id, createdBy, input.notes ?? null, now, now);
+    const ins = db.prepare(
+      `INSERT INTO publish_time_slots (id, test_id, label, planned_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    );
+    for (const s of input.slots) {
+      ins.run(randomUUID(), id, s.label.slice(0, 60), s.planned_at, now, now);
+    }
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  return getPublishTimeTest(id)!;
+}
+
+export function getPublishTimeTest(id: string): PublishTimeTest | null {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM publish_time_tests WHERE id = ?').get(id) as Omit<PublishTimeTest,'slots'> | undefined;
+  if (!row) return null;
+  const slots = db.prepare(
+    'SELECT * FROM publish_time_slots WHERE test_id = ? ORDER BY planned_at ASC'
+  ).all(id) as PublishTimeSlot[];
+  return { ...row, slots };
+}
+
+export function listPublishTimeTestsForChannel(channelId: string, limit = 50): PublishTimeTest[] {
+  const db = getDb();
+  const rows = db.prepare(
+    'SELECT * FROM publish_time_tests WHERE channel_id = ? ORDER BY created_at DESC LIMIT ?'
+  ).all(channelId, Math.max(1, Math.min(200, limit))) as Array<Omit<PublishTimeTest,'slots'>>;
+  return rows.map(r => {
+    const slots = db.prepare(
+      'SELECT * FROM publish_time_slots WHERE test_id = ? ORDER BY planned_at ASC'
+    ).all(r.id) as PublishTimeSlot[];
+    return { ...r, slots };
+  });
+}
+
+export function listPublishTimeTestsForVideo(videoId: string): PublishTimeTest[] {
+  const db = getDb();
+  const rows = db.prepare(
+    'SELECT * FROM publish_time_tests WHERE video_id = ? ORDER BY created_at DESC'
+  ).all(videoId) as Array<Omit<PublishTimeTest,'slots'>>;
+  return rows.map(r => {
+    const slots = db.prepare(
+      'SELECT * FROM publish_time_slots WHERE test_id = ? ORDER BY planned_at ASC'
+    ).all(r.id) as PublishTimeSlot[];
+    return { ...r, slots };
+  });
+}
+
+export interface UpdateSlotInput {
+  published_at?: string | null;
+  views_1h?: number;
+  views_24h?: number;
+  likes?: number;
+  comments?: number;
+}
+
+export function recordPublishSlotMetrics(slotId: string, input: UpdateSlotInput): PublishTimeSlot | null {
+  const db = getDb();
+  const existing = db.prepare('SELECT * FROM publish_time_slots WHERE id = ?').get(slotId) as PublishTimeSlot | undefined;
+  if (!existing) return null;
+  const v1h = input.views_1h ?? existing.views_1h;
+  const v24h = input.views_24h ?? existing.views_24h;
+  const lks = input.likes ?? existing.likes;
+  const cms = input.comments ?? existing.comments;
+  // Simple score: 24h views + 5*likes + 3*comments
+  const score = v24h + 5 * lks + 3 * cms;
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE publish_time_slots SET
+       published_at = COALESCE(?, published_at),
+       views_1h = ?, views_24h = ?, likes = ?, comments = ?, score = ?, updated_at = ?
+     WHERE id = ?`
+  ).run(
+    input.published_at ?? null,
+    v1h, v24h, lks, cms, score, now, slotId,
+  );
+  return db.prepare('SELECT * FROM publish_time_slots WHERE id = ?').get(slotId) as PublishTimeSlot;
+}
+
+export interface PublishTimeScores {
+  test: PublishTimeTest | null;
+  slots: PublishTimeSlot[];
+  winner: PublishTimeSlot | null;
+  is_ready: boolean;
+}
+
+export function getPublishTimeScores(testId: string): PublishTimeScores {
+  const test = getPublishTimeTest(testId);
+  if (!test) return { test: null, slots: [], winner: null, is_ready: false };
+  const withMetrics = test.slots.filter(s => s.published_at !== null);
+  const isReady = withMetrics.length >= 2 && withMetrics.every(s => s.views_24h > 0);
+  const winner = withMetrics.length > 0
+    ? withMetrics.reduce((a, b) => (b.score > a.score ? b : a))
+    : null;
+  return { test, slots: test.slots, winner, is_ready: isReady };
+}
+
+export function completePublishTimeTest(testId: string, force = false): PublishTimeTest | null {
+  const test = getPublishTimeTest(testId);
+  if (!test) return null;
+  const { winner, is_ready } = getPublishTimeScores(testId);
+  if (!force && !is_ready) throw new Error('Publish-time test has not collected enough data');
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare(
+    "UPDATE publish_time_tests SET status = 'completed', winner_slot_id = ?, updated_at = ? WHERE id = ?"
+  ).run(winner?.id ?? null, now, testId);
+  return getPublishTimeTest(testId);
+}
+
+export function cancelPublishTimeTest(testId: string): PublishTimeTest | null {
+  const test = getPublishTimeTest(testId);
+  if (!test) return null;
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare("UPDATE publish_time_tests SET status = 'cancelled', updated_at = ? WHERE id = ?")
+    .run(now, testId);
+  return getPublishTimeTest(testId);
+}
+
+export interface BestPublishHour {
+  hour_utc: number;
+  slot_count: number;
+  avg_score: number;
+}
+
+export function getBestPublishHours(channelId: string, limit = 24): BestPublishHour[] {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT
+      CAST(strftime('%H', s.planned_at) AS INTEGER) AS hour_utc,
+      COUNT(*) AS slot_count,
+      AVG(s.score) AS avg_score
+    FROM publish_time_slots s
+    JOIN publish_time_tests t ON t.id = s.test_id
+    WHERE t.channel_id = ? AND s.published_at IS NOT NULL
+    GROUP BY hour_utc
+    ORDER BY avg_score DESC
+    LIMIT ?
+  `).all(channelId, Math.max(1, Math.min(24, limit))) as Array<{ hour_utc: number; slot_count: number; avg_score: number | null }>;
+  return rows.map(r => ({
+    hour_utc: r.hour_utc,
+    slot_count: r.slot_count,
+    avg_score: r.avg_score ?? 0,
+  }));
 }
