@@ -422,18 +422,18 @@ All 12 items [DONE] accessibility.service (16.1–16.12)
 
 | 18.1 | Upload | [DONE] |
 | 18.2 | Edit | [DONE] editor.service.ts |
-| 18.3 | Draft | [PARTIAL] video status |
-| 18.4 | Schedule | [PARTIAL] distribution |
+| 18.3 | Draft | [DONE] video-management |
+| 18.4 | Schedule | [DONE] video-management |
 | 18.5 | Import | [DONE] migration.service.ts |
 | 18.6 | Privacy Control | [DONE] video visibility |
 | 18.7 | Bulk Upload | [DONE] migration |
 | 18.8 | Version History | [DONE] versions.service.ts |
 | 18.9 | Auto Transcoding | [DONE] transcode.service.ts |
-| 18.10 | Auto-Delete | [TODO] |
-| 18.11 | Folder/Collection Organization | [TODO] |
-| 18.12 | Bulk Edit | [TODO] |
-| 18.13 | Mass Delete | [TODO] |
-| 18.14 | Archive Feature | [TODO] |
+| 18.10 | Auto-Delete | [DONE] video-management |
+| 18.11 | Folder/Collection Organization | [DONE] video-management |
+| 18.12 | Bulk Edit | [DONE] video-management |
+| 18.13 | Mass Delete | [DONE] video-management |
+| 18.14 | Archive Feature | [DONE] video-management |
 
 ## Section 19 — Content Protection
 
