@@ -1056,8 +1056,8 @@ All items [TODO] — zero code
 ## Section 90 — Message Delivery System
 
 | 90.1 | Delivery Queue | [DONE] queue.service.ts |
-| 90.2 | Retry Rules | [PARTIAL] |
-| 90.3 | Delivery Tracking | [TODO] |
+| 90.2 | Retry Rules | [DONE] notification.service.ts |
+| 90.3 | Delivery Tracking | [DONE] notification.service.ts |
 | 90.4 | Failed-Message Logs | [DONE] email log |
 
 ## Section 91 — Email Deliverability
