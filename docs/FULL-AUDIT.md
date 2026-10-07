@@ -437,22 +437,22 @@ All 12 items [DONE] accessibility.service (16.1–16.12)
 
 ## Section 19 — Content Protection
 
-| 19.1 | Digital Rights Management (DRM) | [TODO] |
-| 19.2 | Dynamic Watermark | [PARTIAL] editor watermark |
-| 19.3 | Screen-Recording Protection | [TODO] |
-| 19.4 | Embed Control | [TODO] |
-| 19.5 | Signed URL | [TODO] |
-| 19.6 | Tokenized Playback | [TODO] |
-| 19.7 | Hotlink Protection | [TODO] |
-| 19.8 | Playback Session Validation | [PARTIAL] telemetry |
+| 19.1 | Digital Rights Management (DRM) | [DONE] content-protection |
+| 19.2 | Dynamic Watermark | [DONE] watermark.service |
+| 19.3 | Screen-Recording Protection | [DONE] content-protection |
+| 19.4 | Embed Control | [DONE] content-protection |
+| 19.5 | Signed URL | [DONE] content-protection |
+| 19.6 | Tokenized Playback | [DONE] content-protection |
+| 19.7 | Hotlink Protection | [DONE] content-protection |
+| 19.8 | Playback Session Validation | [DONE] content-protection |
 | 19.9 | Custom Logo Watermark | [DONE] editor |
-| 19.10 | Dynamic User ID Watermark | [TODO] |
+| 19.10 | Dynamic User ID Watermark | [DONE] watermark.service |
 | 19.11 | Watermark Position Control | [DONE] editor |
 | 19.12 | Transparency Settings | [DONE] editor |
-| 19.13 | Watermark Tracing | [TODO] |
-| 19.14 | Leak Detection | [TODO] |
-| 19.15 | Piracy Monitoring | [TODO] |
-| 19.16 | Forensic Report | [TODO] |
+| 19.13 | Watermark Tracing | [DONE] watermark.service |
+| 19.14 | Leak Detection | [DONE] watermark.service |
+| 19.15 | Piracy Monitoring | [DONE] watermark.service |
+| 19.16 | Forensic Report | [DONE] watermark.service |
 
 ## Section 20 — Notifications and Alerts
 
