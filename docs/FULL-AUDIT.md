@@ -828,6 +828,15 @@ infrastructure can carry game streams as channels with kind metadata.
 | 41.3 | Theatrical Version | [DONE] |
 | 41.4 | Multiple Editions | [DONE] |
 
+**Verified 2026-10-08**: All 4 items tested via curl.
+- kinds: original/directors_cut/extended/theatrical/theatrical_cut/
+  unrated/remastered/custom
+- attach a version video to a parent video; each version is itself a
+  video row, linked via video_versions(parent_video_id, version_video_id)
+- default version can be set/cleared; summary reports version_count +
+  kind distribution + default_version_id
+- resolve(versionVideoId) → parent + is_version flag for player routing
+
 ## Section 42 — Streaming Performance
 
 | 42.1 | Pre-Buffering | [DONE] telemetry |
