@@ -1000,6 +1000,24 @@ All routes under /api/v1/videos prefix:
 | 47.4 | TikTok Integration | [DONE] (via URL share) |
 | 47.5 | LinkedIn Integration | [DONE] |
 
+**Verified 2026-10-08**: All 5 items tested via curl (with real
+video having title/description).
+- 5 platforms with per-platform share URL templates + icons +
+  max_title_length + tracking flag + display_order
+- GET /social/platforms → list; PATCH /social/platforms/:id → toggle
+  enabled (verified: disabled tiktok removes it from enabled list)
+- GET /social/share-url/:videoId/:platform → single ready URL
+- GET /social/all-share-urls/:videoId → all 5 at once with title
+- GET /social/tags/:videoId → OG + Twitter card + canonical URL
+- GET /social/embed/:videoId → iframe snippet + embed URL
+- POST /social/track (UUID-validated), GET /social/stats/:videoId,
+  GET /social/events/:videoId — tracking + analytics
+- GET/PUT /social/meta/:videoId — per-video social overrides
+
+Note: cross-posting (auto-publish to social) is handled by
+distribution.service (Section 31); this section focuses on share URLs,
+tracking, OG meta, embed, and admin-toggleable platform config.
+
 Note: Cross-posting (auto-publish to social) already in distribution.service.ts (Section 31). This section focuses on share URLs, tracking, OG meta, embed, and admin-toggleable platform config.
 
 ## Section 48 — Video Preview and Trailer
