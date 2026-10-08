@@ -86,7 +86,32 @@ export function ensurePaymentSchema(): void {
       PRIMARY KEY (base_currency, quote_currency)
     );
     CREATE INDEX IF NOT EXISTS idx_cr_base ON currency_rates(base_currency);
+
+    CREATE TABLE IF NOT EXISTS cross_border_config (
+      id TEXT PRIMARY KEY,
+      home_country TEXT NOT NULL DEFAULT 'BD',
+      fee_percent REAL NOT NULL DEFAULT 0,
+      blocked_countries TEXT NOT NULL DEFAULT '[]',
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS cross_border_log (
+      id TEXT PRIMARY KEY,
+      transaction_id TEXT NOT NULL,
+      origin_country TEXT NOT NULL,
+      target_country TEXT NOT NULL,
+      fee_amount REAL NOT NULL,
+      fee_percent REAL NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_cbl_tx ON cross_border_log(transaction_id);
   `);
+
+  // Lightweight column migrations for existing databases
+  try { db.exec(`ALTER TABLE payment_transactions ADD COLUMN origin_country TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE payment_transactions ADD COLUMN target_country TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE payment_transactions ADD COLUMN is_cross_border INTEGER NOT NULL DEFAULT 0`); } catch {}
+  try { db.exec(`ALTER TABLE payment_transactions ADD COLUMN cross_border_fee REAL NOT NULL DEFAULT 0`); } catch {}
 }
 
 export interface CreateGatewayInput {
@@ -579,4 +604,192 @@ export function convertCurrency(amount: number, from: string, to: string): Conve
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+// ============ Cross-Border Support (29.12) ============
+
+export interface CrossBorderConfig {
+  id: string;
+  home_country: string;
+  fee_percent: number;
+  blocked_countries: string[];
+  updated_at: string;
+}
+
+const CROSS_BORDER_CONFIG_ID = 'default';
+
+export function getCrossBorderConfig(): CrossBorderConfig {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM cross_border_config WHERE id = ?').get(CROSS_BORDER_CONFIG_ID) as
+    | { id: string; home_country: string; fee_percent: number; blocked_countries: string; updated_at: string }
+    | undefined;
+
+  if (!row) {
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO cross_border_config (id, home_country, fee_percent, blocked_countries, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(CROSS_BORDER_CONFIG_ID, 'BD', 0, '[]', now);
+    return {
+      id: CROSS_BORDER_CONFIG_ID,
+      home_country: 'BD',
+      fee_percent: 0,
+      blocked_countries: [],
+      updated_at: now,
+    };
+  }
+
+  let blocked: string[] = [];
+  try { blocked = JSON.parse(row.blocked_countries) as string[]; } catch { blocked = []; }
+
+  return {
+    id: row.id,
+    home_country: row.home_country,
+    fee_percent: row.fee_percent,
+    blocked_countries: blocked,
+    updated_at: row.updated_at,
+  };
+}
+
+export interface SetCrossBorderConfigInput {
+  home_country?: string;
+  fee_percent?: number;
+  blocked_countries?: string[];
+}
+
+export function setCrossBorderConfig(input: SetCrossBorderConfigInput): CrossBorderConfig {
+  const db = getDb();
+  const current = getCrossBorderConfig();
+  const now = new Date().toISOString();
+
+  const home = input.home_country ? input.home_country.toUpperCase().trim() : current.home_country;
+  const fee = input.fee_percent !== undefined ? input.fee_percent : current.fee_percent;
+  if (fee < 0 || fee > 100) throw new Error('fee_percent must be between 0 and 100');
+
+  const blocked = input.blocked_countries
+    ? input.blocked_countries.map((c) => c.toUpperCase().trim()).filter(Boolean)
+    : current.blocked_countries;
+
+  db.prepare(`
+    UPDATE cross_border_config
+    SET home_country = ?, fee_percent = ?, blocked_countries = ?, updated_at = ?
+    WHERE id = ?
+  `).run(home, fee, JSON.stringify(blocked), now, CROSS_BORDER_CONFIG_ID);
+
+  return getCrossBorderConfig();
+}
+
+export function isCountryBlocked(country: string): boolean {
+  const c = country.toUpperCase().trim();
+  const cfg = getCrossBorderConfig();
+  return cfg.blocked_countries.includes(c);
+}
+
+export interface CrossBorderFeeResult {
+  is_cross_border: boolean;
+  origin_country: string;
+  target_country: string;
+  home_country: string;
+  fee_percent: number;
+  fee_amount: number;
+  total: number;
+}
+
+/**
+ * Compute cross-border fee for a transaction.
+ * Cross-border when origin_country !== home_country.
+ * Throws if origin country is blocked.
+ */
+export function computeCrossBorderFee(
+  amount: number,
+  originCountry: string,
+): CrossBorderFeeResult {
+  const origin = originCountry.toUpperCase().trim();
+  if (isCountryBlocked(origin)) {
+    throw new Error(`Transactions from ${origin} are not permitted`);
+  }
+
+  const cfg = getCrossBorderConfig();
+  const isCrossBorder = origin !== cfg.home_country;
+  const feePercent = isCrossBorder ? cfg.fee_percent : 0;
+  const feeAmount = round2(amount * (feePercent / 100));
+
+  return {
+    is_cross_border: isCrossBorder,
+    origin_country: origin,
+    target_country: cfg.home_country,
+    home_country: cfg.home_country,
+    fee_percent: feePercent,
+    fee_amount: feeAmount,
+    total: round2(amount + feeAmount),
+  };
+}
+
+export interface CrossBorderLog {
+  id: string;
+  transaction_id: string;
+  origin_country: string;
+  target_country: string;
+  fee_amount: number;
+  fee_percent: number;
+  created_at: string;
+}
+
+export function logCrossBorder(input: {
+  transaction_id: string;
+  origin_country: string;
+  target_country: string;
+  fee_amount: number;
+  fee_percent: number;
+}): CrossBorderLog {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const row: CrossBorderLog = {
+    id: randomUUID(),
+    transaction_id: input.transaction_id,
+    origin_country: input.origin_country,
+    target_country: input.target_country,
+    fee_amount: input.fee_amount,
+    fee_percent: input.fee_percent,
+    created_at: now,
+  };
+  db.prepare(`
+    INSERT INTO cross_border_log (id, transaction_id, origin_country, target_country,
+      fee_amount, fee_percent, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    row.id, row.transaction_id, row.origin_country, row.target_country,
+    row.fee_amount, row.fee_percent, row.created_at
+  );
+  return row;
+}
+
+export function listCrossBorderLog(limit = 100, offset = 0): CrossBorderLog[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM cross_border_log ORDER BY created_at DESC LIMIT ? OFFSET ?')
+    .all(limit, offset) as CrossBorderLog[];
+}
+
+export interface CrossBorderStats {
+  total_cross_border: number;
+  total_fees_collected: number;
+  by_origin_country: Array<{ country: string; count: number; fees: number }>;
+}
+
+export function getCrossBorderStats(): CrossBorderStats {
+  const db = getDb();
+  const total = (db.prepare('SELECT COUNT(*) as n FROM cross_border_log').get() as { n: number }).n;
+  const fees = (db.prepare('SELECT COALESCE(SUM(fee_amount), 0) as s FROM cross_border_log').get() as { s: number }).s;
+  const byCountry = db.prepare(`
+    SELECT origin_country as country, COUNT(*) as count, COALESCE(SUM(fee_amount), 0) as fees
+    FROM cross_border_log
+    GROUP BY origin_country
+    ORDER BY count DESC
+  `).all() as Array<{ country: string; count: number; fees: number }>;
+
+  return {
+    total_cross_border: total,
+    total_fees_collected: fees,
+    by_origin_country: byCountry,
+  };
 }

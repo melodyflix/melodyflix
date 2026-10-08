@@ -10,6 +10,8 @@ import {
   listAllRefunds, updateRefundStatus, getRefundStats,
   SUPPORTED_CURRENCIES, setCurrencyRate, listCurrencyRates, deleteCurrencyRate,
   convertCurrency, getCurrencyRate,
+  getCrossBorderConfig, setCrossBorderConfig, computeCrossBorderFee,
+  logCrossBorder, listCrossBorderLog, getCrossBorderStats,
 } from '../services/payment.service.js';
 import { grantMessagePack } from '../services/chatlimits.service.js';
 import { getDb } from '@melodyflix/shared-db';
@@ -35,6 +37,7 @@ const CreateTransactionSchema = z.object({
   reference_id: z.string().max(200).optional(),
   metadata: z.record(z.any()).optional(),
   gateway_id: z.string().optional(),
+  origin_country: z.string().min(2).max(2).optional(),
 });
 
 export async function paymentRoutes(app: FastifyInstance) {
@@ -126,6 +129,16 @@ export async function paymentRoutes(app: FastifyInstance) {
       return reply.code(400).send({ success: false, error: 'No active payment gateway configured' });
     }
 
+    // Cross-border fee (if origin_country supplied and differs from home)
+    let crossBorder: ReturnType<typeof computeCrossBorderFee> | null = null;
+    if (parsed.data.origin_country) {
+      try {
+        crossBorder = computeCrossBorderFee(parsed.data.amount, parsed.data.origin_country);
+      } catch (err) {
+        return reply.code(400).send({ success: false, error: (err as Error).message });
+      }
+    }
+
     const tx = createTransaction({
       gateway_id: gateway.id,
       user_id: user.sub,
@@ -137,12 +150,40 @@ export async function paymentRoutes(app: FastifyInstance) {
       status: 'pending',
     });
 
+    // Record cross-border info if applicable
+    if (crossBorder) {
+      const db = getDb();
+      const now = new Date().toISOString();
+      db.prepare(`
+        UPDATE payment_transactions
+        SET origin_country = ?, target_country = ?, is_cross_border = ?, cross_border_fee = ?, updated_at = ?
+        WHERE id = ?
+      `).run(
+        crossBorder.origin_country,
+        crossBorder.target_country,
+        crossBorder.is_cross_border ? 1 : 0,
+        crossBorder.fee_amount,
+        now,
+        tx.id,
+      );
+      if (crossBorder.is_cross_border) {
+        logCrossBorder({
+          transaction_id: tx.id,
+          origin_country: crossBorder.origin_country,
+          target_country: crossBorder.target_country,
+          fee_amount: crossBorder.fee_amount,
+          fee_percent: crossBorder.fee_percent,
+        });
+      }
+    }
+
     return reply.send({
       success: true,
       data: {
         transaction_id: tx.id,
         amount: tx.amount,
         currency: tx.currency,
+        cross_border: crossBorder,
         gateway: {
           provider: gateway.provider,
           display_name: gateway.display_name,
@@ -404,5 +445,49 @@ export async function paymentRoutes(app: FastifyInstance) {
     const ok = deleteCurrencyRate(base, quote);
     if (!ok) return reply.code(404).send({ success: false, error: 'Rate not found' });
     return reply.send({ success: true, data: { deleted: true } });
+  });
+
+  // ============ CROSS-BORDER (29.12) ============
+
+  // GET /payment/cross-border/config — public (for clients to know fee)
+  app.get('/payment/cross-border/config', async (_req, reply) => {
+    return reply.send({ success: true, data: getCrossBorderConfig() });
+  });
+
+  // PUT /payment/admin/cross-border/config — admin
+  app.put('/payment/admin/cross-border/config', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+
+    const BodySchema = z.object({
+      home_country: z.string().min(2).max(2).optional(),
+      fee_percent: z.number().min(0).max(100).optional(),
+      blocked_countries: z.array(z.string().min(2).max(2)).optional(),
+    });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+
+    try {
+      return reply.send({ success: true, data: setCrossBorderConfig(parsed.data) });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // GET /payment/admin/cross-border/stats — admin
+  app.get('/payment/admin/cross-border/stats', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    return reply.send({ success: true, data: getCrossBorderStats() });
+  });
+
+  // GET /payment/admin/cross-border/log — admin
+  app.get('/payment/admin/cross-border/log', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const q = req.query as { limit?: string; offset?: string };
+    const limit = Math.min(Number(q.limit ?? 100), 500);
+    const offset = Number(q.offset ?? 0);
+    return reply.send({ success: true, data: { entries: listCrossBorderLog(limit, offset) } });
   });
 }
