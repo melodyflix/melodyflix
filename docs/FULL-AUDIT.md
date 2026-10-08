@@ -923,6 +923,17 @@ template save, form submit) tested via curl.
 | 44.3 | Bulk Migration Tools | [DONE] |
 | 44.4 | Metadata Preservation | [DONE] |
 
+**Verified 2026-10-08**: All 4 items tested via curl.
+- URL parser handles youtube.com/watch, youtu.be, shorts, embed, live
+  + vimeo.com and player.vimeo.com (ID min 6 chars for YouTube)
+- POST /migration/parse — dry-run URL → source/video_id/canonical_url
+- POST /migration/jobs — single job (pending → fetch → apply flow)
+- POST /migration/jobs/bulk — mixed YouTube+Vimeo batch works (3/3)
+- GET /migration/jobs/:id/metadata — title/description/thumbnail/
+  duration/author preserved
+- stats, cancel, delete, fetch (oEmbed), apply endpoints present
+- 10 endpoints total
+
 ## Section 45 — Voice and Audio Features
 
 | 45.1 | Audio-Only Mode | [PARTIAL] audiotrack |
