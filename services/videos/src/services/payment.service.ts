@@ -134,6 +134,44 @@ export function ensurePaymentSchema(): void {
       session_ttl_minutes INTEGER NOT NULL DEFAULT 15,
       updated_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS crypto_config (
+      id TEXT PRIMARY KEY,
+      enabled INTEGER NOT NULL DEFAULT 0,
+      supported_coins TEXT NOT NULL DEFAULT '["USDT","USDC","BTC","ETH","BNB"]',
+      binance_pay_enabled INTEGER NOT NULL DEFAULT 0,
+      binance_merchant_id TEXT,
+      binance_api_key TEXT,
+      binance_api_secret TEXT,
+      required_confirmations TEXT NOT NULL DEFAULT '{"BTC":2,"ETH":12,"USDT":1,"USDC":1,"BNB":15}',
+      payment_ttl_minutes INTEGER NOT NULL DEFAULT 60,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS crypto_payments (
+      id TEXT PRIMARY KEY,
+      transaction_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      coin TEXT NOT NULL,
+      network TEXT NOT NULL,
+      amount_crypto REAL NOT NULL,
+      amount_fiat REAL NOT NULL,
+      fiat_currency TEXT NOT NULL,
+      receive_address TEXT,
+      memo TEXT,
+      tx_hash TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      confirmations INTEGER NOT NULL DEFAULT 0,
+      required_confirmations INTEGER NOT NULL DEFAULT 1,
+      expires_at TEXT NOT NULL,
+      confirmed_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_cp_tx ON crypto_payments(transaction_id);
+    CREATE INDEX IF NOT EXISTS idx_cp_user ON crypto_payments(user_id);
+    CREATE INDEX IF NOT EXISTS idx_cp_status ON crypto_payments(status);
   `);
 
   // Lightweight column migrations for existing databases
@@ -1087,5 +1125,373 @@ export function getThreeDSStats(): ThreeDSStats {
   }
   const completed = stats.passed_sessions + stats.failed_sessions;
   stats.pass_rate = completed > 0 ? Math.round((stats.passed_sessions / completed) * 10000) / 100 : 0;
+  return stats;
+}
+
+// ============ Cryptocurrency Payments (29.10) ============
+
+export type CryptoCoin = 'BTC' | 'ETH' | 'USDT' | 'USDC' | 'BNB';
+export type CryptoProvider = 'binance_pay' | 'wallet';
+
+export interface CryptoConfig {
+  id: string;
+  enabled: boolean;
+  supported_coins: CryptoCoin[];
+  binance_pay_enabled: boolean;
+  binance_merchant_id: string | null;
+  binance_api_key_masked: string | null;
+  binance_api_secret_masked: string | null;
+  required_confirmations: Record<string, number>;
+  payment_ttl_minutes: number;
+  updated_at: string;
+}
+
+const CRYPTO_CONFIG_ID = 'default';
+const DEFAULT_CONFIRMATIONS: Record<string, number> = { BTC: 2, ETH: 12, USDT: 1, USDC: 1, BNB: 15 };
+
+function maskSecret(s: string | null): string | null {
+  if (!s) return null;
+  if (s.length <= 4) return '****';
+  return s.slice(0, 2) + '*'.repeat(Math.max(4, s.length - 4)) + s.slice(-2);
+}
+
+function parseJsonObject<T>(raw: string, fallback: T): T {
+  try { return JSON.parse(raw) as T; } catch { return fallback; }
+}
+
+function cryptoConfigRowToObj(row: {
+  id: string; enabled: number; supported_coins: string;
+  binance_pay_enabled: number; binance_merchant_id: string | null;
+  binance_api_key: string | null; binance_api_secret: string | null;
+  required_confirmations: string; payment_ttl_minutes: number; updated_at: string;
+}): CryptoConfig {
+  return {
+    id: row.id,
+    enabled: row.enabled === 1,
+    supported_coins: parseJsonObject<CryptoCoin[]>(row.supported_coins, ['USDT', 'USDC', 'BTC', 'ETH', 'BNB']),
+    binance_pay_enabled: row.binance_pay_enabled === 1,
+    binance_merchant_id: row.binance_merchant_id,
+    binance_api_key_masked: maskSecret(row.binance_api_key),
+    binance_api_secret_masked: maskSecret(row.binance_api_secret),
+    required_confirmations: parseJsonObject<Record<string, number>>(row.required_confirmations, DEFAULT_CONFIRMATIONS),
+    payment_ttl_minutes: row.payment_ttl_minutes,
+    updated_at: row.updated_at,
+  };
+}
+
+// Internal — returns row with actual secrets (never exposed externally)
+function getCryptoConfigRow(): {
+  id: string; enabled: number; supported_coins: string;
+  binance_pay_enabled: number; binance_merchant_id: string | null;
+  binance_api_key: string | null; binance_api_secret: string | null;
+  required_confirmations: string; payment_ttl_minutes: number; updated_at: string;
+} {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM crypto_config WHERE id = ?').get(CRYPTO_CONFIG_ID) as
+    | { id: string; enabled: number; supported_coins: string; binance_pay_enabled: number;
+        binance_merchant_id: string | null; binance_api_key: string | null; binance_api_secret: string | null;
+        required_confirmations: string; payment_ttl_minutes: number; updated_at: string }
+    | undefined;
+
+  if (row) return row;
+
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO crypto_config (id, enabled, supported_coins, binance_pay_enabled,
+      binance_merchant_id, binance_api_key, binance_api_secret,
+      required_confirmations, payment_ttl_minutes, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    CRYPTO_CONFIG_ID, 0, JSON.stringify(['USDT', 'USDC', 'BTC', 'ETH', 'BNB']),
+    0, null, null, null, JSON.stringify(DEFAULT_CONFIRMATIONS), 60, now
+  );
+
+  return {
+    id: CRYPTO_CONFIG_ID, enabled: 0,
+    supported_coins: JSON.stringify(['USDT', 'USDC', 'BTC', 'ETH', 'BNB']),
+    binance_pay_enabled: 0, binance_merchant_id: null,
+    binance_api_key: null, binance_api_secret: null,
+    required_confirmations: JSON.stringify(DEFAULT_CONFIRMATIONS),
+    payment_ttl_minutes: 60, updated_at: now,
+  };
+}
+
+export function getCryptoConfig(): CryptoConfig {
+  return cryptoConfigRowToObj(getCryptoConfigRow());
+}
+
+export interface SetCryptoConfigInput {
+  enabled?: boolean;
+  supported_coins?: CryptoCoin[];
+  binance_pay_enabled?: boolean;
+  binance_merchant_id?: string | null;
+  binance_api_key?: string | null;
+  binance_api_secret?: string | null;
+  required_confirmations?: Record<string, number>;
+  payment_ttl_minutes?: number;
+}
+
+export function setCryptoConfig(input: SetCryptoConfigInput): CryptoConfig {
+  const db = getDb();
+  const cur = getCryptoConfigRow();
+  const now = new Date().toISOString();
+
+  const enabled = input.enabled !== undefined ? (input.enabled ? 1 : 0) : cur.enabled;
+  const coins = input.supported_coins !== undefined
+    ? JSON.stringify(input.supported_coins.map((c) => c.toUpperCase().trim()))
+    : cur.supported_coins;
+  const bpayEnabled = input.binance_pay_enabled !== undefined
+    ? (input.binance_pay_enabled ? 1 : 0) : cur.binance_pay_enabled;
+  const merchant = input.binance_merchant_id !== undefined ? input.binance_merchant_id : cur.binance_merchant_id;
+  const apiKey = input.binance_api_key !== undefined ? input.binance_api_key : cur.binance_api_key;
+  const apiSecret = input.binance_api_secret !== undefined ? input.binance_api_secret : cur.binance_api_secret;
+  const confirmations = input.required_confirmations !== undefined
+    ? JSON.stringify(input.required_confirmations) : cur.required_confirmations;
+
+  const ttl = input.payment_ttl_minutes !== undefined ? input.payment_ttl_minutes : cur.payment_ttl_minutes;
+  if (ttl < 5 || ttl > 1440) throw new Error('payment_ttl_minutes must be between 5 and 1440');
+
+  db.prepare(`
+    UPDATE crypto_config
+    SET enabled = ?, supported_coins = ?, binance_pay_enabled = ?,
+        binance_merchant_id = ?, binance_api_key = ?, binance_api_secret = ?,
+        required_confirmations = ?, payment_ttl_minutes = ?, updated_at = ?
+    WHERE id = ?
+  `).run(enabled, coins, bpayEnabled, merchant, apiKey, apiSecret,
+    confirmations, ttl, now, CRYPTO_CONFIG_ID);
+
+  return getCryptoConfig();
+}
+
+export interface CryptoPayment {
+  id: string;
+  transaction_id: string;
+  user_id: string;
+  provider: CryptoProvider;
+  coin: CryptoCoin;
+  network: string;
+  amount_crypto: number;
+  amount_fiat: number;
+  fiat_currency: string;
+  receive_address: string | null;
+  memo: string | null;
+  tx_hash: string | null;
+  status: 'pending' | 'confirmed' | 'failed' | 'expired';
+  confirmations: number;
+  required_confirmations: number;
+  expires_at: string;
+  confirmed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+const NETWORK_BY_COIN: Record<CryptoCoin, string> = {
+  BTC: 'bitcoin',
+  ETH: 'ethereum',
+  USDT: 'tron',       // default USDT network — Tron (TRC20)
+  USDC: 'ethereum',   // default USDC network
+  BNB: 'bsc',
+};
+
+export interface CreateCryptoPaymentInput {
+  transaction_id: string;
+  user_id: string;
+  coin: CryptoCoin;
+  amount_crypto: number;
+  provider?: CryptoProvider;
+}
+
+export function createCryptoPayment(input: CreateCryptoPaymentInput): CryptoPayment {
+  const db = getDb();
+  const cfg = getCryptoConfig();
+
+  if (!cfg.enabled) throw new Error('Crypto payments are disabled');
+  if (!cfg.supported_coins.includes(input.coin)) {
+    throw new Error(`Coin ${input.coin} is not supported`);
+  }
+  if (!(input.amount_crypto > 0)) throw new Error('amount_crypto must be positive');
+
+  const tx = getTransactionById(input.transaction_id);
+  if (!tx) throw new Error('Transaction not found');
+
+  const provider: CryptoProvider = input.provider ?? (cfg.binance_pay_enabled ? 'binance_pay' : 'wallet');
+  if (provider === 'binance_pay' && !cfg.binance_pay_enabled) {
+    throw new Error('Binance Pay is not enabled');
+  }
+
+  const now = new Date();
+  const expires = new Date(now.getTime() + cfg.payment_ttl_minutes * 60 * 1000);
+  const requiredConfirmations = cfg.required_confirmations[input.coin] ?? 1;
+
+  // Binance Pay returns address via API in real flow; placeholder here.
+  const receiveAddress = provider === 'binance_pay'
+    ? `binance_pay:${cfg.binance_merchant_id ?? 'unset'}`
+    : `wallet:${input.coin.toLowerCase()}:placeholder-${randomUUID().slice(0, 8)}`;
+  const memo = provider === 'wallet' ? `MF-${randomUUID().slice(0, 8).toUpperCase()}` : null;
+
+  const cpay: CryptoPayment = {
+    id: randomUUID(),
+    transaction_id: input.transaction_id,
+    user_id: input.user_id,
+    provider,
+    coin: input.coin,
+    network: NETWORK_BY_COIN[input.coin],
+    amount_crypto: input.amount_crypto,
+    amount_fiat: tx.amount,
+    fiat_currency: tx.currency,
+    receive_address: receiveAddress,
+    memo,
+    tx_hash: null,
+    status: 'pending',
+    confirmations: 0,
+    required_confirmations: requiredConfirmations,
+    expires_at: expires.toISOString(),
+    confirmed_at: null,
+    created_at: now.toISOString(),
+    updated_at: now.toISOString(),
+  };
+
+  db.prepare(`
+    INSERT INTO crypto_payments (id, transaction_id, user_id, provider, coin, network,
+      amount_crypto, amount_fiat, fiat_currency, receive_address, memo, tx_hash,
+      status, confirmations, required_confirmations, expires_at, confirmed_at,
+      created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    cpay.id, cpay.transaction_id, cpay.user_id, cpay.provider, cpay.coin, cpay.network,
+    cpay.amount_crypto, cpay.amount_fiat, cpay.fiat_currency, cpay.receive_address,
+    cpay.memo, cpay.tx_hash, cpay.status, cpay.confirmations, cpay.required_confirmations,
+    cpay.expires_at, cpay.confirmed_at, cpay.created_at, cpay.updated_at
+  );
+
+  return cpay;
+}
+
+export function getCryptoPaymentById(id: string): CryptoPayment | null {
+  const db = getDb();
+  return (db.prepare('SELECT * FROM crypto_payments WHERE id = ?').get(id) as CryptoPayment | undefined) ?? null;
+}
+
+export function listCryptoPayments(limit = 100, offset = 0, status?: string): CryptoPayment[] {
+  const db = getDb();
+  if (status) {
+    return db.prepare('SELECT * FROM crypto_payments WHERE status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?')
+      .all(status, limit, offset) as CryptoPayment[];
+  }
+  return db.prepare('SELECT * FROM crypto_payments ORDER BY created_at DESC LIMIT ? OFFSET ?')
+    .all(limit, offset) as CryptoPayment[];
+}
+
+export function listCryptoPaymentsByUser(userId: string, limit = 100): CryptoPayment[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM crypto_payments WHERE user_id = ? ORDER BY created_at DESC LIMIT ?')
+    .all(userId, limit) as CryptoPayment[];
+}
+
+/**
+ * Confirm a crypto payment (called by admin after on-chain verification,
+ * or automatically by a Binance Pay webhook adapter).
+ * If confirmations >= required → status=confirmed + tx completed.
+ */
+export function confirmCryptoPayment(
+  id: string,
+  txHash: string,
+  confirmations: number,
+): CryptoPayment | null {
+  const db = getDb();
+  const cp = getCryptoPaymentById(id);
+  if (!cp) return null;
+  if (cp.status === 'confirmed') return cp;
+  if (cp.status === 'expired' || cp.status === 'failed') {
+    throw new Error(`Cannot confirm payment in status ${cp.status}`);
+  }
+  if (!txHash || txHash.length < 4) throw new Error('tx_hash is required');
+  if (confirmations < 0) throw new Error('confirmations must be >= 0');
+
+  const now = new Date().toISOString();
+  const reached = confirmations >= cp.required_confirmations;
+
+  db.prepare(`
+    UPDATE crypto_payments
+    SET tx_hash = ?, confirmations = ?, status = ?,
+        confirmed_at = CASE WHEN ? = 1 THEN COALESCE(confirmed_at, ?) ELSE confirmed_at END,
+        updated_at = ?
+    WHERE id = ?
+  `).run(
+    txHash, confirmations, reached ? 'confirmed' : 'pending',
+    reached ? 1 : 0, now, now, id
+  );
+
+  if (reached && cp.status !== 'confirmed') {
+    updateTransactionStatus(cp.transaction_id, 'completed');
+  }
+
+  return getCryptoPaymentById(id);
+}
+
+export function failCryptoPayment(id: string, reason?: string): CryptoPayment | null {
+  const db = getDb();
+  const cp = getCryptoPaymentById(id);
+  if (!cp) return null;
+  if (cp.status !== 'pending') return cp;
+  const now = new Date().toISOString();
+  db.prepare(`UPDATE crypto_payments SET status = 'failed', memo = COALESCE(?, memo), updated_at = ? WHERE id = ?`)
+    .run(reason ?? null, now, id);
+  return getCryptoPaymentById(id);
+}
+
+/**
+ * Sweep pending payments whose expires_at < now → mark expired.
+ * Returns number of rows affected.
+ */
+export function expireCryptoPayments(): number {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const r = db.prepare(`
+    UPDATE crypto_payments
+    SET status = 'expired', updated_at = ?
+    WHERE status = 'pending' AND expires_at < ?
+  `).run(now, now);
+  return r.changes;
+}
+
+export interface CryptoStats {
+  total_payments: number;
+  pending: number;
+  confirmed: number;
+  failed: number;
+  expired: number;
+  total_crypto_volume: number;
+  by_coin: Array<{ coin: string; count: number; crypto_amount: number; fiat_amount: number }>;
+}
+
+export function getCryptoStats(): CryptoStats {
+  const db = getDb();
+  const rows = db.prepare('SELECT status, COUNT(*) as n FROM crypto_payments GROUP BY status')
+    .all() as Array<{ status: string; n: number }>;
+  const stats: CryptoStats = {
+    total_payments: 0, pending: 0, confirmed: 0, failed: 0, expired: 0,
+    total_crypto_volume: 0, by_coin: [],
+  };
+  for (const r of rows) {
+    stats.total_payments += r.n;
+    if (r.status === 'pending') stats.pending = r.n;
+    else if (r.status === 'confirmed') stats.confirmed = r.n;
+    else if (r.status === 'failed') stats.failed = r.n;
+    else if (r.status === 'expired') stats.expired = r.n;
+  }
+  stats.by_coin = db.prepare(`
+    SELECT coin, COUNT(*) as count,
+           COALESCE(SUM(amount_crypto), 0) as crypto_amount,
+           COALESCE(SUM(amount_fiat), 0) as fiat_amount
+    FROM crypto_payments
+    GROUP BY coin
+    ORDER BY count DESC
+  `).all() as Array<{ coin: string; count: number; crypto_amount: number; fiat_amount: number }>;
+
+  stats.total_crypto_volume = (db.prepare(
+    "SELECT COALESCE(SUM(amount_crypto), 0) as s FROM crypto_payments WHERE status = 'confirmed'"
+  ).get() as { s: number }).s;
+
   return stats;
 }

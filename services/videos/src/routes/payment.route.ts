@@ -15,6 +15,9 @@ import {
   getThreeDSConfig, setThreeDSConfig, requiresThreeDS, createThreeDSSession,
   getThreeDSSession, listThreeDSSessions, listThreeDSSessionsByTransaction,
   completeThreeDSSession, getThreeDSStats,
+  getCryptoConfig, setCryptoConfig, createCryptoPayment, getCryptoPaymentById,
+  listCryptoPayments, listCryptoPaymentsByUser, confirmCryptoPayment,
+  failCryptoPayment, expireCryptoPayments, getCryptoStats,
 } from '../services/payment.service.js';
 import { grantMessagePack } from '../services/chatlimits.service.js';
 import { getDb } from '@melodyflix/shared-db';
@@ -610,5 +613,150 @@ export async function paymentRoutes(app: FastifyInstance) {
     try { requireRole(req.headers.authorization, ['admin']); }
     catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
     return reply.send({ success: true, data: getThreeDSStats() });
+  });
+
+  // ============ CRYPTO (29.10) ============
+
+  // GET /payment/crypto/config — public (safe fields only)
+  app.get('/payment/crypto/config', async (_req, reply) => {
+    return reply.send({ success: true, data: getCryptoConfig() });
+  });
+
+  // PUT /payment/admin/crypto/config — admin
+  app.put('/payment/admin/crypto/config', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+
+    const BodySchema = z.object({
+      enabled: z.boolean().optional(),
+      supported_coins: z.array(z.enum(['BTC', 'ETH', 'USDT', 'USDC', 'BNB'])).optional(),
+      binance_pay_enabled: z.boolean().optional(),
+      binance_merchant_id: z.string().max(200).nullable().optional(),
+      binance_api_key: z.string().max(500).nullable().optional(),
+      binance_api_secret: z.string().max(500).nullable().optional(),
+      required_confirmations: z.record(z.number().int().min(0).max(100)).optional(),
+      payment_ttl_minutes: z.number().int().min(5).max(1440).optional(),
+    });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+
+    try {
+      return reply.send({ success: true, data: setCryptoConfig(parsed.data) });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // POST /payment/crypto/create — user creates crypto payment for a transaction
+  app.post('/payment/crypto/create', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+
+    const BodySchema = z.object({
+      transaction_id: z.string().min(1),
+      coin: z.enum(['BTC', 'ETH', 'USDT', 'USDC', 'BNB']),
+      amount_crypto: z.number().positive(),
+      provider: z.enum(['binance_pay', 'wallet']).optional(),
+    });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+
+    const tx = getTransactionById(parsed.data.transaction_id);
+    if (!tx) return reply.code(404).send({ success: false, error: 'Transaction not found' });
+    if (tx.user_id !== user.sub) return reply.code(403).send({ success: false, error: 'Not authorized' });
+
+    try {
+      const cp = createCryptoPayment({
+        transaction_id: parsed.data.transaction_id,
+        user_id: user.sub,
+        coin: parsed.data.coin,
+        amount_crypto: parsed.data.amount_crypto,
+        provider: parsed.data.provider,
+      });
+      return reply.code(201).send({ success: true, data: cp });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // GET /payment/crypto/mine — user's crypto payments
+  app.get('/payment/crypto/mine', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    return reply.send({ success: true, data: { payments: listCryptoPaymentsByUser(user.sub) } });
+  });
+
+  // GET /payment/crypto/:id — owner or admin
+  app.get('/payment/crypto/:id', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const cp = getCryptoPaymentById(id);
+    if (!cp) return reply.code(404).send({ success: false, error: 'Crypto payment not found' });
+    if (cp.user_id !== user.sub && user.role !== 'admin') {
+      return reply.code(403).send({ success: false, error: 'Not authorized' });
+    }
+    return reply.send({ success: true, data: cp });
+  });
+
+  // ============ CRYPTO — ADMIN ============
+
+  // GET /payment/admin/crypto/payments — admin list
+  app.get('/payment/admin/crypto/payments', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const q = req.query as { limit?: string; offset?: string; status?: string };
+    const limit = Math.min(Number(q.limit ?? 100), 500);
+    const offset = Number(q.offset ?? 0);
+    return reply.send({ success: true, data: { payments: listCryptoPayments(limit, offset, q.status) } });
+  });
+
+  // POST /payment/admin/crypto/:id/confirm — admin confirms on-chain tx
+  app.post('/payment/admin/crypto/:id/confirm', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const BodySchema = z.object({
+      tx_hash: z.string().min(4),
+      confirmations: z.number().int().min(0),
+    });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+    try {
+      const r = confirmCryptoPayment(id, parsed.data.tx_hash, parsed.data.confirmations);
+      if (!r) return reply.code(404).send({ success: false, error: 'Crypto payment not found' });
+      return reply.send({ success: true, data: r });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // POST /payment/admin/crypto/:id/fail — admin marks failed
+  app.post('/payment/admin/crypto/:id/fail', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const { reason } = (req.body ?? {}) as { reason?: string };
+    const r = failCryptoPayment(id, reason);
+    if (!r) return reply.code(404).send({ success: false, error: 'Crypto payment not found' });
+    return reply.send({ success: true, data: r });
+  });
+
+  // POST /payment/admin/crypto/expire-sweep — admin triggers expiry sweep
+  app.post('/payment/admin/crypto/expire-sweep', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const n = expireCryptoPayments();
+    return reply.send({ success: true, data: { expired: n } });
+  });
+
+  // GET /payment/admin/crypto/stats — admin
+  app.get('/payment/admin/crypto/stats', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    return reply.send({ success: true, data: getCryptoStats() });
   });
 }
