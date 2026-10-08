@@ -862,7 +862,40 @@ infrastructure can carry game streams as channels with kind metadata.
 
 ## Section 43 — Website Builder and Customization
 
-All items [TODO] — zero code (this is a builder feature, not in scope)
+**Phase 1 (DONE — commit 21613ba)** — Site configuration backbone:
+- 43.a Site Settings: name, logo, favicon, tagline, meta, social, contact
+- 43.b Themes: mode (dark/light/auto), primary/secondary/accent/bg/text
+  colors, heading/body fonts, custom_css, tokens; one active theme
+- 43.c Homepage Layout: ordered sections with per-section config_json
+- 43.d Custom Pages: slug, title, markdown/HTML, published, in-nav
+- 43.e Navigation: header/footer/sidebar menus with parent/child
+- 43.f Public Render: GET /site/config bundles all of the above
+
+**Phase 2 (DONE — commit 863bdb5)** — Elementor-style element tree:
+- 43.7 Element Tree: nested section/column/container/widget with
+  deep-merge update, recursive delete, cycle-safe move, deep
+  duplicate, reorder, getPageTree
+- 43.8 Widget Library: 38 widgets across 6 categories
+  (basic/media/layout/form/pro/动态)
+- 43.9 Style Controls: per-element style map (typography/color/
+  spacing/border/shadow/background)
+- 43.10 Responsive: per-element responsive map for tablet/mobile
+- 43.11 Revision History: snapshot + list + restore
+- 43.12 Global Styles: site-wide kind/key/value tokens
+- 43.13 Template Library: save/apply/delete + categories
+- 43.14 Custom CSS/JS per element (scoped .mf-el-<id>)
+- 43.15 Form Builder + Submissions (public submit + admin workflow)
+- 43.16 Dynamic Tags: video_title, video_thumbnail, channel_name,
+  category_list, trending_grid, content_type_grid
+
+**Phase 3 (PENDING)** — Frontend drag-drop editor UI (React):
+canvas, widget palette, inspector panel, responsive toggles,
+undo/redo, template browser. Backend APIs are in place at
+/api/v1/videos/builder/*.
+
+**Verified 2026-10-08**: Phase 1 (settings/themes/homepage/pages/nav/
+render) + Phase 2 (tree build, deep clone, revision, global styles,
+template save, form submit) tested via curl.
 
 ## Section 44 — Content Migration
 
