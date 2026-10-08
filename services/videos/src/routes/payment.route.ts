@@ -23,6 +23,9 @@ import {
   detectCardBrand, luhnCheck, createCardToken, getCardToken,
   listCardTokensByUser, listAllCardTokens, setDefaultCardToken,
   revokeCardToken, markCardTokenUsed, getTokenizationStats, listTokenizationLog,
+  CHARGEBACK_REASON_CODES, createChargeback, getChargebackById, listChargebacks,
+  listChargebacksByUser, listChargebacksByTransaction, addChargebackEvidence,
+  respondToChargeback, resolveChargeback, listChargebackEvents, getChargebackStats,
 } from '../services/payment.service.js';
 import { grantMessagePack } from '../services/chatlimits.service.js';
 import { getDb } from '@melodyflix/shared-db';
@@ -1033,5 +1036,150 @@ export async function paymentRoutes(app: FastifyInstance) {
     const q = req.query as { token_id?: string; limit?: string };
     const limit = Math.min(Number(q.limit ?? 100), 500);
     return reply.send({ success: true, data: { entries: listTokenizationLog(q.token_id, limit) } });
+  });
+
+  // ============ CHARGEBACKS (29.16) ============
+
+  // GET /payment/chargebacks/reason-codes — public (client form)
+  app.get('/payment/chargebacks/reason-codes', async (_req, reply) => {
+    return reply.send({ success: true, data: { codes: CHARGEBACK_REASON_CODES } });
+  });
+
+  // GET /payment/chargebacks/mine — user's chargebacks
+  app.get('/payment/chargebacks/mine', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    return reply.send({ success: true, data: { chargebacks: listChargebacksByUser(user.sub) } });
+  });
+
+  // GET /payment/chargebacks/:id — owner or admin
+  app.get('/payment/chargebacks/:id', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const cb = getChargebackById(id);
+    if (!cb) return reply.code(404).send({ success: false, error: 'Chargeback not found' });
+    if (cb.user_id !== user.sub && user.role !== 'admin') {
+      return reply.code(403).send({ success: false, error: 'Not authorized' });
+    }
+    return reply.send({ success: true, data: cb });
+  });
+
+  // ============ CHARGEBACKS — ADMIN ============
+
+  // GET /payment/admin/chargebacks — list (?status=)
+  app.get('/payment/admin/chargebacks', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const q = req.query as { limit?: string; offset?: string; status?: string };
+    const limit = Math.min(Number(q.limit ?? 100), 500);
+    const offset = Number(q.offset ?? 0);
+    return reply.send({ success: true, data: { chargebacks: listChargebacks(limit, offset, q.status) } });
+  });
+
+  // POST /payment/admin/chargebacks — admin creates (or gateway webhook simulates)
+  app.post('/payment/admin/chargebacks', async (req, reply) => {
+    let admin;
+    try { admin = requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+
+    const BodySchema = z.object({
+      transaction_id: z.string().min(1),
+      reason_code: z.enum(CHARGEBACK_REASON_CODES),
+      reason_text: z.string().max(500).optional(),
+      due_days: z.number().int().min(1).max(120).optional(),
+    });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+
+    try {
+      const cb = createChargeback({ ...parsed.data, actor: admin.sub });
+      return reply.code(201).send({ success: true, data: cb });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // GET /payment/admin/chargebacks/stats — stats
+  app.get('/payment/admin/chargebacks/stats', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    return reply.send({ success: true, data: getChargebackStats() });
+  });
+
+  // GET /payment/admin/chargebacks/by-transaction/:txId — lookup by tx
+  app.get('/payment/admin/chargebacks/by-transaction/:txId', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { txId } = req.params as { txId: string };
+    return reply.send({ success: true, data: { chargebacks: listChargebacksByTransaction(txId) } });
+  });
+
+  // GET /payment/admin/chargebacks/:id/events — admin, event trail
+  app.get('/payment/admin/chargebacks/:id/events', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    return reply.send({ success: true, data: { events: listChargebackEvents(id) } });
+  });
+
+  // POST /payment/admin/chargebacks/:id/evidence — admin adds evidence
+  app.post('/payment/admin/chargebacks/:id/evidence', async (req, reply) => {
+    let admin;
+    try { admin = requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const BodySchema = z.object({
+      label: z.string().min(1).max(100),
+      value: z.string().min(1).max(2000),
+    });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+    try {
+      const cb = addChargebackEvidence(id, parsed.data, admin.sub);
+      if (!cb) return reply.code(404).send({ success: false, error: 'Chargeback not found' });
+      return reply.send({ success: true, data: cb });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // POST /payment/admin/chargebacks/:id/respond — mark under_review
+  app.post('/payment/admin/chargebacks/:id/respond', async (req, reply) => {
+    let admin;
+    try { admin = requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const { notes } = (req.body ?? {}) as { notes?: string };
+    try {
+      const cb = respondToChargeback(id, admin.sub, notes);
+      if (!cb) return reply.code(404).send({ success: false, error: 'Chargeback not found' });
+      return reply.send({ success: true, data: cb });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // POST /payment/admin/chargebacks/:id/resolve — final decision
+  app.post('/payment/admin/chargebacks/:id/resolve', async (req, reply) => {
+    let admin;
+    try { admin = requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const BodySchema = z.object({
+      outcome: z.enum(['merchant_won', 'merchant_lost', 'accepted']),
+      notes: z.string().max(500).optional(),
+    });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+    try {
+      const cb = resolveChargeback(id, parsed.data.outcome, admin.sub, parsed.data.notes);
+      if (!cb) return reply.code(404).send({ success: false, error: 'Chargeback not found' });
+      return reply.send({ success: true, data: cb });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
   });
 }

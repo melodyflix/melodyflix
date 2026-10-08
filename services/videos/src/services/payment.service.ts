@@ -239,6 +239,39 @@ export function ensurePaymentSchema(): void {
     );
     CREATE INDEX IF NOT EXISTS idx_tl_token ON tokenization_log(token_id);
     CREATE INDEX IF NOT EXISTS idx_tl_action ON tokenization_log(action);
+
+    CREATE TABLE IF NOT EXISTS chargebacks (
+      id TEXT PRIMARY KEY,
+      transaction_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      amount REAL NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'BDT',
+      reason_code TEXT NOT NULL,
+      reason_text TEXT,
+      status TEXT NOT NULL DEFAULT 'open',
+      evidence TEXT NOT NULL DEFAULT '[]',
+      disputed_at TEXT NOT NULL,
+      responded_at TEXT,
+      resolved_at TEXT,
+      due_date TEXT,
+      handled_by TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_cb_tx ON chargebacks(transaction_id);
+    CREATE INDEX IF NOT EXISTS idx_cb_user ON chargebacks(user_id);
+    CREATE INDEX IF NOT EXISTS idx_cb_status ON chargebacks(status);
+
+    CREATE TABLE IF NOT EXISTS chargeback_events (
+      id TEXT PRIMARY KEY,
+      chargeback_id TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      actor TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_ce_cb ON chargeback_events(chargeback_id);
   `);
 
   // Lightweight column migrations for existing databases
@@ -2244,4 +2277,293 @@ export function listTokenizationLog(tokenId?: string, limit = 100): Array<{
   }
   return db.prepare('SELECT * FROM tokenization_log ORDER BY created_at DESC LIMIT ?')
     .all(limit) as Array<{ id: string; token_id: string; action: string; ip: string | null; user_agent: string | null; created_at: string }>;
+}
+
+// ============ Chargeback Management (29.16) ============
+
+export type ChargebackStatus = 'open' | 'under_review' | 'merchant_won' | 'merchant_lost' | 'accepted';
+
+export const CHARGEBACK_REASON_CODES = [
+  'fraudulent',
+  'product_not_received',
+  'product_unacceptable',
+  'duplicate',
+  'subscription_canceled',
+  'credit_not_processed',
+  'unrecognized',
+  'other',
+] as const;
+
+export type ChargebackReasonCode = typeof CHARGEBACK_REASON_CODES[number];
+
+export interface Chargeback {
+  id: string;
+  transaction_id: string;
+  user_id: string;
+  amount: number;
+  currency: string;
+  reason_code: string;
+  reason_text: string | null;
+  status: ChargebackStatus;
+  evidence: Array<{ label: string; value: string; added_at: string; added_by?: string }>;
+  disputed_at: string;
+  responded_at: string | null;
+  resolved_at: string | null;
+  due_date: string | null;
+  handled_by: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ChargebackRow {
+  id: string;
+  transaction_id: string;
+  user_id: string;
+  amount: number;
+  currency: string;
+  reason_code: string;
+  reason_text: string | null;
+  status: string;
+  evidence: string;
+  disputed_at: string;
+  responded_at: string | null;
+  resolved_at: string | null;
+  due_date: string | null;
+  handled_by: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function chargebackRowToObj(row: ChargebackRow): Chargeback {
+  let evidence: Chargeback['evidence'] = [];
+  try { evidence = JSON.parse(row.evidence) as Chargeback['evidence']; } catch {}
+  return {
+    id: row.id,
+    transaction_id: row.transaction_id,
+    user_id: row.user_id,
+    amount: row.amount,
+    currency: row.currency,
+    reason_code: row.reason_code,
+    reason_text: row.reason_text,
+    status: row.status as ChargebackStatus,
+    evidence,
+    disputed_at: row.disputed_at,
+    responded_at: row.responded_at,
+    resolved_at: row.resolved_at,
+    due_date: row.due_date,
+    handled_by: row.handled_by,
+    notes: row.notes,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function logChargebackEvent(chargebackId: string, eventType: string, actor?: string, notes?: string): void {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO chargeback_events (id, chargeback_id, event_type, actor, notes, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(randomUUID(), chargebackId, eventType, actor ?? null, notes ?? null, new Date().toISOString());
+}
+
+export interface CreateChargebackInput {
+  transaction_id: string;
+  reason_code: ChargebackReasonCode | string;
+  reason_text?: string;
+  due_days?: number;
+  actor?: string;
+}
+
+export function createChargeback(input: CreateChargebackInput): Chargeback {
+  const db = getDb();
+  const tx = getTransactionById(input.transaction_id);
+  if (!tx) throw new Error('Transaction not found');
+  if (tx.status !== 'completed' && tx.status !== 'refunded') {
+    throw new Error('Only completed (or refunded) transactions can be disputed');
+  }
+
+  // Prevent double chargeback for the same tx while one is still open
+  const existing = db.prepare(
+    "SELECT id FROM chargebacks WHERE transaction_id = ? AND status IN ('open','under_review')"
+  ).get(input.transaction_id) as { id: string } | undefined;
+  if (existing) throw new Error('An open chargeback already exists for this transaction');
+
+  const now = new Date();
+  const due = new Date(now.getTime() + (input.due_days ?? 7) * 24 * 60 * 60 * 1000);
+  const id = randomUUID();
+
+  db.prepare(`
+    INSERT INTO chargebacks (id, transaction_id, user_id, amount, currency, reason_code,
+      reason_text, status, evidence, disputed_at, responded_at, resolved_at, due_date,
+      handled_by, notes, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'open', '[]', ?, NULL, NULL, ?, NULL, NULL, ?, ?)
+  `).run(
+    id, input.transaction_id, tx.user_id, tx.amount, tx.currency,
+    input.reason_code, input.reason_text ?? null,
+    now.toISOString(), due.toISOString(), now.toISOString(), now.toISOString()
+  );
+
+  logChargebackEvent(id, 'created', input.actor ?? 'system', `reason: ${input.reason_code}`);
+
+  return getChargebackById(id)!;
+}
+
+export function getChargebackById(id: string): Chargeback | null {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM chargebacks WHERE id = ?').get(id) as ChargebackRow | undefined;
+  return row ? chargebackRowToObj(row) : null;
+}
+
+export function listChargebacks(limit = 100, offset = 0, status?: string): Chargeback[] {
+  const db = getDb();
+  const rows = status
+    ? db.prepare('SELECT * FROM chargebacks WHERE status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?')
+        .all(status, limit, offset) as ChargebackRow[]
+    : db.prepare('SELECT * FROM chargebacks ORDER BY created_at DESC LIMIT ? OFFSET ?')
+        .all(limit, offset) as ChargebackRow[];
+  return rows.map(chargebackRowToObj);
+}
+
+export function listChargebacksByUser(userId: string, limit = 100): Chargeback[] {
+  const db = getDb();
+  const rows = db.prepare('SELECT * FROM chargebacks WHERE user_id = ? ORDER BY created_at DESC LIMIT ?')
+    .all(userId, limit) as ChargebackRow[];
+  return rows.map(chargebackRowToObj);
+}
+
+export function listChargebacksByTransaction(txId: string): Chargeback[] {
+  const db = getDb();
+  const rows = db.prepare('SELECT * FROM chargebacks WHERE transaction_id = ? ORDER BY created_at DESC')
+    .all(txId) as ChargebackRow[];
+  return rows.map(chargebackRowToObj);
+}
+
+export function addChargebackEvidence(
+  id: string,
+  evidence: { label: string; value: string },
+  addedBy?: string,
+): Chargeback | null {
+  const db = getDb();
+  const cb = getChargebackById(id);
+  if (!cb) return null;
+  if (cb.status === 'merchant_won' || cb.status === 'merchant_lost' || cb.status === 'accepted') {
+    throw new Error(`Cannot add evidence to a resolved chargeback (${cb.status})`);
+  }
+
+  const list = cb.evidence.slice();
+  list.push({
+    label: evidence.label.slice(0, 100),
+    value: evidence.value.slice(0, 2000),
+    added_at: new Date().toISOString(),
+    added_by: addedBy,
+  });
+
+  const now = new Date().toISOString();
+  db.prepare('UPDATE chargebacks SET evidence = ?, updated_at = ? WHERE id = ?')
+    .run(JSON.stringify(list), now, id);
+
+  logChargebackEvent(id, 'evidence_added', addedBy, evidence.label);
+  return getChargebackById(id);
+}
+
+export function respondToChargeback(id: string, adminId: string, notes?: string): Chargeback | null {
+  const db = getDb();
+  const cb = getChargebackById(id);
+  if (!cb) return null;
+  if (cb.status !== 'open' && cb.status !== 'under_review') {
+    throw new Error(`Cannot respond in status ${cb.status}`);
+  }
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE chargebacks
+    SET status = 'under_review', responded_at = COALESCE(responded_at, ?),
+        handled_by = ?, notes = COALESCE(?, notes), updated_at = ?
+    WHERE id = ?
+  `).run(now, adminId, notes ?? null, now, id);
+
+  logChargebackEvent(id, 'responded', adminId, notes);
+  return getChargebackById(id);
+}
+
+export function resolveChargeback(
+  id: string,
+  outcome: 'merchant_won' | 'merchant_lost' | 'accepted',
+  adminId: string,
+  notes?: string,
+): Chargeback | null {
+  const db = getDb();
+  const cb = getChargebackById(id);
+  if (!cb) return null;
+  if (cb.status === 'merchant_won' || cb.status === 'merchant_lost' || cb.status === 'accepted') {
+    return cb; // idempotent
+  }
+
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE chargebacks
+    SET status = ?, resolved_at = ?, handled_by = ?, notes = COALESCE(?, notes), updated_at = ?
+    WHERE id = ?
+  `).run(outcome, now, adminId, notes ?? null, now, id);
+
+  logChargebackEvent(id, 'resolved', adminId, `outcome: ${outcome}${notes ? ' - ' + notes : ''}`);
+  return getChargebackById(id);
+}
+
+export function listChargebackEvents(chargebackId: string): Array<{
+  id: string; chargeback_id: string; event_type: string;
+  actor: string | null; notes: string | null; created_at: string;
+}> {
+  const db = getDb();
+  return db.prepare('SELECT * FROM chargeback_events WHERE chargeback_id = ? ORDER BY created_at ASC')
+    .all(chargebackId) as Array<{ id: string; chargeback_id: string; event_type: string; actor: string | null; notes: string | null; created_at: string }>;
+}
+
+export interface ChargebackStats {
+  total: number;
+  open: number;
+  under_review: number;
+  merchant_won: number;
+  merchant_lost: number;
+  accepted: number;
+  total_disputed_amount: number;
+  total_lost_amount: number;
+  win_rate: number;
+  by_reason: Array<{ reason: string; count: number }>;
+  overdue: number;
+}
+
+export function getChargebackStats(): ChargebackStats {
+  const db = getDb();
+  const rows = db.prepare('SELECT status, COUNT(*) as n, COALESCE(SUM(amount), 0) as amt FROM chargebacks GROUP BY status')
+    .all() as Array<{ status: string; n: number; amt: number }>;
+
+  const stats: ChargebackStats = {
+    total: 0, open: 0, under_review: 0, merchant_won: 0, merchant_lost: 0,
+    accepted: 0, total_disputed_amount: 0, total_lost_amount: 0, win_rate: 0,
+    by_reason: [], overdue: 0,
+  };
+  for (const r of rows) {
+    stats.total += r.n;
+    stats.total_disputed_amount += r.amt;
+    if (r.status === 'open') stats.open = r.n;
+    else if (r.status === 'under_review') stats.under_review = r.n;
+    else if (r.status === 'merchant_won') stats.merchant_won = r.n;
+    else if (r.status === 'merchant_lost') { stats.merchant_lost = r.n; stats.total_lost_amount += r.amt; }
+    else if (r.status === 'accepted') { stats.accepted = r.n; stats.total_lost_amount += r.amt; }
+  }
+  const decided = stats.merchant_won + stats.merchant_lost;
+  stats.win_rate = decided > 0 ? Math.round((stats.merchant_won / decided) * 10000) / 100 : 0;
+
+  stats.by_reason = db.prepare(
+    'SELECT reason_code as reason, COUNT(*) as count FROM chargebacks GROUP BY reason_code ORDER BY count DESC'
+  ).all() as Array<{ reason: string; count: number }>;
+
+  const nowIso = new Date().toISOString();
+  stats.overdue = (db.prepare(
+    "SELECT COUNT(*) as n FROM chargebacks WHERE status IN ('open','under_review') AND due_date IS NOT NULL AND due_date < ?"
+  ).get(nowIso) as { n: number }).n;
+
+  return stats;
 }
