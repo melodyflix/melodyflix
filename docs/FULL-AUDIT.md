@@ -1022,10 +1022,35 @@ Note: Cross-posting (auto-publish to social) already in distribution.service.ts 
 
 ## Section 48 — Video Preview and Trailer
 
-| 48.1 | Automatic Trailer Generation | [TODO] |
-| 48.2 | Preview Clips | [PARTIAL] clip.service.ts |
-| 48.3 | Teaser Creation | [TODO] |
-| 48.4 | Highlight Reel | [PARTIAL] highlight.service.ts |
+| 48.1 | Automatic Trailer Generation | [DONE] preview_jobs + ffmpeg concat |
+| 48.2 | Preview Clips | [DONE] user trim + mp4/HLS output |
+| 48.3 | Teaser Creation | [DONE] kind=teaser preset (10-45s) |
+| 48.4 | Highlight Reel | [DONE] multi-segment compilation (up to 600s) |
+| + | Scene Analysis (BONUS) | [DONE] ffmpeg scene filter + parse |
+| + | Auto Chapters (BONUS) | [DONE] coalesced ≥20s chapters |
+| + | Thumbnail Strips (BONUS) | [DONE] sprite + WebVTT xywh |
+
+**Completed 2026-10-08 (commit 0dab540)**: All 4 Section 48 items + 3
+bonuses. Real ffmpeg execution.
+- Trailer/teaser/highlight: segment planner picks top-scored scenes to
+  fit target duration, then ffmpeg filter_complex trims + concatenates.
+- Preview clips: user-trimmed (max 10 min), mp4 or HLS output via
+  buildCutCommand + runPreviewClip.
+- Scene analysis: ffmpeg `select='gt(scene,threshold)',showinfo` +
+  timestamp parsing → scene intervals with heuristic scores.
+- Auto chapters: deriveAutoChapters coalesces scenes into ≥20s
+  chapters, timestamped titles.
+- Thumbnail strips: sprite generation via `fps=1/N,scale,tile` +
+  WebVTT cue builder emitting `#xywh` tile coordinates for player
+  scrub preview.
+
+30+ endpoints under /api/v1/videos covering jobs (CRUD+segments+run+
+auto-generate), clips (CRUD+run), scene-analyses (CRUD+run),
+auto-chapters (add/list/derive/delete), thumbnail-strips (CRUD+run+vtt).
+
+Verified end-to-end via curl: trailer (3 segments) + teaser + highlight
+jobs, user clip 30-45s, 6-scene analysis, 6 auto chapters, 5x4 sprite
+with WebVTT output.
 
 ## Section 49 — Cloud Storage Management
 
