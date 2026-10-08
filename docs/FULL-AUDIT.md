@@ -685,6 +685,23 @@ Content-Disposition attachment headers.
 | 36.3 | Rewards Program | [DONE] gamification.service.ts |
 | 36.4 | Streak Tracking | [DONE] gamification.service.ts |
 
+**Verified 2026-10-08**: All 4 items smoke-tested via curl (full lifecycle).
+- 36.1: awardPoints (delta + source enum + balance_after), history,
+  global leaderboard with rank/badge_count
+- 36.2: createChallenge (slug/kind/target_value/reward_points),
+  joinChallenge, recordProgress (delta), auto-transition
+  in_progress→completed, claimChallenge awards points+badge
+- 36.3: createReward (slug/title/kind/cost_points/stock), list, redeem
+  flow (pending/fulfilled/cancelled), inventory decrement
+- 36.4: recordStreakEvent (daily_watch|daily_login|weekly_upload),
+  extends on consecutive days, resets on gap, bonus_points, per-kind
+- Stats: total awarded/redeemed points, active challenges, redemption
+  counts, top streak, users_with_points
+
+Note: gamification is content-agnostic — hooks for live game streaming
+(PUBG/CoD/Free Fire watch-minutes) can feed the same watch_minutes
+challenge kind when that feature lands.
+
 ## Section 37 — Auto Content Upload System
 
 | 37.1 | Automatic Movie Upload | [DONE] content-ingest.service.ts |
