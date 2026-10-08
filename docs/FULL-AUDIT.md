@@ -1078,14 +1078,39 @@ executed (0 objects moved in empty DB), analytics snapshots recorded.
 
 ## Section 50 — Video Compliance
 
-| 50.1 | COPPA Compliance | [TODO] |
-| 50.2 | Age-Gate System | [PARTIAL] livetv parental |
-| 50.3 | Content Rating System | [TODO] |
-| 50.4 | Regional Compliance Tools | [TODO] |
-| 50.5 | Compliance Checklist | [TODO] |
-| 50.6 | Evidence Collection | [TODO] |
-| 50.7 | Audit Report | [TODO] |
-| 50.8 | Policy Versioning | [TODO] |
+| 50.1 | COPPA Compliance | [DONE] child-directed flag + auto TV-Y |
+| 50.2 | Age-Gate System | [DONE] per-video gate + user verification |
+| 50.3 | Content Rating System | [DONE] 11 ratings + regional map |
+| 50.4 | Regional Compliance Tools | [DONE] GDPR/CCPA rules engine |
+| 50.5 | Compliance Checklist | [DONE] templates + weighted scoring |
+| 50.6 | Evidence Collection | [DONE] file/url/text/screenshot + sha256 |
+| 50.7 | Audit Report | [DONE] auto-generated score + findings |
+| 50.8 | Policy Versioning | [DONE] draft/published/retired + supersede |
+
+**Completed 2026-10-08 (commit e814e37)**: All 8 items implemented.
+
+- 50.1 COPPA: `coppa_child_directed` auto-sets `age_rating=TV-Y`;
+  flags `coppa_personal_info_collected` as violation in audits
+- 50.2 Age-Gate: per-video `requires_age_gate` + `min_age`
+  auto-derived from rating (PG-13 → 13+, R → 17+, NC-17 → 18+);
+  `canView(compliance, age, country)` returns allowed/reason;
+  user-side compliance_age_verifications table
+- 50.3 Content Rating: 11 canonical (G/PG/PG-13/R/NC-17/TV-Y/TV-G/
+  TV-PG/TV-14/TV-MA) + regional_ratings map (US/GB/BD tested)
+- 50.4 Regional Rules: GDPR/CCPA/DSA pluggable engine with
+  country+region+regulation+rule_key+value JSON
+- 50.5 Checklists: weighted templates + per-target runs, scoring
+  0-100 (verified 77.78% for 5/6 pass with weights)
+- 50.6 Evidence: url/file/text/screenshot kinds with sha256/mime/size
+- 50.7 Audit Reports: aggregates compliance record, checklist runs,
+  evidence, active policies → 0-100 score + severity findings
+  (verified score 99 with 1 warning); draft → final workflow
+- 50.8 Policy Versioning: policy_key + version; draft/published/
+  retired; effective_at; supersedes chain; 4 built-in seeds
+  (COPPA/GDPR/CCPA/age_gate) + v2 supersede tested
+
+Note: compliance uses its own `compliance_age_verifications` table
+(avoids clash with live-tv age_verifications).
 
 ## Section 51 — Ad Management System
 
