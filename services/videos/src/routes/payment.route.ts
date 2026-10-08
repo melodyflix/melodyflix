@@ -20,6 +20,9 @@ import {
   failCryptoPayment, expireCryptoPayments, getCryptoStats,
   getTaxConfig, setTaxConfig, upsertTaxRate, deleteTaxRate, listTaxRates,
   getTaxRateFor, calculateTax, recordTax, listTaxRecords, getTaxStats,
+  detectCardBrand, luhnCheck, createCardToken, getCardToken,
+  listCardTokensByUser, listAllCardTokens, setDefaultCardToken,
+  revokeCardToken, markCardTokenUsed, getTokenizationStats, listTokenizationLog,
 } from '../services/payment.service.js';
 import { grantMessagePack } from '../services/chatlimits.service.js';
 import { getDb } from '@melodyflix/shared-db';
@@ -875,5 +878,160 @@ export async function paymentRoutes(app: FastifyInstance) {
     try { requireRole(req.headers.authorization, ['admin']); }
     catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
     return reply.send({ success: true, data: getTaxStats() });
+  });
+
+  // ============ PCI TOKENIZATION (29.15) ============
+
+  // GET /payment/cards/brands — public (list detectable brands)
+  app.get('/payment/cards/brands', async (_req, reply) => {
+    return reply.send({ success: true, data: { brands: ['visa','mastercard','amex','discover','jcb','diners','unionpay'] } });
+  });
+
+  // POST /payment/cards/validate — public, checks Luhn + returns brand (no storage)
+  app.post('/payment/cards/validate', async (req, reply) => {
+    const BodySchema = z.object({ pan: z.string().min(12).max(25) });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+    const pan = parsed.data.pan.replace(/\D/g, '');
+    const valid = luhnCheck(pan);
+    const brand = detectCardBrand(pan);
+    return reply.send({
+      success: true,
+      data: { valid, brand, last4: pan.slice(-4) },
+    });
+  });
+
+  // POST /payment/cards/tokenize — user submits PAN (discarded server-side)
+  app.post('/payment/cards/tokenize', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+
+    const BodySchema = z.object({
+      pan: z.string().min(12).max(25),
+      exp_month: z.number().int().min(1).max(12),
+      exp_year: z.number().int().min(2024).max(2100),
+      cardholder_name: z.string().max(200).optional(),
+      gateway_id: z.string().optional(),
+      set_default: z.boolean().optional(),
+    });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+
+    try {
+      const token = createCardToken({
+        user_id: user.sub,
+        pan: parsed.data.pan,
+        exp_month: parsed.data.exp_month,
+        exp_year: parsed.data.exp_year,
+        cardholder_name: parsed.data.cardholder_name,
+        gateway_id: parsed.data.gateway_id,
+        set_default: parsed.data.set_default,
+        ip: req.ip,
+        user_agent: req.headers['user-agent'],
+      });
+      return reply.code(201).send({ success: true, data: token });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // GET /payment/cards/mine — user's stored tokens (masked)
+  app.get('/payment/cards/mine', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    return reply.send({ success: true, data: { cards: listCardTokensByUser(user.sub) } });
+  });
+
+  // GET /payment/cards/:token — owner or admin
+  app.get('/payment/cards/:token', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { token } = req.params as { token: string };
+    const card = getCardToken(token);
+    if (!card) return reply.code(404).send({ success: false, error: 'Card not found' });
+    if (card.user_id !== user.sub && user.role !== 'admin') {
+      return reply.code(403).send({ success: false, error: 'Not authorized' });
+    }
+    return reply.send({ success: true, data: card });
+  });
+
+  // DELETE /payment/cards/:token — revoke (owner or admin)
+  app.delete('/payment/cards/:token', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { token } = req.params as { token: string };
+    const card = getCardToken(token);
+    if (!card) return reply.code(404).send({ success: false, error: 'Card not found' });
+    if (card.user_id !== user.sub && user.role !== 'admin') {
+      return reply.code(403).send({ success: false, error: 'Not authorized' });
+    }
+    const updated = revokeCardToken(token);
+    return reply.send({ success: true, data: updated });
+  });
+
+  // POST /payment/cards/:token/default — set default (owner only)
+  app.post('/payment/cards/:token/default', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { token } = req.params as { token: string };
+    try {
+      const updated = setDefaultCardToken(token, user.sub);
+      if (!updated) return reply.code(404).send({ success: false, error: 'Card not found' });
+      return reply.send({ success: true, data: updated });
+    } catch (err) {
+      return reply.code(403).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // POST /payment/cards/:token/use — record a token use (owner or admin)
+  app.post('/payment/cards/:token/use', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { token } = req.params as { token: string };
+    const card = getCardToken(token);
+    if (!card) return reply.code(404).send({ success: false, error: 'Card not found' });
+    if (card.user_id !== user.sub && user.role !== 'admin') {
+      return reply.code(403).send({ success: false, error: 'Not authorized' });
+    }
+    try {
+      const updated = markCardTokenUsed(token, req.ip, req.headers['user-agent']);
+      return reply.send({ success: true, data: updated });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // ============ PCI TOKENIZATION — ADMIN ============
+
+  // GET /payment/admin/cards — admin list
+  app.get('/payment/admin/cards', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const q = req.query as { limit?: string; offset?: string; status?: string };
+    const limit = Math.min(Number(q.limit ?? 100), 500);
+    const offset = Number(q.offset ?? 0);
+    return reply.send({ success: true, data: { cards: listAllCardTokens(limit, offset, q.status) } });
+  });
+
+  // GET /payment/admin/cards/stats — admin
+  app.get('/payment/admin/cards/stats', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    return reply.send({ success: true, data: getTokenizationStats() });
+  });
+
+  // GET /payment/admin/cards/log — admin (tokenization audit log)
+  app.get('/payment/admin/cards/log', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const q = req.query as { token_id?: string; limit?: string };
+    const limit = Math.min(Number(q.limit ?? 100), 500);
+    return reply.send({ success: true, data: { entries: listTokenizationLog(q.token_id, limit) } });
   });
 }

@@ -1,5 +1,5 @@
 // melodyflix - payment gateway management + transactions
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { getDb } from '@melodyflix/shared-db';
 
 export type GatewayProvider =
@@ -208,6 +208,37 @@ export function ensurePaymentSchema(): void {
     );
     CREATE INDEX IF NOT EXISTS idx_trx_tx ON tax_records(transaction_id);
     CREATE INDEX IF NOT EXISTS idx_trx_country ON tax_records(country);
+
+    CREATE TABLE IF NOT EXISTS card_tokens (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      gateway_id TEXT,
+      card_brand TEXT NOT NULL,
+      last4 TEXT NOT NULL,
+      exp_month INTEGER NOT NULL,
+      exp_year INTEGER NOT NULL,
+      cardholder_name TEXT,
+      fingerprint TEXT NOT NULL,
+      is_default INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active',
+      last_used_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(fingerprint, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_ct_user ON card_tokens(user_id);
+    CREATE INDEX IF NOT EXISTS idx_ct_status ON card_tokens(status);
+
+    CREATE TABLE IF NOT EXISTS tokenization_log (
+      id TEXT PRIMARY KEY,
+      token_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      ip TEXT,
+      user_agent TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_tl_token ON tokenization_log(token_id);
+    CREATE INDEX IF NOT EXISTS idx_tl_action ON tokenization_log(action);
   `);
 
   // Lightweight column migrations for existing databases
@@ -1862,4 +1893,355 @@ export function getTaxStats(): TaxStats {
   `).all() as Array<{ country: string; count: number; tax: number; taxable: number }>;
 
   return { total_records: total, total_tax_collected: taxSum, by_country: byCountry };
+}
+
+// ============ PCI Tokenization (29.15) ============
+//
+// IMPORTANT: raw card numbers (PAN) must NEVER be persisted.
+// We only store brand + last4 + a salted hash fingerprint for dedupe.
+
+export type CardBrand = 'visa' | 'mastercard' | 'amex' | 'discover' | 'jcb' | 'diners' | 'unionpay' | 'unknown';
+
+const CARD_BRAND_PATTERNS: Array<{ brand: CardBrand; test: RegExp }> = [
+  { brand: 'visa',       test: /^4/ },
+  { brand: 'mastercard', test: /^(5[1-5]|2[2-7])/ },
+  { brand: 'amex',       test: /^3[47]/ },
+  { brand: 'discover',   test: /^(6011|65|64[4-9])/ },
+  { brand: 'jcb',        test: /^35(2[89]|[3-8])/ },
+  { brand: 'diners',     test: /^3(0[0-5]|[689])/ },
+  { brand: 'unionpay',   test: /^62/ },
+];
+
+export function detectCardBrand(pan: string): CardBrand {
+  const digits = pan.replace(/\D/g, '');
+  for (const p of CARD_BRAND_PATTERNS) {
+    if (p.test.test(digits)) return p.brand;
+  }
+  return 'unknown';
+}
+
+export function luhnCheck(pan: string): boolean {
+  const digits = pan.replace(/\D/g, '');
+  if (digits.length < 12 || digits.length > 19) return false;
+  let sum = 0;
+  let alternate = false;
+  for (let i = digits.length - 1; i >= 0; i--) {
+    let n = parseInt(digits[i], 10);
+    if (alternate) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
+    sum += n;
+    alternate = !alternate;
+  }
+  return sum % 10 === 0;
+}
+
+function cardFingerprint(pan: string): string {
+  // Salted hash — for dedupe only; not reversible.
+  const salt = loadConfigSalt();
+  return createHash('sha256').update(`${salt}:${pan.replace(/\D/g, '')}`).digest('hex');
+}
+
+function loadConfigSalt(): string {
+  // Re-use JWT secret as salt source; stable per install.
+  // (In production a dedicated TOKENIZATION_SALT env is preferred.)
+  try {
+    const cfg = (globalThis as { __mfConfigSalt?: string }).__mfConfigSalt;
+    if (cfg) return cfg;
+  } catch {}
+  const envSalt = process.env.TOKENIZATION_SALT;
+  if (envSalt) {
+    (globalThis as { __mfConfigSalt?: string }).__mfConfigSalt = envSalt;
+    return envSalt;
+  }
+  // Fallback stable salt (still fine for fingerprinting — not for security)
+  const fallback = 'melodyflix.tokenization.v1';
+  (globalThis as { __mfConfigSalt?: string }).__mfConfigSalt = fallback;
+  return fallback;
+}
+
+export interface CardToken {
+  id: string;
+  user_id: string;
+  gateway_id: string | null;
+  card_brand: CardBrand;
+  last4: string;
+  exp_month: number;
+  exp_year: number;
+  cardholder_name: string | null;
+  fingerprint: string;
+  is_default: boolean;
+  status: 'active' | 'expired' | 'revoked';
+  last_used_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface CardTokenRow {
+  id: string;
+  user_id: string;
+  gateway_id: string | null;
+  card_brand: string;
+  last4: string;
+  exp_month: number;
+  exp_year: number;
+  cardholder_name: string | null;
+  fingerprint: string;
+  is_default: number;
+  status: string;
+  last_used_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function cardTokenRowToObj(row: CardTokenRow, mask = true): CardToken {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    gateway_id: row.gateway_id,
+    card_brand: row.card_brand as CardBrand,
+    last4: mask ? `****${row.last4}` : row.last4,
+    exp_month: row.exp_month,
+    exp_year: row.exp_year,
+    cardholder_name: row.cardholder_name,
+    fingerprint: row.fingerprint,
+    is_default: row.is_default === 1,
+    status: row.status as CardToken['status'],
+    last_used_at: row.last_used_at,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+export interface CreateCardTokenInput {
+  user_id: string;
+  pan: string;                 // ⚠️ never persisted
+  exp_month: number;
+  exp_year: number;
+  cardholder_name?: string;
+  gateway_id?: string;
+  set_default?: boolean;
+  ip?: string;
+  user_agent?: string;
+}
+
+export function createCardToken(input: CreateCardTokenInput): CardToken {
+  const db = getDb();
+  const pan = input.pan.replace(/\D/g, '');
+  if (!luhnCheck(pan)) throw new Error('Invalid card number (Luhn check failed)');
+  if (input.exp_month < 1 || input.exp_month > 12) throw new Error('Invalid exp_month');
+  const now = new Date();
+  if (input.exp_year < now.getFullYear() ||
+      (input.exp_year === now.getFullYear() && input.exp_month < now.getMonth() + 1)) {
+    throw new Error('Card is already expired');
+  }
+
+  const brand = detectCardBrand(pan);
+  const last4 = pan.slice(-4);
+  const fp = cardFingerprint(pan);
+  const nowIso = now.toISOString();
+
+  // Dedupe: if this user already has this card → update expiry, return existing
+  const existing = db.prepare(
+    'SELECT * FROM card_tokens WHERE fingerprint = ? AND user_id = ?'
+  ).get(fp, input.user_id) as CardTokenRow | undefined;
+
+  if (existing) {
+    if (existing.status === 'revoked') {
+      // Reactivate if re-added
+      db.prepare(`
+        UPDATE card_tokens
+        SET status = 'active', exp_month = ?, exp_year = ?, cardholder_name = COALESCE(?, cardholder_name),
+            updated_at = ?
+        WHERE id = ?
+      `).run(input.exp_month, input.exp_year, input.cardholder_name ?? null, nowIso, existing.id);
+      logTokenization(existing.id, 'created', input.ip, input.user_agent);
+      const row = db.prepare('SELECT * FROM card_tokens WHERE id = ?').get(existing.id) as CardTokenRow;
+      return cardTokenRowToObj(row);
+    }
+    // Already active — just update expiry if changed
+    db.prepare(`
+      UPDATE card_tokens SET exp_month = ?, exp_year = ?, updated_at = ? WHERE id = ?
+    `).run(input.exp_month, input.exp_year, nowIso, existing.id);
+    const row = db.prepare('SELECT * FROM card_tokens WHERE id = ?').get(existing.id) as CardTokenRow;
+    return cardTokenRowToObj(row);
+  }
+
+  const setDefault = input.set_default === true;
+  if (setDefault) {
+    db.prepare('UPDATE card_tokens SET is_default = 0 WHERE user_id = ?').run(input.user_id);
+  } else {
+    const any = db.prepare('SELECT COUNT(*) as n FROM card_tokens WHERE user_id = ? AND status = ?')
+      .get(input.user_id, 'active') as { n: number };
+    if (any.n === 0) {
+      // First card → default
+      // (fall through with setDefault = true behavior)
+    }
+  }
+
+  const isFirstCard = (db.prepare(
+    "SELECT COUNT(*) as n FROM card_tokens WHERE user_id = ? AND status = 'active'"
+  ).get(input.user_id) as { n: number }).n === 0;
+
+  const makeDefault = setDefault || isFirstCard ? 1 : 0;
+  if (makeDefault) {
+    db.prepare('UPDATE card_tokens SET is_default = 0 WHERE user_id = ?').run(input.user_id);
+  }
+
+  const tokenId = randomUUID();
+  db.prepare(`
+    INSERT INTO card_tokens (id, user_id, gateway_id, card_brand, last4, exp_month, exp_year,
+      cardholder_name, fingerprint, is_default, status, last_used_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NULL, ?, ?)
+  `).run(
+    tokenId, input.user_id, input.gateway_id ?? null, brand, last4,
+    input.exp_month, input.exp_year, input.cardholder_name ?? null,
+    fp, makeDefault, nowIso, nowIso
+  );
+
+  logTokenization(tokenId, 'created', input.ip, input.user_agent);
+
+  const row = db.prepare('SELECT * FROM card_tokens WHERE id = ?').get(tokenId) as CardTokenRow;
+  return cardTokenRowToObj(row);
+}
+
+export function getCardToken(tokenId: string): CardToken | null {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM card_tokens WHERE id = ?').get(tokenId) as CardTokenRow | undefined;
+  return row ? cardTokenRowToObj(row) : null;
+}
+
+export function listCardTokensByUser(userId: string): CardToken[] {
+  const db = getDb();
+  const rows = db.prepare(
+    'SELECT * FROM card_tokens WHERE user_id = ? AND status != ? ORDER BY is_default DESC, created_at DESC'
+  ).all(userId, 'revoked') as CardTokenRow[];
+  return rows.map((r) => cardTokenRowToObj(r));
+}
+
+export function listAllCardTokens(limit = 100, offset = 0, status?: string): CardToken[] {
+  const db = getDb();
+  const rows = status
+    ? db.prepare('SELECT * FROM card_tokens WHERE status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?')
+        .all(status, limit, offset) as CardTokenRow[]
+    : db.prepare('SELECT * FROM card_tokens ORDER BY created_at DESC LIMIT ? OFFSET ?')
+        .all(limit, offset) as CardTokenRow[];
+  return rows.map((r) => cardTokenRowToObj(r));
+}
+
+export function setDefaultCardToken(tokenId: string, userId: string): CardToken | null {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM card_tokens WHERE id = ?').get(tokenId) as CardTokenRow | undefined;
+  if (!row) return null;
+  if (row.user_id !== userId) throw new Error('Not authorized');
+  if (row.status !== 'active') throw new Error('Card is not active');
+
+  const nowIso = new Date().toISOString();
+  db.prepare('UPDATE card_tokens SET is_default = 0 WHERE user_id = ?').run(userId);
+  db.prepare('UPDATE card_tokens SET is_default = 1, updated_at = ? WHERE id = ?').run(nowIso, tokenId);
+  return getCardToken(tokenId);
+}
+
+export function revokeCardToken(tokenId: string, reason?: string): CardToken | null {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM card_tokens WHERE id = ?').get(tokenId) as CardTokenRow | undefined;
+  if (!row) return null;
+  if (row.status === 'revoked') return cardTokenRowToObj(row);
+
+  const nowIso = new Date().toISOString();
+  const wasDefault = row.is_default === 1;
+  db.prepare('UPDATE card_tokens SET status = ?, is_default = 0, updated_at = ? WHERE id = ?')
+    .run('revoked', nowIso, tokenId);
+
+  // If it was default, promote the newest active card of this user
+  if (wasDefault) {
+    const next = db.prepare(
+      "SELECT id FROM card_tokens WHERE user_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1"
+    ).get(row.user_id) as { id: string } | undefined;
+    if (next) {
+      db.prepare('UPDATE card_tokens SET is_default = 1, updated_at = ? WHERE id = ?').run(nowIso, next.id);
+    }
+  }
+
+  logTokenization(tokenId, 'revoked');
+  void reason;
+  return getCardToken(tokenId);
+}
+
+export function markCardTokenUsed(tokenId: string, ip?: string, userAgent?: string): CardToken | null {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM card_tokens WHERE id = ?').get(tokenId) as CardTokenRow | undefined;
+  if (!row) return null;
+  if (row.status !== 'active') throw new Error('Card is not active');
+
+  // Expiry check
+  const now = new Date();
+  if (row.exp_year < now.getFullYear() ||
+      (row.exp_year === now.getFullYear() && row.exp_month < now.getMonth() + 1)) {
+    db.prepare("UPDATE card_tokens SET status = 'expired', updated_at = ? WHERE id = ?")
+      .run(now.toISOString(), tokenId);
+    logTokenization(tokenId, 'expired');
+    return getCardToken(tokenId);
+  }
+
+  db.prepare('UPDATE card_tokens SET last_used_at = ?, updated_at = ? WHERE id = ?')
+    .run(now.toISOString(), now.toISOString(), tokenId);
+  logTokenization(tokenId, 'used', ip, userAgent);
+  return getCardToken(tokenId);
+}
+
+export function logTokenization(tokenId: string, action: string, ip?: string, userAgent?: string): void {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO tokenization_log (id, token_id, action, ip, user_agent, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(randomUUID(), tokenId, action, ip ?? null, userAgent ?? null, new Date().toISOString());
+}
+
+export interface TokenizationStats {
+  total_tokens: number;
+  active: number;
+  revoked: number;
+  expired: number;
+  by_brand: Array<{ brand: string; count: number }>;
+  actions_24h: number;
+}
+
+export function getTokenizationStats(): TokenizationStats {
+  const db = getDb();
+  const rows = db.prepare('SELECT status, COUNT(*) as n FROM card_tokens GROUP BY status')
+    .all() as Array<{ status: string; n: number }>;
+  const stats: TokenizationStats = {
+    total_tokens: 0, active: 0, revoked: 0, expired: 0, by_brand: [], actions_24h: 0,
+  };
+  for (const r of rows) {
+    stats.total_tokens += r.n;
+    if (r.status === 'active') stats.active = r.n;
+    else if (r.status === 'revoked') stats.revoked = r.n;
+    else if (r.status === 'expired') stats.expired = r.n;
+  }
+  stats.by_brand = db.prepare(
+    'SELECT card_brand as brand, COUNT(*) as count FROM card_tokens GROUP BY card_brand ORDER BY count DESC'
+  ).all() as Array<{ brand: string; count: number }>;
+
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  stats.actions_24h = (db.prepare(
+    'SELECT COUNT(*) as n FROM tokenization_log WHERE created_at >= ?'
+  ).get(cutoff) as { n: number }).n;
+
+  return stats;
+}
+
+export function listTokenizationLog(tokenId?: string, limit = 100): Array<{
+  id: string; token_id: string; action: string; ip: string | null;
+  user_agent: string | null; created_at: string;
+}> {
+  const db = getDb();
+  if (tokenId) {
+    return db.prepare('SELECT * FROM tokenization_log WHERE token_id = ? ORDER BY created_at DESC LIMIT ?')
+      .all(tokenId, limit) as Array<{ id: string; token_id: string; action: string; ip: string | null; user_agent: string | null; created_at: string }>;
+  }
+  return db.prepare('SELECT * FROM tokenization_log ORDER BY created_at DESC LIMIT ?')
+    .all(limit) as Array<{ id: string; token_id: string; action: string; ip: string | null; user_agent: string | null; created_at: string }>;
 }
