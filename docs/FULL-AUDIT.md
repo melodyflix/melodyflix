@@ -531,6 +531,8 @@ All 12 items [DONE] accessibility.service (16.1–16.12)
 | 27.3 | Influencer Dashboard | [DONE] influencer.service.ts |
 | 27.4 | Promotional Banner | [DONE] banner.service.ts |
 
+**Verified 2026-10-08**: All 4 modules smoke-tested via curl. During verification, discovered and fixed a systematic bug — 43 route files used `requireAuth` (plain helper) as Fastify preHandler instead of the proper `authGuard`. Commit fcd9ab7 + 7dad668. All endpoints now return 200 with token, 401 without.
+
 ## Section 28 — Mobile App Features
 
 All items [TODO] — mobile apps separately built
