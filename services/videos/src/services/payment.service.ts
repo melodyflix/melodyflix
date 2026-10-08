@@ -172,6 +172,42 @@ export function ensurePaymentSchema(): void {
     CREATE INDEX IF NOT EXISTS idx_cp_tx ON crypto_payments(transaction_id);
     CREATE INDEX IF NOT EXISTS idx_cp_user ON crypto_payments(user_id);
     CREATE INDEX IF NOT EXISTS idx_cp_status ON crypto_payments(status);
+
+    CREATE TABLE IF NOT EXISTS tax_config (
+      id TEXT PRIMARY KEY,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      default_rate_percent REAL NOT NULL DEFAULT 0,
+      apply_on_fees INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS tax_rates (
+      id TEXT PRIMARY KEY,
+      country TEXT NOT NULL,
+      region TEXT NOT NULL DEFAULT '',
+      tax_type TEXT NOT NULL DEFAULT 'VAT',
+      rate_percent REAL NOT NULL,
+      inclusive INTEGER NOT NULL DEFAULT 0,
+      label TEXT,
+      updated_at TEXT NOT NULL,
+      UNIQUE(country, region, tax_type)
+    );
+    CREATE INDEX IF NOT EXISTS idx_tr_country ON tax_rates(country);
+
+    CREATE TABLE IF NOT EXISTS tax_records (
+      id TEXT PRIMARY KEY,
+      transaction_id TEXT NOT NULL,
+      country TEXT NOT NULL,
+      region TEXT NOT NULL DEFAULT '',
+      tax_type TEXT NOT NULL,
+      rate_percent REAL NOT NULL,
+      taxable_amount REAL NOT NULL,
+      tax_amount REAL NOT NULL,
+      inclusive INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_trx_tx ON tax_records(transaction_id);
+    CREATE INDEX IF NOT EXISTS idx_trx_country ON tax_records(country);
   `);
 
   // Lightweight column migrations for existing databases
@@ -1494,4 +1530,336 @@ export function getCryptoStats(): CryptoStats {
   ).get() as { s: number }).s;
 
   return stats;
+}
+
+// ============ Country-Based Tax (29.13) ============
+
+export type TaxType = 'VAT' | 'GST' | 'Sales' | 'None';
+
+export interface TaxConfig {
+  id: string;
+  enabled: boolean;
+  default_rate_percent: number;
+  apply_on_fees: boolean;
+  updated_at: string;
+}
+
+const TAX_CONFIG_ID = 'default';
+
+export function getTaxConfig(): TaxConfig {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM tax_config WHERE id = ?').get(TAX_CONFIG_ID) as
+    | { id: string; enabled: number; default_rate_percent: number; apply_on_fees: number; updated_at: string }
+    | undefined;
+
+  if (row) {
+    return {
+      id: row.id,
+      enabled: row.enabled === 1,
+      default_rate_percent: row.default_rate_percent,
+      apply_on_fees: row.apply_on_fees === 1,
+      updated_at: row.updated_at,
+    };
+  }
+
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO tax_config (id, enabled, default_rate_percent, apply_on_fees, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(TAX_CONFIG_ID, 1, 0, 1, now);
+
+  return { id: TAX_CONFIG_ID, enabled: true, default_rate_percent: 0, apply_on_fees: true, updated_at: now };
+}
+
+export interface SetTaxConfigInput {
+  enabled?: boolean;
+  default_rate_percent?: number;
+  apply_on_fees?: boolean;
+}
+
+export function setTaxConfig(input: SetTaxConfigInput): TaxConfig {
+  const db = getDb();
+  const cur = getTaxConfig();
+  const now = new Date().toISOString();
+
+  const enabled = input.enabled !== undefined ? (input.enabled ? 1 : 0) : (cur.enabled ? 1 : 0);
+  const defaultRate = input.default_rate_percent !== undefined ? input.default_rate_percent : cur.default_rate_percent;
+  if (defaultRate < 0 || defaultRate > 100) throw new Error('default_rate_percent must be between 0 and 100');
+  const applyFees = input.apply_on_fees !== undefined ? (input.apply_on_fees ? 1 : 0) : (cur.apply_on_fees ? 1 : 0);
+
+  db.prepare(`
+    UPDATE tax_config SET enabled = ?, default_rate_percent = ?, apply_on_fees = ?, updated_at = ?
+    WHERE id = ?
+  `).run(enabled, defaultRate, applyFees, now, TAX_CONFIG_ID);
+
+  return getTaxConfig();
+}
+
+export interface TaxRate {
+  id: string;
+  country: string;
+  region: string;
+  tax_type: TaxType;
+  rate_percent: number;
+  inclusive: boolean;
+  label: string | null;
+  updated_at: string;
+}
+
+interface TaxRateRow {
+  id: string;
+  country: string;
+  region: string;
+  tax_type: string;
+  rate_percent: number;
+  inclusive: number;
+  label: string | null;
+  updated_at: string;
+}
+
+function taxRateRowToObj(row: TaxRateRow): TaxRate {
+  return {
+    id: row.id,
+    country: row.country,
+    region: row.region,
+    tax_type: row.tax_type as TaxType,
+    rate_percent: row.rate_percent,
+    inclusive: row.inclusive === 1,
+    label: row.label,
+    updated_at: row.updated_at,
+  };
+}
+
+export interface UpsertTaxRateInput {
+  country: string;
+  region?: string;
+  tax_type?: TaxType;
+  rate_percent: number;
+  inclusive?: boolean;
+  label?: string;
+}
+
+export function upsertTaxRate(input: UpsertTaxRateInput): TaxRate {
+  const db = getDb();
+  const country = input.country.toUpperCase().trim();
+  const region = (input.region ?? '').toUpperCase().trim();
+  const type = input.tax_type ?? 'VAT';
+  if (!country || country.length !== 2) throw new Error('country must be 2-letter code');
+  if (input.rate_percent < 0 || input.rate_percent > 100) throw new Error('rate_percent must be between 0 and 100');
+
+  const now = new Date().toISOString();
+  const existing = db.prepare(
+    'SELECT id FROM tax_rates WHERE country = ? AND region = ? AND tax_type = ?'
+  ).get(country, region, type) as { id: string } | undefined;
+
+  if (existing) {
+    db.prepare(`
+      UPDATE tax_rates SET rate_percent = ?, inclusive = ?, label = ?, updated_at = ?
+      WHERE id = ?
+    `).run(input.rate_percent, input.inclusive ? 1 : 0, input.label ?? null, now, existing.id);
+  } else {
+    db.prepare(`
+      INSERT INTO tax_rates (id, country, region, tax_type, rate_percent, inclusive, label, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      randomUUID(), country, region, type, input.rate_percent,
+      input.inclusive ? 1 : 0, input.label ?? null, now
+    );
+  }
+
+  const row = db.prepare(
+    'SELECT * FROM tax_rates WHERE country = ? AND region = ? AND tax_type = ?'
+  ).get(country, region, type) as TaxRateRow;
+  return taxRateRowToObj(row);
+}
+
+export function deleteTaxRate(country: string, region: string, taxType: TaxType): boolean {
+  const db = getDb();
+  const r = db.prepare(
+    'DELETE FROM tax_rates WHERE country = ? AND region = ? AND tax_type = ?'
+  ).run(country.toUpperCase(), (region ?? '').toUpperCase(), taxType);
+  return r.changes > 0;
+}
+
+export function listTaxRates(country?: string): TaxRate[] {
+  const db = getDb();
+  if (country) {
+    const rows = db.prepare(
+      'SELECT * FROM tax_rates WHERE country = ? ORDER BY region, tax_type'
+    ).all(country.toUpperCase()) as TaxRateRow[];
+    return rows.map(taxRateRowToObj);
+  }
+  const rows = db.prepare('SELECT * FROM tax_rates ORDER BY country, region, tax_type')
+    .all() as TaxRateRow[];
+  return rows.map(taxRateRowToObj);
+}
+
+/**
+ * Lookup: exact region match → country default (region='') → null.
+ */
+export function getTaxRateFor(country: string, region?: string): TaxRate | null {
+  const db = getDb();
+  const c = country.toUpperCase().trim();
+  const r = (region ?? '').toUpperCase().trim();
+
+  if (r) {
+    const exact = db.prepare(
+      "SELECT * FROM tax_rates WHERE country = ? AND region = ? ORDER BY tax_type LIMIT 1"
+    ).get(c, r) as TaxRateRow | undefined;
+    if (exact) return taxRateRowToObj(exact);
+  }
+
+  const def = db.prepare(
+    "SELECT * FROM tax_rates WHERE country = ? AND region = '' ORDER BY tax_type LIMIT 1"
+  ).get(c) as TaxRateRow | undefined;
+  if (def) return taxRateRowToObj(def);
+
+  return null;
+}
+
+export interface TaxCalculation {
+  taxable_amount: number;
+  tax_amount: number;
+  total: number;
+  rate_percent: number;
+  tax_type: TaxType;
+  inclusive: boolean;
+  country: string;
+  region: string;
+  applied: boolean;
+  source: 'country' | 'region' | 'default' | 'none';
+}
+
+/**
+ * Calculate tax for a given amount.
+ * If no country-specific rate → use default_rate_percent from config.
+ */
+export function calculateTax(
+  amount: number,
+  country: string,
+  region?: string,
+): TaxCalculation {
+  const cfg = getTaxConfig();
+  const c = country.toUpperCase().trim();
+  const r = (region ?? '').toUpperCase().trim();
+
+  if (!cfg.enabled || amount <= 0) {
+    return {
+      taxable_amount: amount, tax_amount: 0, total: amount,
+      rate_percent: 0, tax_type: 'None', inclusive: false,
+      country: c, region: r, applied: false, source: 'none',
+    };
+  }
+
+  const rate = getTaxRateFor(c, r);
+  const ratePercent = rate ? rate.rate_percent : cfg.default_rate_percent;
+  const taxType: TaxType = rate ? rate.tax_type : 'VAT';
+  const inclusive = rate ? rate.inclusive : false;
+  const source: TaxCalculation['source'] = rate
+    ? (r && rate.region === r ? 'region' : 'country')
+    : (cfg.default_rate_percent > 0 ? 'default' : 'none');
+
+  if (ratePercent <= 0) {
+    return {
+      taxable_amount: amount, tax_amount: 0, total: amount,
+      rate_percent: 0, tax_type: taxType, inclusive,
+      country: c, region: r, applied: false, source,
+    };
+  }
+
+  let taxable: number;
+  let tax: number;
+  let total: number;
+
+  if (inclusive) {
+    // Amount already includes tax; extract it.
+    taxable = round2(amount / (1 + ratePercent / 100));
+    tax = round2(amount - taxable);
+    total = amount;
+  } else {
+    taxable = amount;
+    tax = round2(amount * (ratePercent / 100));
+    total = round2(amount + tax);
+  }
+
+  return {
+    taxable_amount: taxable,
+    tax_amount: tax,
+    total,
+    rate_percent: ratePercent,
+    tax_type: taxType,
+    inclusive,
+    country: c,
+    region: r,
+    applied: true,
+    source,
+  };
+}
+
+export interface TaxRecord {
+  id: string;
+  transaction_id: string;
+  country: string;
+  region: string;
+  tax_type: string;
+  rate_percent: number;
+  taxable_amount: number;
+  tax_amount: number;
+  inclusive: boolean;
+  created_at: string;
+}
+
+export function recordTax(transactionId: string, calc: TaxCalculation): TaxRecord | null {
+  if (!calc.applied) return null;
+  const db = getDb();
+  const now = new Date().toISOString();
+  const id = randomUUID();
+  db.prepare(`
+    INSERT INTO tax_records (id, transaction_id, country, region, tax_type,
+      rate_percent, taxable_amount, tax_amount, inclusive, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, transactionId, calc.country, calc.region, calc.tax_type,
+    calc.rate_percent, calc.taxable_amount, calc.tax_amount,
+    calc.inclusive ? 1 : 0, now
+  );
+  return {
+    id, transaction_id: transactionId,
+    country: calc.country, region: calc.region, tax_type: calc.tax_type,
+    rate_percent: calc.rate_percent, taxable_amount: calc.taxable_amount,
+    tax_amount: calc.tax_amount, inclusive: calc.inclusive, created_at: now,
+  };
+}
+
+export function listTaxRecords(transactionId?: string, limit = 100, offset = 0): TaxRecord[] {
+  const db = getDb();
+  if (transactionId) {
+    return db.prepare(
+      'SELECT * FROM tax_records WHERE transaction_id = ? ORDER BY created_at DESC'
+    ).all(transactionId) as TaxRecord[];
+  }
+  return db.prepare('SELECT * FROM tax_records ORDER BY created_at DESC LIMIT ? OFFSET ?')
+    .all(limit, offset) as TaxRecord[];
+}
+
+export interface TaxStats {
+  total_records: number;
+  total_tax_collected: number;
+  by_country: Array<{ country: string; count: number; tax: number; taxable: number }>;
+}
+
+export function getTaxStats(): TaxStats {
+  const db = getDb();
+  const total = (db.prepare('SELECT COUNT(*) as n FROM tax_records').get() as { n: number }).n;
+  const taxSum = (db.prepare('SELECT COALESCE(SUM(tax_amount), 0) as s FROM tax_records').get() as { s: number }).s;
+  const byCountry = db.prepare(`
+    SELECT country, COUNT(*) as count,
+           COALESCE(SUM(tax_amount), 0) as tax,
+           COALESCE(SUM(taxable_amount), 0) as taxable
+    FROM tax_records
+    GROUP BY country
+    ORDER BY tax DESC
+  `).all() as Array<{ country: string; count: number; tax: number; taxable: number }>;
+
+  return { total_records: total, total_tax_collected: taxSum, by_country: byCountry };
 }

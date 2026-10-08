@@ -18,6 +18,8 @@ import {
   getCryptoConfig, setCryptoConfig, createCryptoPayment, getCryptoPaymentById,
   listCryptoPayments, listCryptoPaymentsByUser, confirmCryptoPayment,
   failCryptoPayment, expireCryptoPayments, getCryptoStats,
+  getTaxConfig, setTaxConfig, upsertTaxRate, deleteTaxRate, listTaxRates,
+  getTaxRateFor, calculateTax, recordTax, listTaxRecords, getTaxStats,
 } from '../services/payment.service.js';
 import { grantMessagePack } from '../services/chatlimits.service.js';
 import { getDb } from '@melodyflix/shared-db';
@@ -44,6 +46,8 @@ const CreateTransactionSchema = z.object({
   metadata: z.record(z.any()).optional(),
   gateway_id: z.string().optional(),
   origin_country: z.string().min(2).max(2).optional(),
+  tax_country: z.string().min(2).max(2).optional(),
+  tax_region: z.string().max(10).optional(),
 });
 
 export async function paymentRoutes(app: FastifyInstance) {
@@ -183,6 +187,16 @@ export async function paymentRoutes(app: FastifyInstance) {
       }
     }
 
+    // Tax calculation (29.13)
+    let tax = null;
+    if (parsed.data.tax_country) {
+      const taxableBase = parsed.data.amount + (crossBorder?.fee_amount ?? 0);
+      tax = calculateTax(taxableBase, parsed.data.tax_country, parsed.data.tax_region);
+      if (tax.applied) {
+        try { recordTax(tx.id, tax); } catch {}
+      }
+    }
+
     // 3DS — auto-create session when threshold+provider match
     const bodyReturnUrl = (req.body as { return_url?: string })?.return_url;
     let threeDs = null;
@@ -208,6 +222,7 @@ export async function paymentRoutes(app: FastifyInstance) {
         amount: tx.amount,
         currency: tx.currency,
         cross_border: crossBorder,
+        tax: tax,
         requires_3ds: threeDs !== null,
         three_ds_session: threeDs,
         gateway: {
@@ -758,5 +773,107 @@ export async function paymentRoutes(app: FastifyInstance) {
     try { requireRole(req.headers.authorization, ['admin']); }
     catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
     return reply.send({ success: true, data: getCryptoStats() });
+  });
+
+  // ============ TAX (29.13) ============
+
+  // GET /payment/tax/config — public
+  app.get('/payment/tax/config', async (_req, reply) => {
+    return reply.send({ success: true, data: getTaxConfig() });
+  });
+
+  // PUT /payment/admin/tax/config — admin
+  app.put('/payment/admin/tax/config', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+
+    const BodySchema = z.object({
+      enabled: z.boolean().optional(),
+      default_rate_percent: z.number().min(0).max(100).optional(),
+      apply_on_fees: z.boolean().optional(),
+    });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+
+    try {
+      return reply.send({ success: true, data: setTaxConfig(parsed.data) });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // GET /payment/tax/rates — public (?country=BD)
+  app.get('/payment/tax/rates', async (req, reply) => {
+    const q = req.query as { country?: string };
+    return reply.send({ success: true, data: { rates: listTaxRates(q.country) } });
+  });
+
+  // PUT /payment/admin/tax/rates — admin upsert
+  app.put('/payment/admin/tax/rates', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+
+    const BodySchema = z.object({
+      country: z.string().length(2),
+      region: z.string().max(10).optional(),
+      tax_type: z.enum(['VAT', 'GST', 'Sales', 'None']).optional(),
+      rate_percent: z.number().min(0).max(100),
+      inclusive: z.boolean().optional(),
+      label: z.string().max(100).optional(),
+    });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+
+    try {
+      return reply.send({ success: true, data: upsertTaxRate(parsed.data) });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // DELETE /payment/admin/tax/rates/:country/:type — admin (?region= optional)
+  app.delete('/payment/admin/tax/rates/:country/:type', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { country, type } = req.params as { country: string; type: string };
+    const q = req.query as { region?: string };
+    const ok = deleteTaxRate(country, q.region ?? '', type as 'VAT' | 'GST' | 'Sales' | 'None');
+    if (!ok) return reply.code(404).send({ success: false, error: 'Tax rate not found' });
+    return reply.send({ success: true, data: { deleted: true } });
+  });
+
+  // POST /payment/tax/calculate — public tax calculator (no transaction)
+  app.post('/payment/tax/calculate', async (req, reply) => {
+    const BodySchema = z.object({
+      amount: z.number().positive(),
+      country: z.string().length(2),
+      region: z.string().max(10).optional(),
+    });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+
+    try {
+      const calc = calculateTax(parsed.data.amount, parsed.data.country, parsed.data.region);
+      return reply.send({ success: true, data: calc });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // GET /payment/admin/tax/records — admin (?transaction_id= optional)
+  app.get('/payment/admin/tax/records', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const q = req.query as { transaction_id?: string; limit?: string; offset?: string };
+    const limit = Math.min(Number(q.limit ?? 100), 500);
+    const offset = Number(q.offset ?? 0);
+    return reply.send({ success: true, data: { records: listTaxRecords(q.transaction_id, limit, offset) } });
+  });
+
+  // GET /payment/admin/tax/stats — admin
+  app.get('/payment/admin/tax/stats', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    return reply.send({ success: true, data: getTaxStats() });
   });
 }
