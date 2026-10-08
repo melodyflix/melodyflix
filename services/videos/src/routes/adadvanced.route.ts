@@ -15,7 +15,9 @@ function userId(req: any): string | null {
 
 function isAdmin(req: any): boolean {
   const u = req.user as any;
-  const roles = u?.roles ?? [];
+  // JWT payload uses 'role' (singular); accept 'roles' array too for safety
+  if (u?.role === 'admin') return true;
+  const roles = u?.roles;
   return Array.isArray(roles) && roles.includes('admin');
 }
 

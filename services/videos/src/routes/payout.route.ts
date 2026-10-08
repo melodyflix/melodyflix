@@ -18,7 +18,8 @@ function userId(req: any): string | null {
 
 function isAdmin(req: any): boolean {
   const u = req.user as any;
-  const roles = u?.roles ?? [];
+  if (u?.role === 'admin') return true;
+  const roles = u?.roles;
   return Array.isArray(roles) && roles.includes('admin');
 }
 

@@ -194,8 +194,8 @@ export async function searchRoutes(app: FastifyInstance) {
   // GET /search/analytics/summary — aggregate stats (admin)
   app.get('/search/analytics/summary', { preHandler: [authGuard] }, async (req, reply) => {
     const me = (req as any).user;
-    const roles = me?.roles ?? [];
-    if (!Array.isArray(roles) || !roles.includes('admin')) {
+    const isAdmin = me?.role === 'admin' || (Array.isArray(me?.roles) && me.roles.includes('admin'));
+    if (!isAdmin) {
       return reply.code(403).send({ success: false, error: 'Admin only' });
     }
     const q = req.query as { from?: string; to?: string; top?: string };

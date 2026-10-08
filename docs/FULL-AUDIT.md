@@ -1138,6 +1138,19 @@ Note: compliance uses its own `compliance_age_verifications` table
 | 51.22 | Creative Approval | [DONE] |
 | 51.23 | Billing Report | [DONE] |
 
+**Verified 2026-10-08**: All 23 items confirmed via curl (endpoints
+across 5 route files: adcampaign 27, adadvanced 12, adnetworks 11,
+banner 7, overlays 8 = 65 endpoints).
+
+**Systematic bug fix during verification**: the `isAdmin` helper in 5
+route files (adadvanced, telemetry, payout, ai, ai-safety) plus one
+inline check in search.route.ts expected `req.user.roles` (array), but
+the shared-auth JWT payload only sets `role` (singular). Admin routes
+in those files were returning 403 for legitimate admins. Fixed to
+accept both shapes. This unblocks 51.11 revenue dashboard, 51.14 ad
+block detection, search analytics summary, payout admin endpoints,
+telemetry/AI/AI-safety admin endpoints.
+
 ## Section 52 — Video Server Management
 
 All items [TODO] — currently single-server
