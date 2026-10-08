@@ -355,3 +355,119 @@ export function autoGenerateSubtitle(
   });
 }
 
+
+// ---------- 38.4 Subtitle Editor — advanced ops ----------
+
+/**
+ * Shift all cue times by `offsetSeconds` (can be negative).
+ * Clamps to >= 0; returns updated track.
+ */
+export function shiftSubtitleCues(trackId: string, offsetSeconds: number): SubtitleTrack | null {
+  const track = getSubtitle(trackId);
+  if (!track) return null;
+  const cues = parseSubtitle(track.content, track.format);
+  const shifted = cues.map((c) => ({
+    ...c,
+    start: Math.max(0, c.start + offsetSeconds),
+    end: Math.max(0.01, c.end + offsetSeconds),
+  })).sort((a, b) => a.start - b.start);
+  return updateSubtitleCues(trackId, shifted);
+}
+
+export interface FindReplaceResult {
+  track: SubtitleTrack;
+  replaced_count: number;
+  total_cues: number;
+}
+
+/**
+ * Find & replace text across all cues.
+ * `regex` = true treats `find` as a JS regular expression.
+ */
+export function findReplaceSubtitleCues(
+  trackId: string,
+  find: string,
+  replace: string,
+  opts: { regex?: boolean; caseSensitive?: boolean } = {},
+): FindReplaceResult | null {
+  const track = getSubtitle(trackId);
+  if (!track) return null;
+  if (!find) throw new Error('find string required');
+  const cues = parseSubtitle(track.content, track.format);
+
+  const flags = opts.caseSensitive ? 'g' : 'gi';
+  let pattern: RegExp;
+  try {
+    pattern = opts.regex ? new RegExp(find, flags) : new RegExp(find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+  } catch (err) {
+    throw new Error(`Invalid pattern: ${(err as Error).message}`);
+  }
+
+  let replaced = 0;
+  const updated = cues.map((c) => {
+    const next = c.text.replace(pattern, replace);
+    if (next !== c.text) replaced++;
+    return { ...c, text: next };
+  });
+
+  const track2 = updateSubtitleCues(trackId, updated);
+  if (!track2) return null;
+  return { track: track2, replaced_count: replaced, total_cues: updated.length };
+}
+
+/**
+ * Split a cue at time `at` (seconds) — must be strictly inside the cue.
+ * Original text splits evenly on words; if odd, first takes extra word.
+ */
+export function splitSubtitleCue(trackId: string, cueIndex: number, at: number): SubtitleTrack | null {
+  const track = getSubtitle(trackId);
+  if (!track) return null;
+  const cues = parseSubtitle(track.content, track.format);
+  const c = cues[cueIndex];
+  if (!c) throw new Error(`cue ${cueIndex} not found`);
+  if (at <= c.start || at >= c.end) throw new Error('split time must be strictly inside cue');
+
+  const words = c.text.trim().split(/\s+/);
+  const half = Math.max(1, Math.ceil(words.length / 2));
+  const left = words.slice(0, half).join(' ');
+  const right = words.slice(half).join(' ') || ' ';
+
+  const before = cues.slice(0, cueIndex);
+  const after = cues.slice(cueIndex + 1);
+  const updated = [
+    ...before,
+    { start: c.start, end: at, text: left },
+    { start: at, end: c.end, text: right },
+    ...after,
+  ];
+  return updateSubtitleCues(trackId, updated);
+}
+
+/**
+ * Merge cue `cueIndex` with the next cue.
+ * Merged start = first.start; end = last.end; text = join.
+ */
+export function mergeSubtitleCues(
+  trackId: string,
+  cueIndex: number,
+  joiner = ' ',
+): SubtitleTrack | null {
+  const track = getSubtitle(trackId);
+  if (!track) return null;
+  const cues = parseSubtitle(track.content, track.format);
+  const a = cues[cueIndex];
+  const b = cues[cueIndex + 1];
+  if (!a || !b) throw new Error('need two consecutive cues to merge');
+
+  const merged = {
+    start: a.start,
+    end: b.end,
+    text: `${a.text.trim()}${joiner}${b.text.trim()}`,
+  };
+  const updated = [
+    ...cues.slice(0, cueIndex),
+    merged,
+    ...cues.slice(cueIndex + 2),
+  ];
+  return updateSubtitleCues(trackId, updated);
+}
