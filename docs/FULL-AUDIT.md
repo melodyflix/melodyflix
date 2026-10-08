@@ -758,8 +758,19 @@ on top of Section 37 foundations (commits 92306e2, 62661b2, 54f52ab):
 | 38.1 | Multi-Language Subtitle Support | [DONE] subtitle.service.ts |
 | 38.2 | Automatic Subtitle Generation | [DONE] |
 | 38.3 | Subtitle Upload (SRT/VTT) | [DONE] |
-| 38.4 | Subtitle Editor | [PARTIAL] |
-| 38.5 | Closed Captions (CC) | [DONE] |
+| 38.4 | Subtitle Editor | [DONE] + advanced ops (shift/find-replace/split/merge) |
+| 38.5 | Closed Captions (CC) | [DONE] kind='captions' |
+
+**Completed 2026-10-08 (commit cd4ee8d)**: 38.4 expanded with advanced
+editor operations:
+- POST /subtitles/:id/shift       — bulk time-shift ±seconds
+- POST /subtitles/:id/find-replace — regex/plain, returns count
+- POST /subtitles/:id/split       — split cue at time
+- POST /subtitles/:id/merge       — merge consecutive cues
+All gated by authGuard; verified end-to-end.
+
+Also fixed structural bug in subtitle.route.ts (advanced routes were
+inserted inside helper function scope).
 
 ## Section 39 — Content Scheduling and Planning
 
