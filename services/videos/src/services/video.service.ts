@@ -651,3 +651,164 @@ export function listHdrVideos(limit = 40): { id: string; title: string; hdr_form
     ORDER BY created_at DESC LIMIT ?
   `).all(n) as any[];
 }
+
+// ---------- Content-type segregation (Section 37 Phase B) ----------
+
+export type ContentType =
+  | 'video'
+  | 'movie'
+  | 'tv'
+  | 'drama'
+  | 'web_series'
+  | 'music_video'
+  | 'song'
+  | 'album'
+  | 'podcast'
+  | 'short'
+  | 'news'
+  | 'article'
+  | 'other';
+
+export const CONTENT_TYPES: ContentType[] = [
+  'video', 'movie', 'tv', 'drama', 'web_series', 'music_video',
+  'song', 'album', 'podcast', 'short', 'news', 'article', 'other',
+];
+
+export interface ContentTypeStat {
+  content_type: string;
+  count: number;
+  label: string;
+}
+
+const CONTENT_TYPE_LABELS: Record<string, string> = {
+  video: 'Videos',
+  movie: 'Movies',
+  tv: 'TV Shows',
+  drama: 'Dramas',
+  web_series: 'Web Series',
+  music_video: 'Music Videos',
+  song: 'Songs',
+  album: 'Albums',
+  podcast: 'Podcasts',
+  short: 'Shorts',
+  news: 'News',
+  article: 'Articles',
+  other: 'Other',
+};
+
+export function contentLabel(contentType: string): string {
+  return CONTENT_TYPE_LABELS[contentType] ?? contentType;
+}
+
+export function listVideosByContentType(contentType: string, limit = 50, offset = 0): Video[] {
+  const db = getDb();
+  const n = Math.min(Math.max(limit, 1), 200);
+  const o = Math.max(offset, 0);
+  return db.prepare(`
+    SELECT * FROM videos
+    WHERE visibility = 'public' AND status = 'ready'
+      AND COALESCE(content_type, 'video') = ?
+    ORDER BY created_at DESC LIMIT ? OFFSET ?
+  `).all(contentType, n, o) as Video[];
+}
+
+export function countVideosByContentType(contentType: string): number {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT COUNT(*) as n FROM videos
+    WHERE visibility = 'public' AND status = 'ready'
+      AND COALESCE(content_type, 'video') = ?
+  `).get(contentType) as { n: number };
+  return row.n;
+}
+
+export function listContentTypeStats(): ContentTypeStat[] {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT COALESCE(content_type, 'video') as content_type, COUNT(*) as count
+    FROM videos
+    WHERE visibility = 'public' AND status = 'ready'
+    GROUP BY content_type
+    ORDER BY count DESC
+  `).all() as Array<{ content_type: string; count: number }>;
+  return rows.map((r) => ({
+    content_type: r.content_type,
+    count: r.count,
+    label: contentLabel(r.content_type),
+  }));
+}
+
+/**
+ * Trending videos per content type — for the home page.
+ * Each category returns up to `perCategory` top videos (by views).
+ */
+export interface TrendingByCategory {
+  content_type: string;
+  label: string;
+  videos: Video[];
+  total_in_category: number;
+}
+
+export function trendingByContentType(perCategory = 3, windowDays = 7): TrendingByCategory[] {
+  const db = getDb();
+  const n = Math.min(Math.max(perCategory, 1), 20);
+  const cutoff = new Date(Date.now() - Math.min(windowDays, 90) * 24 * 60 * 60 * 1000).toISOString();
+
+  // Content types with at least one ready+public row
+  const kinds = db.prepare(`
+    SELECT DISTINCT COALESCE(content_type, 'video') as content_type
+    FROM videos
+    WHERE visibility = 'public' AND status = 'ready'
+  `).all() as Array<{ content_type: string }>;
+
+  const result: TrendingByCategory[] = [];
+  const trendingStmt = db.prepare(`
+    SELECT * FROM videos
+    WHERE visibility = 'public' AND status = 'ready'
+      AND COALESCE(content_type, 'video') = ?
+      AND created_at >= ?
+    ORDER BY view_count DESC, like_count DESC, created_at DESC
+    LIMIT ?
+  `);
+  const fallbackStmt = db.prepare(`
+    SELECT * FROM videos
+    WHERE visibility = 'public' AND status = 'ready'
+      AND COALESCE(content_type, 'video') = ?
+    ORDER BY view_count DESC, like_count DESC, created_at DESC
+    LIMIT ?
+  `);
+  const countStmt = db.prepare(`
+    SELECT COUNT(*) as n FROM videos
+    WHERE visibility = 'public' AND status = 'ready'
+      AND COALESCE(content_type, 'video') = ?
+  `);
+
+  for (const k of kinds) {
+    let videos = trendingStmt.all(k.content_type, cutoff, n) as Video[];
+    if (videos.length === 0) videos = fallbackStmt.all(k.content_type, n) as Video[];
+    if (videos.length === 0) continue;
+    result.push({
+      content_type: k.content_type,
+      label: contentLabel(k.content_type),
+      videos,
+      total_in_category: (countStmt.get(k.content_type) as { n: number }).n,
+    });
+  }
+  // sort categories by total_in_category desc
+  result.sort((a, b) => b.total_in_category - a.total_in_category);
+  return result;
+}
+
+export function updateVideoContentType(id: string, ownerId: string, contentType: string): Video {
+  const db = getDb();
+  const existing = getVideoById(id);
+  if (!existing) throw new Error('Video not found');
+  if (existing.owner_id !== ownerId) throw new Error('Not authorized');
+  if (!CONTENT_TYPES.includes(contentType as ContentType)) {
+    throw new Error(`Unknown content_type: ${contentType}`);
+  }
+  const now = new Date().toISOString();
+  db.prepare('UPDATE videos SET content_type = ?, updated_at = ? WHERE id = ?')
+    .run(contentType, now, id);
+  return getVideoById(id)!;
+}
