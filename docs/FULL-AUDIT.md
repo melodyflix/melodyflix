@@ -852,6 +852,14 @@ infrastructure can carry game streams as channels with kind metadata.
 | 42.11 | WebRTC | [DONE] calling.service.ts |
 | 42.12 | RTMP/SRT Ingest | [DONE] rtmp.service.ts |
 
+**Verified 2026-10-08**: All 12 items confirmed via curl.
+- telemetry (18 endpoints): QoE, bandwidth, errors, alerts, problems,
+  streaming-config, playback-directive, cdn-endpoints
+- cdn (12 endpoints): providers, routes, health, resolve/:videoId, stats
+- failover (12 endpoints): policies, trigger/restore/evaluate, events, stats
+- WebRTC: calling service exposes ICE servers + call lifecycle
+- RTMP ingest: live service rtmp.service.ts (startRtmpServer)
+
 ## Section 43 — Website Builder and Customization
 
 All items [TODO] — zero code (this is a builder feature, not in scope)
