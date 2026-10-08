@@ -1060,6 +1060,22 @@ with WebVTT output.
 | 49.4 | Storage Analytics | [DONE] cloud-storage.service.ts |
 | 49.5 | Automatic Archiving | [DONE] cloud-storage.service.ts |
 
+**Verified 2026-10-08**: All 5 items tested via curl.
+- 49.1/49.2/49.3 Providers: aws_s3 | gcs | azure_blob | local;
+  register with bucket/region/endpoint/credentials_ref/is_default;
+  CRUD under /storage/backends
+- 49.4 Analytics: POST /storage/analytics/snapshot, per-backend
+  GET /storage/backends/:id/analytics + /trend, and GET /storage/stats
+  (aggregates by provider + storage class hot/cool/cold/archive)
+- 49.5 Archiving: storage_policies (from_class → to_class,
+  older_than_days, video_category, min_size_bytes), per-policy run +
+  run-all, storage_archive_runs log (status/objects_moved/bytes_moved)
+- storage_objects with key/backend_id + class-change endpoint
+
+25+ endpoints under /api/v1/videos/storage/*. Verified: registered
+AWS/GCS/Azure backends, policy transitioned hot→cold after 90 days
+executed (0 objects moved in empty DB), analytics snapshots recorded.
+
 ## Section 50 — Video Compliance
 
 | 50.1 | COPPA Compliance | [TODO] |
