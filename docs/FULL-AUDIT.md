@@ -1153,7 +1153,33 @@ telemetry/AI/AI-safety admin endpoints.
 
 ## Section 52 — Video Server Management
 
-All items [TODO] — currently single-server
+**Completed 2026-10-08 (commit 0d7db7b)** — full multi-server fleet.
+
+- 52.1 Server Registry: `video_servers` (role origin/edge/worker/backup,
+  region, base_url, streaming_url, priority, weight, max bandwidth/
+  storage, headers/config JSON); CRUD
+- 52.2 Health Monitoring: heartbeat log (latency, http code, cpu/
+  memory/disk %, bandwidth, active streams); auto-transition status;
+  fires failover event on down
+- 52.3 Video Replication: `video_server_replicas` (unique video ×
+  server); status pending/syncing/ready/stale/failed; coverage summary
+- 52.4 Capacity: snapshots (disk used/total, bandwidth, streams);
+  latest + history
+- 52.5 Load Balancing: 5 strategies — priority / least_load / geo /
+  round_robin / weighted; filters enabled + healthy + has-replica;
+  every decision logged
+- 52.6 Failover: auto event on health→down; candidate ranking
+  (same-region first); manual failover + restore
+- 52.7 Config Sync: push config → pending → applied/failed per server
+- 52.8 Fleet Stats: aggregates by role/region/health + capacity +
+  replicas + 24h failovers
+
+**Verified 2026-10-08**: 3 servers registered (origin US + edge EU +
+edge BD); video v1 replicated to all 3 (coverage 3/0/0); priority→
+Origin, geo(EU)→Edge EU, least_load→Origin; s1 health=down auto-
+triggered failover event and priority routing switched to Edge BD;
+config sync pushed to Edge EU; fleet stats showed 150TB capacity,
+30Gbps bandwidth, 45 streams.
 
 ## Section 53 — Content Licensing and Rights
 
