@@ -1,7 +1,7 @@
 // melodyflix videos — Internet Radio routes (Section 124)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   createRadioStation, getRadioStation, listRadioStations,
   updateRadioStation, deleteRadioStation,
@@ -63,14 +63,14 @@ export async function radioRoutes(app: FastifyInstance) {
 
   // ---- Owner-scoped ----
 
-  app.get('/radio/mine', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/radio/mine', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const stations = listRadioStations({ owner_id: me, active_only: false, public_only: false, limit: 500 });
     return reply.send({ success: true, data: { stations, count: countStationsByOwner(me) } });
   });
 
-  app.post('/radio/stations', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/radio/stations', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = StationSchema.safeParse(req.body);
@@ -92,7 +92,7 @@ export async function radioRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { station: st } });
   });
 
-  app.patch('/radio/stations/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/radio/stations/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -105,7 +105,7 @@ export async function radioRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { station: updated } });
   });
 
-  app.delete('/radio/stations/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/radio/stations/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -118,7 +118,7 @@ export async function radioRoutes(app: FastifyInstance) {
 
   // ---- Health ----
 
-  app.post('/radio/stations/:id/health', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/radio/stations/:id/health', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -168,7 +168,7 @@ export async function radioRoutes(app: FastifyInstance) {
   });
 
   // POST /radio/stations/:id/jingles — create
-  app.post('/radio/stations/:id/jingles', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/radio/stations/:id/jingles', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -186,7 +186,7 @@ export async function radioRoutes(app: FastifyInstance) {
   });
 
   // PATCH /radio/jingles/:id — update
-  app.patch('/radio/jingles/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/radio/jingles/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -202,7 +202,7 @@ export async function radioRoutes(app: FastifyInstance) {
   });
 
   // DELETE /radio/jingles/:id
-  app.delete('/radio/jingles/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/radio/jingles/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -289,7 +289,7 @@ export async function radioRoutes(app: FastifyInstance) {
   });
 
   // POST /radio/stations/:id/schedule — create slot
-  app.post('/radio/stations/:id/schedule', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/radio/stations/:id/schedule', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -316,7 +316,7 @@ export async function radioRoutes(app: FastifyInstance) {
   });
 
   // PATCH /radio/schedule/:id — update
-  app.patch('/radio/schedule/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/radio/schedule/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -335,7 +335,7 @@ export async function radioRoutes(app: FastifyInstance) {
   });
 
   // DELETE /radio/schedule/:id
-  app.delete('/radio/schedule/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/radio/schedule/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -391,7 +391,7 @@ export async function radioRoutes(app: FastifyInstance) {
   });
 
   // POST /radio/stations/:id/history — log a play (owner or worker)
-  app.post('/radio/stations/:id/history', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/radio/stations/:id/history', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -417,7 +417,7 @@ export async function radioRoutes(app: FastifyInstance) {
   });
 
   // DELETE /radio/history/:id — delete a play (owner-only)
-  app.delete('/radio/history/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/radio/history/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -430,7 +430,7 @@ export async function radioRoutes(app: FastifyInstance) {
   });
 
   // POST /radio/stations/:id/history/prune — retention prune (owner or worker)
-  app.post('/radio/stations/:id/history/prune', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/radio/stations/:id/history/prune', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };

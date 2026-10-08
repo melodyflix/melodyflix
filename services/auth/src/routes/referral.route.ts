@@ -1,7 +1,7 @@
 // melodyflix auth - referral routes (27.2)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   getOrCreateCode, getReferralStats, listReferralsByUser,
   getCreditBalance, buildShareLink, REFERRER_REWARD, REFERRED_BONUS,
@@ -13,7 +13,7 @@ const ApplySchema = z.object({
 
 export async function referralRoutes(app: FastifyInstance) {
   // GET /referrals/me — own code + stats + credits
-  app.get('/referrals/me', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/referrals/me', { preHandler: [authGuard] }, async (req, reply) => {
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const stats = getReferralStats(userId);
@@ -29,7 +29,7 @@ export async function referralRoutes(app: FastifyInstance) {
   });
 
   // GET /referrals/me/list — list of referred users
-  app.get('/referrals/me/list', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/referrals/me/list', { preHandler: [authGuard] }, async (req, reply) => {
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { limit?: string };
@@ -39,14 +39,14 @@ export async function referralRoutes(app: FastifyInstance) {
   });
 
   // GET /referrals/credits — own credits only
-  app.get('/referrals/credits', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/referrals/credits', { preHandler: [authGuard] }, async (req, reply) => {
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     return reply.send({ success: true, data: getCreditBalance(userId) });
   });
 
   // POST /referrals/code/regenerate — regenerate own code (drops old one)
-  app.post('/referrals/code/regenerate', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/referrals/code/regenerate', { preHandler: [authGuard] }, async (req, reply) => {
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     // Simple: delete existing and recreate (old code becomes invalid)
@@ -57,7 +57,7 @@ export async function referralRoutes(app: FastifyInstance) {
   });
 
   // GET /referrals/share — return full share link (with current origin)
-  app.get('/referrals/share', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/referrals/share', { preHandler: [authGuard] }, async (req, reply) => {
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const code = getOrCreateCode(userId).code;

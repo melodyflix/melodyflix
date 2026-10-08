@@ -1,7 +1,7 @@
 // melodyflix videos - clip routes
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth, verifyJwt, extractBearerToken } from '@melodyflix/shared-auth';
+import { authGuard, verifyJwt, extractBearerToken } from '@melodyflix/shared-auth';
 import {
   createClip, getClip, listClipsForVideo, listClipsByCreator,
   incrementClipView, deleteClip,
@@ -33,7 +33,7 @@ export async function clipRoutes(app: FastifyInstance) {
   });
 
   // POST /:videoId/clips
-  app.post('/:videoId/clips', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/:videoId/clips', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -73,7 +73,7 @@ export async function clipRoutes(app: FastifyInstance) {
   });
 
   // GET /clips/mine — my clips
-  app.get('/clips/mine', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/clips/mine', { preHandler: [authGuard] }, async (req, reply) => {
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const clips = listClipsByCreator(userId);
@@ -81,7 +81,7 @@ export async function clipRoutes(app: FastifyInstance) {
   });
 
   // DELETE /clips/:clipId
-  app.delete('/clips/:clipId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/clips/:clipId', { preHandler: [authGuard] }, async (req, reply) => {
     const { clipId } = req.params as { clipId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     const role = (req as any).user?.role;

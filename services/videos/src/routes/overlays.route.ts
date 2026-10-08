@@ -1,7 +1,7 @@
 // melodyflix videos - lower thirds + transitions routes (30.6, 30.7)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import { getDb } from '@melodyflix/shared-db';
 import {
   LOWER_THIRD_STYLES, LOWER_THIRD_ANIMATIONS, TRANSITION_PRESETS,
@@ -58,7 +58,7 @@ export async function overlaysRoutes(app: FastifyInstance) {
   });
 
   // POST /channels/:channelId/lower-thirds (owner)
-  app.post('/channels/:channelId/lower-thirds', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/channels/:channelId/lower-thirds', { preHandler: [authGuard] }, async (req, reply) => {
     const { channelId } = req.params as { channelId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -74,7 +74,7 @@ export async function overlaysRoutes(app: FastifyInstance) {
   });
 
   // PUT /channels/:channelId/lower-thirds/:id (owner)
-  app.put('/channels/:channelId/lower-thirds/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/channels/:channelId/lower-thirds/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const { channelId, id } = req.params as { channelId: string; id: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -90,7 +90,7 @@ export async function overlaysRoutes(app: FastifyInstance) {
   });
 
   // DELETE /channels/:channelId/lower-thirds/:id (owner)
-  app.delete('/channels/:channelId/lower-thirds/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/channels/:channelId/lower-thirds/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const { channelId, id } = req.params as { channelId: string; id: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -116,7 +116,7 @@ export async function overlaysRoutes(app: FastifyInstance) {
   });
 
   // PUT /channels/:channelId/transition (owner)
-  app.put('/channels/:channelId/transition', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/channels/:channelId/transition', { preHandler: [authGuard] }, async (req, reply) => {
     const { channelId } = req.params as { channelId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -135,7 +135,7 @@ export async function overlaysRoutes(app: FastifyInstance) {
   });
 
   // DELETE /channels/:channelId/transition (owner)
-  app.delete('/channels/:channelId/transition', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/channels/:channelId/transition', { preHandler: [authGuard] }, async (req, reply) => {
     const { channelId } = req.params as { channelId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });

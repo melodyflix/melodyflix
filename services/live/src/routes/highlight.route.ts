@@ -1,7 +1,7 @@
 // melodyflix live — Auto Highlight routes (7.6)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import { getStreamById } from '../services/live.service.js';
 import {
   getHighlight, listHighlights, updateHighlight, deleteHighlight,
@@ -45,7 +45,7 @@ export async function highlightRoutes(app: FastifyInstance) {
     labels: z.array(z.string().max(40)).max(10).optional(),
   });
 
-  app.post('/streams/:id/highlights/manual', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/streams/:id/highlights/manual', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -79,7 +79,7 @@ export async function highlightRoutes(app: FastifyInstance) {
     labels: z.array(z.string().max(40)).max(10).optional(),
   });
 
-  app.patch('/highlights/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/highlights/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -98,7 +98,7 @@ export async function highlightRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { highlight: updated } });
   });
 
-  app.delete('/highlights/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/highlights/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -151,7 +151,7 @@ export async function highlightRoutes(app: FastifyInstance) {
     duration_seconds: z.number().min(5).max(300).optional(),
   });
 
-  app.post('/streams/:id/highlights/detect', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/streams/:id/highlights/detect', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -172,7 +172,7 @@ export async function highlightRoutes(app: FastifyInstance) {
   });
 
   // POST /streams/:id/highlights/detect-and-save — persist candidates
-  app.post('/streams/:id/highlights/detect-and-save', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/streams/:id/highlights/detect-and-save', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };

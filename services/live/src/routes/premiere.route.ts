@@ -1,7 +1,7 @@
 // melodyflix live — Premiere routes (7.2)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   createPremiere, getPremiere, getPremiereByStreamId, listPremieres,
   listUpcomingPremieres, updatePremiere, cancelPremiere, endPremiere,
@@ -70,7 +70,7 @@ export async function premiereRoutes(app: FastifyInstance) {
     thumbnail_url: z.string().url().nullable().optional(),
   });
 
-  app.post('/premieres', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/premieres', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = CreateSchema.safeParse(req.body);
@@ -92,7 +92,7 @@ export async function premiereRoutes(app: FastifyInstance) {
     thumbnail_url: z.string().url().nullable().optional(),
   });
 
-  app.patch('/premieres/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/premieres/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -108,7 +108,7 @@ export async function premiereRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/premieres/:id/cancel', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/premieres/:id/cancel', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -121,7 +121,7 @@ export async function premiereRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/premieres/:id/end', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/premieres/:id/end', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -160,7 +160,7 @@ export async function premiereRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { chat, count: chat.length } });
   });
 
-  app.post('/premieres/:id/chat', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/premieres/:id/chat', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -180,7 +180,7 @@ export async function premiereRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/premieres/:id/chat/:msgId/pin', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/premieres/:id/chat/:msgId/pin', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id, msgId } = req.params as { id: string; msgId: string };
@@ -198,7 +198,7 @@ export async function premiereRoutes(app: FastifyInstance) {
     remind_minutes_before: z.number().int().min(1).max(24 * 60).optional(),
   });
 
-  app.post('/premieres/:id/rsvp', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/premieres/:id/rsvp', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -212,7 +212,7 @@ export async function premiereRoutes(app: FastifyInstance) {
     }
   });
 
-  app.delete('/premieres/:id/rsvp', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/premieres/:id/rsvp', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -220,7 +220,7 @@ export async function premiereRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { removed, count: countRsvps(id) } });
   });
 
-  app.get('/premieres/:id/rsvp', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/premieres/:id/rsvp', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -235,7 +235,7 @@ export async function premiereRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { due, count: due.length } });
   });
 
-  app.post('/premieres/rsvp/:rsvpId/notified', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/premieres/rsvp/:rsvpId/notified', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { rsvpId } = req.params as { rsvpId: string };

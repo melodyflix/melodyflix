@@ -1,7 +1,7 @@
 // melodyflix videos - VR/360 routes (3.6)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import { getDb } from '@melodyflix/shared-db';
 import {
   PROJECTIONS, STEREOS, getVrMetadata, setVrMetadata, clearVrMetadata, listVrVideos,
@@ -44,7 +44,7 @@ export async function vrRoutes(app: FastifyInstance) {
   });
 
   // PUT /:videoId/vr — update metadata (owner only)
-  app.put('/:videoId/vr', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/:videoId/vr', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -60,7 +60,7 @@ export async function vrRoutes(app: FastifyInstance) {
   });
 
   // DELETE /:videoId/vr — clear metadata (revert to 2D) (owner only)
-  app.delete('/:videoId/vr', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/:videoId/vr', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });

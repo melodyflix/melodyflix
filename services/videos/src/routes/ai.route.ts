@@ -1,7 +1,7 @@
 // melodyflix videos — AI Features routes (Section 8)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   getAiJob, listAiJobs, listQueuedAiJobs, cancelAiJob,
   markAiJobRunning, markAiJobDone, markAiJobFailed,
@@ -32,13 +32,13 @@ function checkInternalSecret(req: any): boolean {
 export async function aiRoutes(app: FastifyInstance) {
   // ---- Dashboard ----
 
-  app.get('/ai/summary', { preHandler: [requireAuth] }, async (_req, reply) => {
+  app.get('/ai/summary', { preHandler: [authGuard] }, async (_req, reply) => {
     return reply.send({ success: true, data: getAiSummary() });
   });
 
   // ---- Jobs ----
 
-  app.get('/ai/jobs', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/ai/jobs', { preHandler: [authGuard] }, async (req, reply) => {
     const q = req.query as { feature?: string; status?: string; limit?: string };
     const jobs = listAiJobs({
       feature: q.feature as any,
@@ -48,14 +48,14 @@ export async function aiRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { jobs, count: jobs.length } });
   });
 
-  app.get('/ai/jobs/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/ai/jobs/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const j = getAiJob(id);
     if (!j) return reply.code(404).send({ success: false, error: 'Job not found' });
     return reply.send({ success: true, data: { job: j } });
   });
 
-  app.post('/ai/jobs/:id/cancel', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/jobs/:id/cancel', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -135,7 +135,7 @@ export async function aiRoutes(app: FastifyInstance) {
     is_auto: z.boolean().optional(),
   });
 
-  app.put('/ai/videos/:videoId/caption', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/ai/videos/:videoId/caption', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const parsed = CaptionSaveSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
@@ -148,7 +148,7 @@ export async function aiRoutes(app: FastifyInstance) {
     transcript: z.string().max(200_000).optional(),
   });
 
-  app.post('/ai/videos/:videoId/caption/generate', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/videos/:videoId/caption/generate', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { videoId } = req.params as { videoId: string };
@@ -187,7 +187,7 @@ export async function aiRoutes(app: FastifyInstance) {
     content_type: z.string().max(20).optional(),
   });
 
-  app.post('/ai/videos/:videoId/translate', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/videos/:videoId/translate', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { videoId } = req.params as { videoId: string };
@@ -216,7 +216,7 @@ export async function aiRoutes(app: FastifyInstance) {
     language: z.string().max(8).optional(),
   });
 
-  app.post('/ai/videos/:videoId/summary', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/videos/:videoId/summary', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { videoId } = req.params as { videoId: string };
@@ -244,7 +244,7 @@ export async function aiRoutes(app: FastifyInstance) {
     transcript: z.string().min(10).max(500_000),
   });
 
-  app.post('/ai/videos/:videoId/key-moments', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/videos/:videoId/key-moments', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { videoId } = req.params as { videoId: string };
@@ -269,7 +269,7 @@ export async function aiRoutes(app: FastifyInstance) {
     max: z.number().int().min(1).max(20).optional(),
   });
 
-  app.post('/ai/suggest-tags', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/suggest-tags', { preHandler: [authGuard] }, async (req, reply) => {
     const parsed = SuggestTagsSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
     try {

@@ -1,7 +1,7 @@
 // melodyflix videos — Online Video Editor routes (Section 9.5)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   createEditorJob, getEditorJob, listEditorJobs,
   updateEditorJob, deleteEditorJob,
@@ -21,7 +21,7 @@ export async function editorRoutes(app: FastifyInstance) {
   const KindEnum = z.enum(['trim', 'crop', 'watermark', 'composite']);
 
   // GET /editor/jobs — list own jobs
-  app.get('/editor/jobs', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/editor/jobs', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { status?: string; video_id?: string; limit?: string };
@@ -35,14 +35,14 @@ export async function editorRoutes(app: FastifyInstance) {
   });
 
   // GET /editor/summary — per-owner dashboard
-  app.get('/editor/summary', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/editor/summary', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     return reply.send({ success: true, data: getEditorSummary(me) });
   });
 
   // GET /editor/jobs/:id
-  app.get('/editor/jobs/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/editor/jobs/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -53,7 +53,7 @@ export async function editorRoutes(app: FastifyInstance) {
   });
 
   // GET /editor/jobs/:id/preview — ffmpeg args preview (dry-run)
-  app.get('/editor/jobs/:id/preview', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/editor/jobs/:id/preview', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -86,7 +86,7 @@ export async function editorRoutes(app: FastifyInstance) {
     watermark_opacity: z.number().min(0).max(1).optional(),
   });
 
-  app.post('/editor/jobs', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/editor/jobs', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = CreateSchema.safeParse(req.body);
@@ -104,7 +104,7 @@ export async function editorRoutes(app: FastifyInstance) {
 
   // PATCH /editor/jobs/:id — update
   const UpdateSchema = CreateSchema.partial().omit({ video_id: true });
-  app.patch('/editor/jobs/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/editor/jobs/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -120,7 +120,7 @@ export async function editorRoutes(app: FastifyInstance) {
   });
 
   // DELETE /editor/jobs/:id
-  app.delete('/editor/jobs/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/editor/jobs/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -134,7 +134,7 @@ export async function editorRoutes(app: FastifyInstance) {
   });
 
   // POST /editor/jobs/:id/queue
-  app.post('/editor/jobs/:id/queue', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/editor/jobs/:id/queue', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -148,7 +148,7 @@ export async function editorRoutes(app: FastifyInstance) {
   });
 
   // POST /editor/jobs/:id/cancel
-  app.post('/editor/jobs/:id/cancel', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/editor/jobs/:id/cancel', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -162,7 +162,7 @@ export async function editorRoutes(app: FastifyInstance) {
   });
 
   // POST /editor/jobs/:id/render — mock-safe render (real mode delegates to worker)
-  app.post('/editor/jobs/:id/render', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/editor/jobs/:id/render', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };

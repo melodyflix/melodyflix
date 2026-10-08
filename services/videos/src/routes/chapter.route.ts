@@ -1,7 +1,7 @@
 // melodyflix videos - chapter routes
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth, requireRole } from '@melodyflix/shared-auth';
+import { authGuard, requireRole } from '@melodyflix/shared-auth';
 import { getDb } from '@melodyflix/shared-db';
 import { getEffectiveChapters, replaceChapters, clearChapters } from '../services/chapter.service.js';
 
@@ -29,7 +29,7 @@ export async function chapterRoutes(app: FastifyInstance) {
   });
 
   // Set (replace) manual chapters — owner only
-  app.put('/:id/chapters', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/:id/chapters', { preHandler: [authGuard] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ message: 'Unauthorized' });
@@ -45,7 +45,7 @@ export async function chapterRoutes(app: FastifyInstance) {
   });
 
   // Delete all manual chapters (fallback to auto) — owner only
-  app.delete('/:id/chapters', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/:id/chapters', { preHandler: [authGuard] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ message: 'Unauthorized' });

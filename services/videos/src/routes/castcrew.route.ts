@@ -1,7 +1,7 @@
 // melodyflix videos - cast & crew routes
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import { getDb } from '@melodyflix/shared-db';
 import {
   ROLES, listPeopleForVideo, replaceCastCrew, addPerson, removePerson, listVideosByPerson,
@@ -39,7 +39,7 @@ export async function castCrewRoutes(app: FastifyInstance) {
   });
 
   // POST /:videoId/credits  { name, role, character_name? }
-  app.post('/:videoId/credits', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/:videoId/credits', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -57,7 +57,7 @@ export async function castCrewRoutes(app: FastifyInstance) {
   });
 
   // PUT /:videoId/credits  { people: [...] } — replace all
-  app.put('/:videoId/credits', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/:videoId/credits', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -71,7 +71,7 @@ export async function castCrewRoutes(app: FastifyInstance) {
   });
 
   // DELETE /:videoId/credits/:personId
-  app.delete('/:videoId/credits/:personId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/:videoId/credits/:personId', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId, personId } = req.params as { videoId: string; personId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });

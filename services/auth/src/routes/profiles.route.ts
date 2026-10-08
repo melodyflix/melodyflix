@@ -1,7 +1,7 @@
 // melodyflix auth — Account Profiles routes (Section 1.6)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   createProfile, getProfile, listProfiles, countProfiles,
   updateProfile, deleteProfile, getDefaultProfile, setDefaultProfile,
@@ -38,7 +38,7 @@ export async function profilesRoutes(app: FastifyInstance) {
   const PinSchema = z.object({ pin: z.string().regex(/^\d{4,6}$/) });
 
   // GET /profiles — list all profiles for the current account
-  app.get('/profiles', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/profiles', { preHandler: [authGuard] }, async (req, reply) => {
     const me = accountId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const summary = summarizeProfiles(me);
@@ -46,7 +46,7 @@ export async function profilesRoutes(app: FastifyInstance) {
   });
 
   // POST /profiles — create (max 5)
-  app.post('/profiles', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/profiles', { preHandler: [authGuard] }, async (req, reply) => {
     const me = accountId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = CreateSchema.safeParse(req.body);
@@ -64,7 +64,7 @@ export async function profilesRoutes(app: FastifyInstance) {
   });
 
   // GET /profiles/:id — single (account-scoped)
-  app.get('/profiles/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/profiles/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = accountId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -80,7 +80,7 @@ export async function profilesRoutes(app: FastifyInstance) {
   });
 
   // PATCH /profiles/:id — update
-  app.patch('/profiles/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/profiles/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = accountId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -99,7 +99,7 @@ export async function profilesRoutes(app: FastifyInstance) {
   });
 
   // DELETE /profiles/:id — cannot delete default
-  app.delete('/profiles/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/profiles/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = accountId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -113,7 +113,7 @@ export async function profilesRoutes(app: FastifyInstance) {
   });
 
   // POST /profiles/:id/default — make this the default profile
-  app.post('/profiles/:id/default', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/profiles/:id/default', { preHandler: [authGuard] }, async (req, reply) => {
     const me = accountId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -127,7 +127,7 @@ export async function profilesRoutes(app: FastifyInstance) {
   });
 
   // GET /profiles/default — current default
-  app.get('/profiles/default', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/profiles/default', { preHandler: [authGuard] }, async (req, reply) => {
     const me = accountId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     return reply.send({ success: true, data: { profile: getDefaultProfile(me) } });
@@ -136,7 +136,7 @@ export async function profilesRoutes(app: FastifyInstance) {
   // ---- PIN ----
 
   // POST /profiles/:id/pin — set PIN
-  app.post('/profiles/:id/pin', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/profiles/:id/pin', { preHandler: [authGuard] }, async (req, reply) => {
     const me = accountId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -154,7 +154,7 @@ export async function profilesRoutes(app: FastifyInstance) {
   });
 
   // DELETE /profiles/:id/pin — remove PIN (requires current)
-  app.delete('/profiles/:id/pin', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/profiles/:id/pin', { preHandler: [authGuard] }, async (req, reply) => {
     const me = accountId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };

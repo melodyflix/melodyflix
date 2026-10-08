@@ -1,7 +1,7 @@
 // melodyflix videos - Live TV Broadcasting routes (Section 40)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   listChannels, getChannel, createChannel, updateChannel, deleteChannel,
   listCategories, countByOwner, checkStreamHealth, getLatestHealth, listHealthHistory,
@@ -90,7 +90,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   // ---- Owner-protected ----
 
   // GET /live-tv/mine — my channels (40.6)
-  app.get('/live-tv/mine', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/live-tv/mine', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const channels = listChannels({ owner_id: me, active_only: false, public_only: false, limit: 500 });
@@ -98,7 +98,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/channels — create (40.1, 40.15)
-  app.post('/live-tv/channels', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/channels', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = CreateSchema.safeParse(req.body);
@@ -110,7 +110,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // PATCH /live-tv/channels/:id — update (owner only)
-  app.patch('/live-tv/channels/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/live-tv/channels/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     const { id } = req.params as { id: string };
     const ch = getChannel(id);
@@ -125,7 +125,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // DELETE /live-tv/channels/:id — remove (owner only)
-  app.delete('/live-tv/channels/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/live-tv/channels/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     const { id } = req.params as { id: string };
     const ch = getChannel(id);
@@ -138,7 +138,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   // ---- Stream Health (40.16) ----
 
   // POST /live-tv/channels/:id/health — run health check (owner only)
-  app.post('/live-tv/channels/:id/health', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/channels/:id/health', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     const { id } = req.params as { id: string };
     const ch = getChannel(id);
@@ -178,7 +178,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/import/m3u/preview — parse only, no DB write
-  app.post('/live-tv/import/m3u/preview', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/import/m3u/preview', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = ImportSchema.safeParse(req.body);
@@ -190,7 +190,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/import/m3u — parse + insert
-  app.post('/live-tv/import/m3u', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/import/m3u', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = ImportSchema.safeParse(req.body);
@@ -215,7 +215,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/import/xmltv/preview — parse only, no DB write
-  app.post('/live-tv/import/xmltv/preview', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/import/xmltv/preview', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = XmltvImportSchema.safeParse(req.body);
@@ -235,7 +235,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/import/xmltv — parse + upsert channels + insert programs
-  app.post('/live-tv/import/xmltv', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/import/xmltv', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = XmltvImportSchema.safeParse(req.body);
@@ -314,7 +314,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/switch/:channelId — switch to a channel, save state
-  app.post('/live-tv/switch/:channelId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/switch/:channelId', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { channelId } = req.params as { channelId: string };
@@ -334,7 +334,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // GET /live-tv/state — current watch state + channel
-  app.get('/live-tv/state', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/live-tv/state', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const state = getWatchState(me);
@@ -342,7 +342,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // PATCH /live-tv/state/position — heartbeat to update position_seconds
-  app.patch('/live-tv/state/position', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/live-tv/state/position', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const body = PositionBodySchema.safeParse(req.body);
@@ -354,7 +354,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // DELETE /live-tv/state — stop watching (clear current state, keep recents)
-  app.delete('/live-tv/state', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/live-tv/state', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     clearWatchState(me);
@@ -362,7 +362,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // GET /live-tv/recent?limit=N — recently watched channels
-  app.get('/live-tv/recent', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/live-tv/recent', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { limit?: string };
@@ -374,7 +374,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   // ---- Channel Favorites (40.11) ----
 
   // GET /live-tv/favorites — my favorites
-  app.get('/live-tv/favorites', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/live-tv/favorites', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { limit?: string };
@@ -383,7 +383,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/favorites/:channelId — add to favorites
-  app.post('/live-tv/favorites/:channelId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/favorites/:channelId', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { channelId } = req.params as { channelId: string };
@@ -399,7 +399,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // DELETE /live-tv/favorites/:channelId — remove from favorites
-  app.delete('/live-tv/favorites/:channelId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/live-tv/favorites/:channelId', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { channelId } = req.params as { channelId: string };
@@ -408,7 +408,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/favorites/:channelId/toggle — toggle favorite
-  app.post('/live-tv/favorites/:channelId/toggle', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/favorites/:channelId/toggle', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { channelId } = req.params as { channelId: string };
@@ -424,7 +424,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // GET /live-tv/favorites/:channelId — check favorite status
-  app.get('/live-tv/favorites/:channelId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/live-tv/favorites/:channelId', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { channelId } = req.params as { channelId: string };
@@ -432,7 +432,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // PUT /live-tv/favorites/order — reorder favorites
-  app.put('/live-tv/favorites/order', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/live-tv/favorites/order', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const OrderSchema = z.object({
@@ -463,7 +463,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   const MaxAgeSchema = z.object({ max_age_rating: z.number().int().min(0).max(21) });
 
   // GET /live-tv/parental — settings (no hash/salt)
-  app.get('/live-tv/parental', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/live-tv/parental', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const settings = getParentalSettings(me);
@@ -480,7 +480,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/parental/pin — set PIN (first time)
-  app.post('/live-tv/parental/pin', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/parental/pin', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     if (hasPin(me)) {
@@ -500,7 +500,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/parental/pin/change — change PIN
-  app.post('/live-tv/parental/pin/change', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/parental/pin/change', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = ChangePinSchema.safeParse(req.body);
@@ -511,7 +511,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // DELETE /live-tv/parental/pin — remove PIN (requires current)
-  app.delete('/live-tv/parental/pin', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/live-tv/parental/pin', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = VerifyPinSchema.safeParse(req.body);
@@ -522,7 +522,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // PATCH /live-tv/parental/max-age — update max age rating
-  app.patch('/live-tv/parental/max-age', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/live-tv/parental/max-age', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = MaxAgeSchema.safeParse(req.body);
@@ -533,7 +533,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/parental/unlock — verify PIN → 1h session
-  app.post('/live-tv/parental/unlock', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/parental/unlock', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = VerifyPinSchema.safeParse(req.body);
@@ -544,7 +544,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/parental/lock — end unlock session
-  app.post('/live-tv/parental/lock', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/parental/lock', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     lockSession(me);
@@ -552,7 +552,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/parental/verify — check PIN (no session grant)
-  app.post('/live-tv/parental/verify', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/parental/verify', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = VerifyPinSchema.safeParse(req.body);
@@ -563,7 +563,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   // ---- Blocked channels ----
 
   // GET /live-tv/parental/blocked — list
-  app.get('/live-tv/parental/blocked', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/live-tv/parental/blocked', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const blocked = listBlockedChannels(me);
@@ -571,7 +571,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/parental/blocked/:channelId — block
-  app.post('/live-tv/parental/blocked/:channelId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/parental/blocked/:channelId', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { channelId } = req.params as { channelId: string };
@@ -580,7 +580,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // DELETE /live-tv/parental/blocked/:channelId — unblock
-  app.delete('/live-tv/parental/blocked/:channelId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/live-tv/parental/blocked/:channelId', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { channelId } = req.params as { channelId: string };
@@ -589,7 +589,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // GET /live-tv/parental/blocked/:channelId — status
-  app.get('/live-tv/parental/blocked/:channelId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/live-tv/parental/blocked/:channelId', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { channelId } = req.params as { channelId: string };
@@ -614,7 +614,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // PATCH /live-tv/channels/:id/age-rating — set age rating (owner only)
-  app.patch('/live-tv/channels/:id/age-rating', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/live-tv/channels/:id/age-rating', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -652,7 +652,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/chat/:channelId — send a message
-  app.post('/live-tv/chat/:channelId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/chat/:channelId', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { channelId } = req.params as { channelId: string };
@@ -674,7 +674,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // DELETE /live-tv/chat/messages/:id — delete own message
-  app.delete('/live-tv/chat/messages/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/live-tv/chat/messages/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -687,7 +687,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/chat/messages/:id/report — flag a message
-  app.post('/live-tv/chat/messages/:id/report', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/chat/messages/:id/report', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -700,7 +700,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/chat/messages/:id/hide — hide message (channel owner only)
-  app.post('/live-tv/chat/messages/:id/hide', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/chat/messages/:id/hide', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -722,7 +722,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // GET /live-tv/recordings — list user recordings (owner-scoped)
-  app.get('/live-tv/recordings', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/live-tv/recordings', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { status?: string; channel_id?: string; from?: string; to?: string; limit?: string };
@@ -738,7 +738,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // GET /live-tv/recordings/stats — summary
-  app.get('/live-tv/recordings/stats', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/live-tv/recordings/stats', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     return reply.send({ success: true, data: recordingStats(me) });
@@ -760,7 +760,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // GET /live-tv/recordings/:id — single
-  app.get('/live-tv/recordings/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/live-tv/recordings/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -771,7 +771,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/recordings — schedule
-  app.post('/live-tv/recordings', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/recordings', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = ScheduleRecordingSchema.safeParse(req.body);
@@ -787,7 +787,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // POST /live-tv/recordings/:id/cancel
-  app.post('/live-tv/recordings/:id/cancel', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/recordings/:id/cancel', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -801,7 +801,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // DELETE /live-tv/recordings/:id
-  app.delete('/live-tv/recordings/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/live-tv/recordings/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -889,7 +889,7 @@ export async function liveTvRoutes(app: FastifyInstance) {
   });
 
   // Session lifecycle (user-scoped)
-  app.post('/live-tv/timeshift/session/:channelId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/live-tv/timeshift/session/:channelId', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { channelId } = req.params as { channelId: string };
@@ -904,20 +904,20 @@ export async function liveTvRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/live-tv/timeshift/session', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/live-tv/timeshift/session', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     return reply.send({ success: true, data: { session: getTimeshiftSession(me) } });
   });
 
-  app.patch('/live-tv/timeshift/session/heartbeat', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/live-tv/timeshift/session/heartbeat', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     heartbeatTimeshiftSession(me);
     return reply.send({ success: true, data: { ok: true } });
   });
 
-  app.delete('/live-tv/timeshift/session', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/live-tv/timeshift/session', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     endTimeshiftSession(me);

@@ -4,7 +4,7 @@ import { createWriteStream, statSync, existsSync, createReadStream } from 'node:
 import { pipeline } from 'node:stream/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { requireAuth, verifyJwt, extractBearerToken } from '@melodyflix/shared-auth';
+import { requireAuth, authGuard, verifyJwt, extractBearerToken } from '@melodyflix/shared-auth';
 import { createLogger } from '@melodyflix/shared-logger';
 import { publish, CHANNELS } from '@melodyflix/shared-events';
 import {
@@ -314,7 +314,7 @@ export async function videoRoutes(app: FastifyInstance) {
   });
 
   // PUT /:videoId/hdr — set HDR metadata (owner only)
-  app.put('/:videoId/hdr', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/:videoId/hdr', { preHandler: [authGuard] }, async (req, reply) => {
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { videoId } = req.params as { videoId: string };

@@ -1,7 +1,7 @@
 // melodyflix videos — Monetization routes (10.3 Donation, 10.9 Coupon)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   createDonation, getDonation, listDonationsForRecipient,
   listDonationsForChannel, refundDonation, getDonationStats,
@@ -30,7 +30,7 @@ export async function monetizationRoutes(app: FastifyInstance) {
     transaction_id: z.string().nullable().optional(),
   });
 
-  app.post('/donations', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/donations', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = DonateSchema.safeParse(req.body);
@@ -43,7 +43,7 @@ export async function monetizationRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/donations/received', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/donations/received', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { limit?: string };
@@ -58,7 +58,7 @@ export async function monetizationRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { donations, count: donations.length } });
   });
 
-  app.get('/donations/stats', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/donations/stats', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     return reply.send({ success: true, data: getDonationStats(me) });
@@ -71,7 +71,7 @@ export async function monetizationRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { donation: d } });
   });
 
-  app.post('/donations/:id/refund', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/donations/:id/refund', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -101,7 +101,7 @@ export async function monetizationRoutes(app: FastifyInstance) {
     ends_at: z.string().nullable().optional(),
   });
 
-  app.get('/promo-codes/mine', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/promo-codes/mine', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { limit?: string };
@@ -109,7 +109,7 @@ export async function monetizationRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { codes, count: codes.length } });
   });
 
-  app.get('/promo-codes/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/promo-codes/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -119,7 +119,7 @@ export async function monetizationRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { code } });
   });
 
-  app.post('/promo-codes', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/promo-codes', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = CreatePromoSchema.safeParse(req.body);
@@ -144,7 +144,7 @@ export async function monetizationRoutes(app: FastifyInstance) {
     is_active: z.boolean().optional(),
   });
 
-  app.patch('/promo-codes/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/promo-codes/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -159,7 +159,7 @@ export async function monetizationRoutes(app: FastifyInstance) {
     }
   });
 
-  app.delete('/promo-codes/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/promo-codes/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -179,7 +179,7 @@ export async function monetizationRoutes(app: FastifyInstance) {
     amount: z.number().min(0).max(1_000_000).optional(),
   });
 
-  app.post('/promo-codes/validate', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/promo-codes/validate', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = ValidateSchema.safeParse(req.body);
@@ -199,7 +199,7 @@ export async function monetizationRoutes(app: FastifyInstance) {
     amount_saved: z.number().min(0).max(100000),
   });
 
-  app.post('/promo-codes/redeem', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/promo-codes/redeem', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = RedeemSchema.safeParse(req.body);
@@ -216,7 +216,7 @@ export async function monetizationRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { redeemed: true } });
   });
 
-  app.get('/promo-codes/:id/redemptions', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/promo-codes/:id/redemptions', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };

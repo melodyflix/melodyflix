@@ -1,7 +1,7 @@
 // melodyflix live — moderation routes (7.8 Slow Mode, 7.9 Live Moderator)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import { getStreamById } from '../services/live.service.js';
 import {
   getChatSettings, setChatSettings,
@@ -41,7 +41,7 @@ export async function moderationRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { settings: getChatSettings(id) } });
   });
 
-  app.put('/streams/:id/chat-settings', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/streams/:id/chat-settings', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -53,7 +53,7 @@ export async function moderationRoutes(app: FastifyInstance) {
   });
 
   // Pre-post permission check (lightweight)
-  app.get('/streams/:id/chat-permission', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/streams/:id/chat-permission', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -76,7 +76,7 @@ export async function moderationRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { moderators: listModerators(id) } });
   });
 
-  app.post('/streams/:id/moderators', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/streams/:id/moderators', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -93,7 +93,7 @@ export async function moderationRoutes(app: FastifyInstance) {
     }
   });
 
-  app.delete('/streams/:id/moderators/:userId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/streams/:id/moderators/:userId', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id, userId: target } = req.params as { id: string; userId: string };
@@ -110,7 +110,7 @@ export async function moderationRoutes(app: FastifyInstance) {
     reason: z.string().max(200).nullable().optional(),
   });
 
-  app.get('/streams/:id/mutes', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/streams/:id/mutes', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -118,7 +118,7 @@ export async function moderationRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { mutes: listMutes(id) } });
   });
 
-  app.post('/streams/:id/mutes', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/streams/:id/mutes', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -133,7 +133,7 @@ export async function moderationRoutes(app: FastifyInstance) {
     return reply.code(201).send({ success: true, data: { mute } });
   });
 
-  app.delete('/streams/:id/mutes/:userId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/streams/:id/mutes/:userId', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id, userId: target } = req.params as { id: string; userId: string };
@@ -154,7 +154,7 @@ export async function moderationRoutes(app: FastifyInstance) {
     reason: z.string().max(200).nullable().optional(),
   });
 
-  app.get('/streams/:id/bans', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/streams/:id/bans', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -162,7 +162,7 @@ export async function moderationRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { bans: listBans(id) } });
   });
 
-  app.post('/streams/:id/bans', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/streams/:id/bans', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -176,7 +176,7 @@ export async function moderationRoutes(app: FastifyInstance) {
     return reply.code(201).send({ success: true, data: { ban } });
   });
 
-  app.delete('/streams/:id/bans/:userId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/streams/:id/bans/:userId', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id, userId: target } = req.params as { id: string; userId: string };

@@ -1,7 +1,7 @@
 // melodyflix videos - audio track routes (45.8)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth, verifyJwt, extractBearerToken } from '@melodyflix/shared-auth';
+import { authGuard, verifyJwt, extractBearerToken } from '@melodyflix/shared-auth';
 import { getDb } from '@melodyflix/shared-db';
 import {
   AUDIO_TRACK_KINDS, listAudioTracks, getAudioTrack, addAudioTrack,
@@ -53,7 +53,7 @@ export async function audioTrackRoutes(app: FastifyInstance) {
   });
 
   // POST /:videoId/audio-tracks — owner only
-  app.post('/:videoId/audio-tracks', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/:videoId/audio-tracks', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -73,7 +73,7 @@ export async function audioTrackRoutes(app: FastifyInstance) {
   });
 
   // POST /audio-tracks/:trackId/set-default — owner only
-  app.post('/audio-tracks/:trackId/set-default', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/audio-tracks/:trackId/set-default', { preHandler: [authGuard] }, async (req, reply) => {
     const { trackId } = req.params as { trackId: string };
     const track = getAudioTrack(trackId);
     if (!track) return reply.code(404).send({ success: false, error: 'Track not found' });
@@ -86,7 +86,7 @@ export async function audioTrackRoutes(app: FastifyInstance) {
   });
 
   // DELETE /audio-tracks/:trackId — owner only
-  app.delete('/audio-tracks/:trackId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/audio-tracks/:trackId', { preHandler: [authGuard] }, async (req, reply) => {
     const { trackId } = req.params as { trackId: string };
     const track = getAudioTrack(trackId);
     if (!track) return reply.code(404).send({ success: false, error: 'Track not found' });
@@ -99,7 +99,7 @@ export async function audioTrackRoutes(app: FastifyInstance) {
   });
 
   // POST /:videoId/audio-tracks/preference { track_id } — signed-in user
-  app.post('/:videoId/audio-tracks/preference', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/:videoId/audio-tracks/preference', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });

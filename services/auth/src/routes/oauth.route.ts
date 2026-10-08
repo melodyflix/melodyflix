@@ -1,7 +1,7 @@
 // melodyflix auth — Social Login routes (Section 1.3)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   createOAuthState, consumeOAuthState, computeCodeChallenge,
   buildAuthUrl, exchangeCode, fetchUserProfile,
@@ -161,7 +161,7 @@ export async function oauthRoutes(app: FastifyInstance) {
   // ---- Linked account management ----
 
   // GET /oauth/linked — list my linked social accounts
-  app.get('/oauth/linked', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/oauth/linked', { preHandler: [authGuard] }, async (req, reply) => {
     const me = currentUserId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const accounts = listLinkedAccounts(me);
@@ -177,7 +177,7 @@ export async function oauthRoutes(app: FastifyInstance) {
   });
 
   // GET /oauth/:provider/status — whether provider is linked
-  app.get('/oauth/:provider/status', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/oauth/:provider/status', { preHandler: [authGuard] }, async (req, reply) => {
     const me = currentUserId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { provider } = req.params as { provider: string };
@@ -189,7 +189,7 @@ export async function oauthRoutes(app: FastifyInstance) {
   });
 
   // DELETE /oauth/:provider — unlink
-  app.delete('/oauth/:provider', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/oauth/:provider', { preHandler: [authGuard] }, async (req, reply) => {
     const me = currentUserId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { provider } = req.params as { provider: string };

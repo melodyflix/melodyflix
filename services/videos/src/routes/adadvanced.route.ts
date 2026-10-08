@@ -1,7 +1,7 @@
 // melodyflix videos — Advanced Ad routes (Section 51.11, 51.14, 51.17)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   getRevenueOverview, getDailyRevenue, getTopAdvertisers,
   recordAdBlock, getAdBlockStats, listAdBlockEvents,
@@ -22,14 +22,14 @@ function isAdmin(req: any): boolean {
 export async function adAdvancedRoutes(app: FastifyInstance) {
   // ---- 51.11 Revenue Dashboard ----
 
-  app.get('/admin/ads/revenue/overview', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/admin/ads/revenue/overview', { preHandler: [authGuard] }, async (req, reply) => {
     if (!isAdmin(req as any)) return reply.code(403).send({ success: false, error: 'Admin only' });
     const q = req.query as { from?: string; to?: string };
     const overview = getRevenueOverview({ from: q.from, to: q.to });
     return reply.send({ success: true, data: overview });
   });
 
-  app.get('/admin/ads/revenue/daily', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/admin/ads/revenue/daily', { preHandler: [authGuard] }, async (req, reply) => {
     if (!isAdmin(req as any)) return reply.code(403).send({ success: false, error: 'Admin only' });
     const q = req.query as { from?: string; to?: string; days?: string };
     const daily = getDailyRevenue({
@@ -40,7 +40,7 @@ export async function adAdvancedRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { daily, count: daily.length } });
   });
 
-  app.get('/admin/ads/revenue/advertisers', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/admin/ads/revenue/advertisers', { preHandler: [authGuard] }, async (req, reply) => {
     if (!isAdmin(req as any)) return reply.code(403).send({ success: false, error: 'Admin only' });
     const q = req.query as { from?: string; to?: string; limit?: string };
     const advertisers = getTopAdvertisers({
@@ -74,7 +74,7 @@ export async function adAdvancedRoutes(app: FastifyInstance) {
   });
 
   // GET /admin/ads/adblock/stats — aggregated
-  app.get('/admin/ads/adblock/stats', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/admin/ads/adblock/stats', { preHandler: [authGuard] }, async (req, reply) => {
     if (!isAdmin(req as any)) return reply.code(403).send({ success: false, error: 'Admin only' });
     const q = req.query as { from?: string; to?: string };
     const stats = getAdBlockStats({ from: q.from, to: q.to });
@@ -82,7 +82,7 @@ export async function adAdvancedRoutes(app: FastifyInstance) {
   });
 
   // GET /admin/ads/adblock/events — recent raw events
-  app.get('/admin/ads/adblock/events', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/admin/ads/adblock/events', { preHandler: [authGuard] }, async (req, reply) => {
     if (!isAdmin(req as any)) return reply.code(403).send({ success: false, error: 'Admin only' });
     const q = req.query as { detected_only?: string; user_id?: string; limit?: string };
     const events = listAdBlockEvents({
@@ -135,7 +135,7 @@ export async function adAdvancedRoutes(app: FastifyInstance) {
   });
 
   // POST /videos/:videoId/ssai/breaks — create break (owner/admin)
-  app.post('/videos/:videoId/ssai/breaks', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/videos/:videoId/ssai/breaks', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { videoId } = req.params as { videoId: string };
@@ -154,7 +154,7 @@ export async function adAdvancedRoutes(app: FastifyInstance) {
   });
 
   // PATCH /ssai/breaks/:id
-  app.patch('/ssai/breaks/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/ssai/breaks/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -172,7 +172,7 @@ export async function adAdvancedRoutes(app: FastifyInstance) {
   });
 
   // DELETE /ssai/breaks/:id
-  app.delete('/ssai/breaks/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/ssai/breaks/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };

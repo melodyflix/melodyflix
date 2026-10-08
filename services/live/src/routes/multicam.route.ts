@@ -1,7 +1,7 @@
 // melodyflix live — Multi-Camera + Emergency Backup routes (7.5, 7.10)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import { getStreamById } from '../services/live.service.js';
 import {
   createCamera, getCamera, listCameras, getPrimaryCamera,
@@ -52,7 +52,7 @@ export async function multicamRoutes(app: FastifyInstance) {
   });
 
   // GET /streams/:id/cameras/mine — with ingest keys (owner only)
-  app.get('/streams/:id/cameras/mine', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/streams/:id/cameras/mine', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -61,7 +61,7 @@ export async function multicamRoutes(app: FastifyInstance) {
   });
 
   // POST /streams/:id/cameras
-  app.post('/streams/:id/cameras', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/streams/:id/cameras', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -84,7 +84,7 @@ export async function multicamRoutes(app: FastifyInstance) {
   });
 
   // PATCH /streams/:id/cameras/:camId
-  app.patch('/streams/:id/cameras/:camId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/streams/:id/cameras/:camId', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id, camId } = req.params as { id: string; camId: string };
@@ -101,7 +101,7 @@ export async function multicamRoutes(app: FastifyInstance) {
   });
 
   // DELETE /streams/:id/cameras/:camId
-  app.delete('/streams/:id/cameras/:camId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/streams/:id/cameras/:camId', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id, camId } = req.params as { id: string; camId: string };
@@ -120,7 +120,7 @@ export async function multicamRoutes(app: FastifyInstance) {
     reason: z.string().max(200).optional(),
   });
 
-  app.post('/streams/:id/cameras/switch', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/streams/:id/cameras/switch', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -137,7 +137,7 @@ export async function multicamRoutes(app: FastifyInstance) {
     ordered_ids: z.array(z.string().min(1)).min(1).max(20),
   });
 
-  app.post('/streams/:id/cameras/reorder', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/streams/:id/cameras/reorder', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -188,7 +188,7 @@ export async function multicamRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { config: getBackupConfig(id) } });
   });
 
-  app.put('/streams/:id/backup-config', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/streams/:id/backup-config', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -210,7 +210,7 @@ export async function multicamRoutes(app: FastifyInstance) {
 
   // ---- Manual failover trigger (for debugging / admin) ----
 
-  app.post('/streams/:id/failover', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/streams/:id/failover', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };

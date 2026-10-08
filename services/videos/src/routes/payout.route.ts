@@ -1,7 +1,7 @@
 // melodyflix videos — Payout + KYC routes (10.10, 10.11, 10.12, 10.13)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   getRevenueShare, setRevenueShare, splitRevenue, creditEarning,
   getBalance, releasePending,
@@ -25,13 +25,13 @@ function isAdmin(req: any): boolean {
 export async function payoutRoutes(app: FastifyInstance) {
   // ---- Summary ----
 
-  app.get('/payouts/summary', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/payouts/summary', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     return reply.send({ success: true, data: getOwnerPayoutSummary(me) });
   });
 
-  app.get('/payouts/balance', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/payouts/balance', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     return reply.send({ success: true, data: { balance: getBalance(me) } });
@@ -39,14 +39,14 @@ export async function payoutRoutes(app: FastifyInstance) {
 
   // ---- 10.10 Revenue sharing ----
 
-  app.get('/payouts/revenue-share', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/payouts/revenue-share', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     return reply.send({ success: true, data: { revenue_share: getRevenueShare(me) } });
   });
 
   const RevShareSchema = z.object({ creator_share_pct: z.number().min(0).max(100) });
-  app.put('/payouts/revenue-share', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/payouts/revenue-share', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = RevShareSchema.safeParse(req.body);
@@ -61,7 +61,7 @@ export async function payoutRoutes(app: FastifyInstance) {
 
   // Split preview
   const SplitSchema = z.object({ gross_cents: z.number().int().min(1).max(100_000_000) });
-  app.post('/payouts/split-preview', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/payouts/split-preview', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = SplitSchema.safeParse(req.body);
@@ -76,7 +76,7 @@ export async function payoutRoutes(app: FastifyInstance) {
     reference_id: z.string().nullable().optional(),
     note: z.string().max(200).nullable().optional(),
   });
-  app.post('/payouts/credit', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/payouts/credit', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = CreditSchema.safeParse(req.body);
@@ -85,7 +85,7 @@ export async function payoutRoutes(app: FastifyInstance) {
     return reply.code(201).send({ success: true, data: result });
   });
 
-  app.post('/payouts/release-pending', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/payouts/release-pending', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     return reply.send({ success: true, data: { balance: releasePending(me) } });
@@ -93,7 +93,7 @@ export async function payoutRoutes(app: FastifyInstance) {
 
   // ---- 10.11 + 10.12 Settings ----
 
-  app.get('/payouts/settings', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/payouts/settings', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     return reply.send({ success: true, data: { settings: getPayoutSettings(me) } });
@@ -108,7 +108,7 @@ export async function payoutRoutes(app: FastifyInstance) {
     is_active: z.boolean().optional(),
   });
 
-  app.put('/payouts/settings', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/payouts/settings', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = SettingsSchema.safeParse(req.body ?? {});
@@ -119,7 +119,7 @@ export async function payoutRoutes(app: FastifyInstance) {
 
   // ---- 10.13 KYC ----
 
-  app.get('/payouts/kyc', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/payouts/kyc', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     return reply.send({
@@ -135,7 +135,7 @@ export async function payoutRoutes(app: FastifyInstance) {
     business_type: z.string().max(40).nullable().optional(),
   });
 
-  app.post('/payouts/kyc/submit', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/payouts/kyc/submit', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = KYCSchema.safeParse(req.body);
@@ -151,7 +151,7 @@ export async function payoutRoutes(app: FastifyInstance) {
   // Admin: verify / reject
   const KYCDecisionSchema = z.object({ reason: z.string().max(500).optional() });
 
-  app.post('/payouts/kyc/:ownerId/verify', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/payouts/kyc/:ownerId/verify', { preHandler: [authGuard] }, async (req, reply) => {
     if (!isAdmin(req as any)) return reply.code(403).send({ success: false, error: 'Admin only' });
     const { ownerId } = req.params as { ownerId: string };
     try {
@@ -162,7 +162,7 @@ export async function payoutRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/payouts/kyc/:ownerId/reject', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/payouts/kyc/:ownerId/reject', { preHandler: [authGuard] }, async (req, reply) => {
     if (!isAdmin(req as any)) return reply.code(403).send({ success: false, error: 'Admin only' });
     const { ownerId } = req.params as { ownerId: string };
     const parsed = KYCDecisionSchema.safeParse(req.body ?? {});
@@ -182,7 +182,7 @@ export async function payoutRoutes(app: FastifyInstance) {
     file_hash: z.string().max(128).nullable().optional(),
   });
 
-  app.post('/payouts/kyc/documents', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/payouts/kyc/documents', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = DocSchema.safeParse(req.body);
@@ -195,7 +195,7 @@ export async function payoutRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/payouts/kyc/documents', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/payouts/kyc/documents', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     return reply.send({ success: true, data: { documents: listKYCDocuments(me) } });
@@ -205,7 +205,7 @@ export async function payoutRoutes(app: FastifyInstance) {
     decision: z.enum(['approved', 'rejected']),
     notes: z.string().max(500).optional(),
   });
-  app.post('/payouts/kyc/documents/:docId/review', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/payouts/kyc/documents/:docId/review', { preHandler: [authGuard] }, async (req, reply) => {
     if (!isAdmin(req as any)) return reply.code(403).send({ success: false, error: 'Admin only' });
     const { docId } = req.params as { docId: string };
     const parsed = DocReviewSchema.safeParse(req.body);
@@ -219,7 +219,7 @@ export async function payoutRoutes(app: FastifyInstance) {
 
   const RequestSchema = z.object({ force: z.boolean().optional() });
 
-  app.post('/payouts/request', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/payouts/request', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = RequestSchema.safeParse(req.body ?? {});
@@ -229,7 +229,7 @@ export async function payoutRoutes(app: FastifyInstance) {
     return reply.code(code).send({ success: result.ok, data: result });
   });
 
-  app.get('/payouts/mine', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/payouts/mine', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { limit?: string };
@@ -237,7 +237,7 @@ export async function payoutRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { payouts, count: payouts.length } });
   });
 
-  app.get('/payouts/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/payouts/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -248,7 +248,7 @@ export async function payoutRoutes(app: FastifyInstance) {
   });
 
   // Admin: list by state
-  app.get('/admin/payouts', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/admin/payouts', { preHandler: [authGuard] }, async (req, reply) => {
     if (!isAdmin(req as any)) return reply.code(403).send({ success: false, error: 'Admin only' });
     const q = req.query as { state?: string; limit?: string };
     const state = (q.state as any) ?? 'pending';
@@ -263,7 +263,7 @@ export async function payoutRoutes(app: FastifyInstance) {
     error_message: z.string().max(500).nullable().optional(),
   });
 
-  app.post('/admin/payouts/:id/advance', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/admin/payouts/:id/advance', { preHandler: [authGuard] }, async (req, reply) => {
     if (!isAdmin(req as any)) return reply.code(403).send({ success: false, error: 'Admin only' });
     const { id } = req.params as { id: string };
     const parsed = AdvanceSchema.safeParse(req.body);
@@ -277,7 +277,7 @@ export async function payoutRoutes(app: FastifyInstance) {
   });
 
   // Admin: due payout owners (for scheduler)
-  app.get('/admin/payouts/due', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/admin/payouts/due', { preHandler: [authGuard] }, async (req, reply) => {
     if (!isAdmin(req as any)) return reply.code(403).send({ success: false, error: 'Admin only' });
     const q = req.query as { at?: string };
     const due = listDuePayoutOwners(q.at);

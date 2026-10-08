@@ -1,7 +1,7 @@
 // melodyflix videos - intro/outro routes (30.3, 30.5)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import { getDb } from '@melodyflix/shared-db';
 import {
   INTRO_TEMPLATES, listChannelIntros, getChannelIntro, setChannelIntro,
@@ -48,7 +48,7 @@ export async function introOutroRoutes(app: FastifyInstance) {
   });
 
   // PUT /channels/:channelId/intros — upsert (owner)
-  app.put('/channels/:channelId/intros', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/channels/:channelId/intros', { preHandler: [authGuard] }, async (req, reply) => {
     const { channelId } = req.params as { channelId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -66,7 +66,7 @@ export async function introOutroRoutes(app: FastifyInstance) {
   });
 
   // DELETE /channels/:channelId/intros/:kind — remove (owner)
-  app.delete('/channels/:channelId/intros/:kind', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/channels/:channelId/intros/:kind', { preHandler: [authGuard] }, async (req, reply) => {
     const { channelId, kind } = req.params as { channelId: string; kind: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });

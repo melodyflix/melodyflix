@@ -1,7 +1,7 @@
 // melodyflix videos — Cross-Platform Sync routes (Section 34)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   registerDevice, getDevice, listDevices, touchDevice, deactivateDevice,
   pushChange, pushBatch, pullChanges,
@@ -27,14 +27,14 @@ export async function syncRoutes(app: FastifyInstance) {
     device_id: z.string().nullable().optional(),
   });
 
-  app.get('/sync/devices', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/sync/devices', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const devices = listDevices(me);
     return reply.send({ success: true, data: { devices, count: devices.length } });
   });
 
-  app.post('/sync/devices', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/sync/devices', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = DeviceSchema.safeParse(req.body);
@@ -47,7 +47,7 @@ export async function syncRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/sync/devices/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/sync/devices/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -57,7 +57,7 @@ export async function syncRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { device: d } });
   });
 
-  app.post('/sync/devices/:id/heartbeat', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/sync/devices/:id/heartbeat', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -68,7 +68,7 @@ export async function syncRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { device: getDevice(id) } });
   });
 
-  app.delete('/sync/devices/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/sync/devices/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -85,7 +85,7 @@ export async function syncRoutes(app: FastifyInstance) {
     device_id: z.string().nullable().optional(),
   });
 
-  app.post('/sync/push', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/sync/push', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = PushSchema.safeParse(req.body);
@@ -108,7 +108,7 @@ export async function syncRoutes(app: FastifyInstance) {
     })).min(1).max(500),
   });
 
-  app.post('/sync/push/batch', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/sync/push/batch', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = BatchSchema.safeParse(req.body);
@@ -119,7 +119,7 @@ export async function syncRoutes(app: FastifyInstance) {
 
   // ---- Change log: pull ----
 
-  app.get('/sync/pull', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/sync/pull', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { since?: string; scopes?: string; limit?: string; device_id?: string };
@@ -143,7 +143,7 @@ export async function syncRoutes(app: FastifyInstance) {
     device_id: z.string().nullable().optional(),
   });
 
-  app.post('/sync/watch-progress', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/sync/watch-progress', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = ProgressSchema.safeParse(req.body);
@@ -152,7 +152,7 @@ export async function syncRoutes(app: FastifyInstance) {
     return reply.code(201).send({ success: true, data: { change } });
   });
 
-  app.get('/sync/watch-progress/:videoId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/sync/watch-progress/:videoId', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { videoId } = req.params as { videoId: string };
@@ -166,7 +166,7 @@ export async function syncRoutes(app: FastifyInstance) {
     device_id: z.string().nullable().optional(),
   });
 
-  app.post('/sync/playlists', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/sync/playlists', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = PlaylistSchema.safeParse(req.body);
@@ -180,7 +180,7 @@ export async function syncRoutes(app: FastifyInstance) {
     device_id: z.string().nullable().optional(),
   });
 
-  app.post('/sync/settings', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/sync/settings', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = SettingsSchema.safeParse(req.body);
@@ -189,7 +189,7 @@ export async function syncRoutes(app: FastifyInstance) {
     return reply.code(201).send({ success: true, data: { change } });
   });
 
-  app.get('/sync/settings', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/sync/settings', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const settings = getLatestSettings(me);
@@ -198,7 +198,7 @@ export async function syncRoutes(app: FastifyInstance) {
 
   // ---- Summary ----
 
-  app.get('/sync/summary', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/sync/summary', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     return reply.send({ success: true, data: getSyncSummary(me) });

@@ -1,7 +1,7 @@
 // melodyflix videos - quiz routes
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth, verifyJwt, extractBearerToken } from '@melodyflix/shared-auth';
+import { authGuard, verifyJwt, extractBearerToken } from '@melodyflix/shared-auth';
 import { getDb } from '@melodyflix/shared-db';
 import {
   getQuiz, getQuizForVideo, createQuiz, answerQuiz, closeQuiz, deleteQuiz,
@@ -45,7 +45,7 @@ export async function quizRoutes(app: FastifyInstance) {
   });
 
   // POST /:videoId/quiz — create (video owner only)
-  app.post('/:videoId/quiz', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/:videoId/quiz', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -72,7 +72,7 @@ export async function quizRoutes(app: FastifyInstance) {
   });
 
   // POST /quizzes/:quizId/answer
-  app.post('/quizzes/:quizId/answer', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/quizzes/:quizId/answer', { preHandler: [authGuard] }, async (req, reply) => {
     const { quizId } = req.params as { quizId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -89,7 +89,7 @@ export async function quizRoutes(app: FastifyInstance) {
   });
 
   // POST /quizzes/:quizId/close — video owner only
-  app.post('/quizzes/:quizId/close', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/quizzes/:quizId/close', { preHandler: [authGuard] }, async (req, reply) => {
     const { quizId } = req.params as { quizId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -103,7 +103,7 @@ export async function quizRoutes(app: FastifyInstance) {
   });
 
   // DELETE /quizzes/:quizId — video owner only
-  app.delete('/quizzes/:quizId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/quizzes/:quizId', { preHandler: [authGuard] }, async (req, reply) => {
     const { quizId } = req.params as { quizId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });

@@ -1,7 +1,7 @@
 // melodyflix videos — Merch + Affiliate routes (10.7, 10.8)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   createMerchItem, getMerchItem, listMerchByChannel, listMerchByOwner,
   updateMerchItem, deleteMerchItem, reorderMerch,
@@ -30,7 +30,7 @@ export async function merchRoutes(app: FastifyInstance) {
     position: z.number().int().min(0).max(100).optional(),
   });
 
-  app.post('/merch/items', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/merch/items', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = MerchCreateSchema.safeParse(req.body);
@@ -45,7 +45,7 @@ export async function merchRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/merch/items/mine', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/merch/items/mine', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { limit?: string };
@@ -71,7 +71,7 @@ export async function merchRoutes(app: FastifyInstance) {
     is_active: z.boolean().optional(),
   });
 
-  app.patch('/merch/items/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/merch/items/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -86,7 +86,7 @@ export async function merchRoutes(app: FastifyInstance) {
     }
   });
 
-  app.delete('/merch/items/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/merch/items/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -104,7 +104,7 @@ export async function merchRoutes(app: FastifyInstance) {
     ordered_ids: z.array(z.string().min(1)).min(1).max(50),
   });
 
-  app.post('/merch/reorder', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/merch/reorder', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = ReorderSchema.safeParse(req.body);
@@ -136,7 +136,7 @@ export async function merchRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/merch/items/:id/stats', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/merch/items/:id/stats', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -154,7 +154,7 @@ export async function merchRoutes(app: FastifyInstance) {
     slug: z.string().min(3).max(40).regex(/^[a-zA-Z0-9_-]+$/).optional(),
   });
 
-  app.post('/affiliate/links', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/affiliate/links', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = AffiliateCreateSchema.safeParse(req.body);
@@ -169,7 +169,7 @@ export async function merchRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/affiliate/links/mine', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/affiliate/links/mine', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { limit?: string };
@@ -177,7 +177,7 @@ export async function merchRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { links, count: links.length } });
   });
 
-  app.get('/affiliate/links/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/affiliate/links/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -193,7 +193,7 @@ export async function merchRoutes(app: FastifyInstance) {
     is_active: z.boolean().optional(),
   });
 
-  app.patch('/affiliate/links/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/affiliate/links/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -208,7 +208,7 @@ export async function merchRoutes(app: FastifyInstance) {
     }
   });
 
-  app.delete('/affiliate/links/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/affiliate/links/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -261,7 +261,7 @@ export async function merchRoutes(app: FastifyInstance) {
     });
   });
 
-  app.get('/affiliate/links/:id/stats', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/affiliate/links/:id/stats', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };

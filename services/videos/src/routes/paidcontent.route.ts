@@ -1,7 +1,7 @@
 // melodyflix videos — Paid Content routes (10.5 PPV, 10.6 Rent/Buy)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   setPricing, getPricing, clearPricing, listPaidContentByOwner,
   listPaidContent,
@@ -28,7 +28,7 @@ export async function paidContentRoutes(app: FastifyInstance) {
     description: z.string().max(500).nullable().optional(),
   });
 
-  app.put('/videos/:videoId/pricing', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/videos/:videoId/pricing', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { videoId } = req.params as { videoId: string };
@@ -51,7 +51,7 @@ export async function paidContentRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { pricing } });
   });
 
-  app.delete('/videos/:videoId/pricing', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/videos/:videoId/pricing', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { videoId } = req.params as { videoId: string };
@@ -63,7 +63,7 @@ export async function paidContentRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/pricing/mine', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/pricing/mine', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { limit?: string };
@@ -84,7 +84,7 @@ export async function paidContentRoutes(app: FastifyInstance) {
     transaction_id: z.string().nullable().optional(),
   });
 
-  app.post('/purchases', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/purchases', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = PurchaseSchema.safeParse(req.body);
@@ -97,7 +97,7 @@ export async function paidContentRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/purchases/mine', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/purchases/mine', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { limit?: string };
@@ -105,7 +105,7 @@ export async function paidContentRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { purchases: items, count: items.length } });
   });
 
-  app.get('/purchases/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/purchases/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -115,7 +115,7 @@ export async function paidContentRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { purchase: p } });
   });
 
-  app.post('/purchases/:id/first-played', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/purchases/:id/first-played', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -126,7 +126,7 @@ export async function paidContentRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { recorded: true } });
   });
 
-  app.post('/purchases/:id/revoke', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/purchases/:id/revoke', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -139,7 +139,7 @@ export async function paidContentRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/purchases/:id/refund', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/purchases/:id/refund', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -168,7 +168,7 @@ export async function paidContentRoutes(app: FastifyInstance) {
 
   // ---- Stats (owner) ----
 
-  app.get('/videos/:videoId/pricing/stats', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/videos/:videoId/pricing/stats', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { videoId } = req.params as { videoId: string };

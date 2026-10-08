@@ -1,7 +1,7 @@
 // melodyflix videos - distribution routes (31.1 - 31.4)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import { getDb } from '@melodyflix/shared-db';
 import {
   PLATFORMS, listPlatformAccounts, connectPlatform, disconnectPlatform,
@@ -67,7 +67,7 @@ export async function distributionRoutes(app: FastifyInstance) {
   });
 
   // POST /channels/:channelId/platforms (owner)
-  app.post('/channels/:channelId/platforms', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/channels/:channelId/platforms', { preHandler: [authGuard] }, async (req, reply) => {
     const { channelId } = req.params as { channelId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -83,7 +83,7 @@ export async function distributionRoutes(app: FastifyInstance) {
   });
 
   // DELETE /channels/:channelId/platforms/:platform (owner)
-  app.delete('/channels/:channelId/platforms/:platform', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/channels/:channelId/platforms/:platform', { preHandler: [authGuard] }, async (req, reply) => {
     const { channelId, platform } = req.params as { channelId: string; platform: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -95,7 +95,7 @@ export async function distributionRoutes(app: FastifyInstance) {
   // ============ Distribution jobs (31.1, 31.2) ============
 
   // POST /channels/:channelId/distribution/jobs (owner)
-  app.post('/channels/:channelId/distribution/jobs', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/channels/:channelId/distribution/jobs', { preHandler: [authGuard] }, async (req, reply) => {
     const { channelId } = req.params as { channelId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -125,7 +125,7 @@ export async function distributionRoutes(app: FastifyInstance) {
   });
 
   // POST /distribution/jobs/:id/publish — simulate publish now
-  app.post('/distribution/jobs/:id/publish', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/distribution/jobs/:id/publish', { preHandler: [authGuard] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -137,7 +137,7 @@ export async function distributionRoutes(app: FastifyInstance) {
   });
 
   // POST /distribution/jobs/:id/cancel
-  app.post('/distribution/jobs/:id/cancel', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/distribution/jobs/:id/cancel', { preHandler: [authGuard] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -153,7 +153,7 @@ export async function distributionRoutes(app: FastifyInstance) {
   });
 
   // DELETE /distribution/jobs/:id
-  app.delete('/distribution/jobs/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/distribution/jobs/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -165,7 +165,7 @@ export async function distributionRoutes(app: FastifyInstance) {
   });
 
   // POST /distribution/process-scheduled — cron hook (admin-only)
-  app.post('/distribution/process-scheduled', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/distribution/process-scheduled', { preHandler: [authGuard] }, async (req, reply) => {
     const role = (req as any).user?.role;
     if (role !== 'admin') return reply.code(403).send({ success: false, error: 'Admin only' });
     const n = processScheduledJobs();
@@ -175,7 +175,7 @@ export async function distributionRoutes(app: FastifyInstance) {
   // ============ Auto-share rules (31.3) ============
 
   // GET /channels/:channelId/auto-share
-  app.get('/channels/:channelId/auto-share', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/channels/:channelId/auto-share', { preHandler: [authGuard] }, async (req, reply) => {
     const { channelId } = req.params as { channelId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -184,7 +184,7 @@ export async function distributionRoutes(app: FastifyInstance) {
   });
 
   // PUT /channels/:channelId/auto-share (owner)
-  app.put('/channels/:channelId/auto-share', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/channels/:channelId/auto-share', { preHandler: [authGuard] }, async (req, reply) => {
     const { channelId } = req.params as { channelId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -196,7 +196,7 @@ export async function distributionRoutes(app: FastifyInstance) {
   });
 
   // POST /videos/:videoId/auto-share — trigger manually (owner)
-  app.post('/videos/:videoId/auto-share', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/videos/:videoId/auto-share', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -211,7 +211,7 @@ export async function distributionRoutes(app: FastifyInstance) {
   // ============ Syndication feed (31.4) ============
 
   // GET /channels/:channelId/feed (owner)
-  app.get('/channels/:channelId/feed', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/channels/:channelId/feed', { preHandler: [authGuard] }, async (req, reply) => {
     const { channelId } = req.params as { channelId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -220,7 +220,7 @@ export async function distributionRoutes(app: FastifyInstance) {
   });
 
   // POST /channels/:channelId/feed (owner, creates if missing)
-  app.post('/channels/:channelId/feed', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/channels/:channelId/feed', { preHandler: [authGuard] }, async (req, reply) => {
     const { channelId } = req.params as { channelId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -231,7 +231,7 @@ export async function distributionRoutes(app: FastifyInstance) {
   });
 
   // PUT /channels/:channelId/feed (owner)
-  app.put('/channels/:channelId/feed', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/channels/:channelId/feed', { preHandler: [authGuard] }, async (req, reply) => {
     const { channelId } = req.params as { channelId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -243,7 +243,7 @@ export async function distributionRoutes(app: FastifyInstance) {
   });
 
   // DELETE /channels/:channelId/feed (owner)
-  app.delete('/channels/:channelId/feed', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/channels/:channelId/feed', { preHandler: [authGuard] }, async (req, reply) => {
     const { channelId } = req.params as { channelId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });

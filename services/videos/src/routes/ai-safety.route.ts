@@ -1,7 +1,7 @@
 // melodyflix videos — AI Safety routes (8.11, 8.12, 8.13, 8.14, 8.15, 8.16)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   getSafetyPolicy, setSafetyPolicy, listCategories,
   runSafetyCheck, listChecks, getCheck,
@@ -31,7 +31,7 @@ export async function aiSafetyRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { categories: cats, count: cats.length } });
   });
 
-  app.get('/ai/safety/policy', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/ai/safety/policy', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     return reply.send({ success: true, data: { policy: getSafetyPolicy(me) } });
@@ -44,7 +44,7 @@ export async function aiSafetyRoutes(app: FastifyInstance) {
     review_threshold: z.number().min(0.1).max(0.9).optional(),
   });
 
-  app.put('/ai/safety/policy', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/ai/safety/policy', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = PolicySchema.safeParse(req.body ?? {});
@@ -63,7 +63,7 @@ export async function aiSafetyRoutes(app: FastifyInstance) {
     context: z.record(z.any()).optional(),
   });
 
-  app.post('/ai/safety/check', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/safety/check', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = CheckSchema.safeParse(req.body);
@@ -87,7 +87,7 @@ export async function aiSafetyRoutes(app: FastifyInstance) {
   // Convenience wrappers
   const WrapSchema = CheckSchema.omit({ feature: true });
 
-  app.post('/ai/safety/check/content-filter', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/safety/check/content-filter', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = WrapSchema.safeParse(req.body);
@@ -96,7 +96,7 @@ export async function aiSafetyRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: r });
   });
 
-  app.post('/ai/safety/check/inappropriate', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/safety/check/inappropriate', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = WrapSchema.safeParse(req.body);
@@ -114,7 +114,7 @@ export async function aiSafetyRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: r });
   });
 
-  app.post('/ai/safety/check/fake-account', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/safety/check/fake-account', { preHandler: [authGuard] }, async (req, reply) => {
     if (!isAdmin(req as any)) return reply.code(403).send({ success: false, error: 'Admin only' });
     const parsed = WrapSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ success: false, error: 'Invalid body', issues: parsed.error.issues });
@@ -122,7 +122,7 @@ export async function aiSafetyRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: r });
   });
 
-  app.post('/ai/safety/check/hallucination', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/safety/check/hallucination', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = WrapSchema.safeParse(req.body);
@@ -142,7 +142,7 @@ export async function aiSafetyRoutes(app: FastifyInstance) {
 
   // ---- Checks list + read ----
 
-  app.get('/ai/safety/checks', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/ai/safety/checks', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { feature?: string; verdict?: string; severity?: string; subject_id?: string; limit?: string };
@@ -157,7 +157,7 @@ export async function aiSafetyRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { checks, count: checks.length } });
   });
 
-  app.get('/ai/safety/checks/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/ai/safety/checks/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -180,7 +180,7 @@ export async function aiSafetyRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { hash: row } });
   });
 
-  app.get('/ai/safety/spam-hash/:hash', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/ai/safety/spam-hash/:hash', { preHandler: [authGuard] }, async (req, reply) => {
     if (!isAdmin(req as any)) return reply.code(403).send({ success: false, error: 'Admin only' });
     const { hash } = req.params as { hash: string };
     const row = getSpamHash(hash);
@@ -190,7 +190,7 @@ export async function aiSafetyRoutes(app: FastifyInstance) {
 
   // ---- 8.14 User trust ----
 
-  app.get('/ai/safety/trust/:userId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/ai/safety/trust/:userId', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     const { userId: target } = req.params as { userId: string };
     if (target !== me && !isAdmin(req as any)) return reply.code(403).send({ success: false, error: 'Forbidden' });
@@ -202,7 +202,7 @@ export async function aiSafetyRoutes(app: FastifyInstance) {
     note: z.string().max(200).nullable().optional(),
   });
 
-  app.post('/ai/safety/trust/:userId/adjust', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/safety/trust/:userId/adjust', { preHandler: [authGuard] }, async (req, reply) => {
     if (!isAdmin(req as any)) return reply.code(403).send({ success: false, error: 'Admin only' });
     const { userId: target } = req.params as { userId: string };
     const parsed = TrustAdjSchema.safeParse(req.body);
@@ -211,7 +211,7 @@ export async function aiSafetyRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { trust: t } });
   });
 
-  app.get('/ai/safety/low-trust-users', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/ai/safety/low-trust-users', { preHandler: [authGuard] }, async (req, reply) => {
     if (!isAdmin(req as any)) return reply.code(403).send({ success: false, error: 'Admin only' });
     const q = req.query as { threshold?: string; limit?: string };
     const users = listLowTrustUsers(q.threshold ? parseInt(q.threshold) : 60, q.limit ? parseInt(q.limit) : 100);
@@ -220,7 +220,7 @@ export async function aiSafetyRoutes(app: FastifyInstance) {
 
   // ---- Stats ----
 
-  app.get('/ai/safety/stats', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/ai/safety/stats', { preHandler: [authGuard] }, async (req, reply) => {
     if (!isAdmin(req as any)) return reply.code(403).send({ success: false, error: 'Admin only' });
     const q = req.query as { from?: string; to?: string };
     const stats = getSafetyStats({ from: q.from, to: q.to });

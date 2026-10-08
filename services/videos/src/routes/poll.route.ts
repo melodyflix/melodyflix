@@ -1,7 +1,7 @@
 // melodyflix videos - poll routes
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth, verifyJwt, extractBearerToken } from '@melodyflix/shared-auth';
+import { authGuard, verifyJwt, extractBearerToken } from '@melodyflix/shared-auth';
 import { getDb } from '@melodyflix/shared-db';
 import {
   getPoll, getPollForVideo, createPoll, votePoll, closePoll, deletePoll,
@@ -43,7 +43,7 @@ export async function pollRoutes(app: FastifyInstance) {
   });
 
   // POST /:videoId/poll — create a new poll (video owner only)
-  app.post('/:videoId/poll', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/:videoId/poll', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -63,7 +63,7 @@ export async function pollRoutes(app: FastifyInstance) {
   });
 
   // POST /polls/:pollId/vote — vote on a poll
-  app.post('/polls/:pollId/vote', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/polls/:pollId/vote', { preHandler: [authGuard] }, async (req, reply) => {
     const { pollId } = req.params as { pollId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -80,7 +80,7 @@ export async function pollRoutes(app: FastifyInstance) {
   });
 
   // POST /polls/:pollId/close — close a poll (video owner only)
-  app.post('/polls/:pollId/close', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/polls/:pollId/close', { preHandler: [authGuard] }, async (req, reply) => {
     const { pollId } = req.params as { pollId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -94,7 +94,7 @@ export async function pollRoutes(app: FastifyInstance) {
   });
 
   // DELETE /polls/:pollId — delete a poll (video owner only)
-  app.delete('/polls/:pollId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/polls/:pollId', { preHandler: [authGuard] }, async (req, reply) => {
     const { pollId } = req.params as { pollId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });

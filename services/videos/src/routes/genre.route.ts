@@ -1,7 +1,7 @@
 // melodyflix videos - genre routes
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import { getDb } from '@melodyflix/shared-db';
 import {
   GENRES, listGenresForVideo, replaceGenres, addGenre, removeGenre,
@@ -37,7 +37,7 @@ export async function genreRoutes(app: FastifyInstance) {
   });
 
   // POST /:videoId/genres  { genre }
-  app.post('/:videoId/genres', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/:videoId/genres', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -55,7 +55,7 @@ export async function genreRoutes(app: FastifyInstance) {
   });
 
   // PUT /:videoId/genres  { genres: [...] } — replace all
-  app.put('/:videoId/genres', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/:videoId/genres', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -69,7 +69,7 @@ export async function genreRoutes(app: FastifyInstance) {
   });
 
   // DELETE /:videoId/genres/:genre
-  app.delete('/:videoId/genres/:genre', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/:videoId/genres/:genre', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId, genre } = req.params as { videoId: string; genre: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });

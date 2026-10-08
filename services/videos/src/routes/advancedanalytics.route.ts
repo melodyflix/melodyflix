@@ -1,7 +1,7 @@
 // melodyflix videos - advanced analytics routes (26.2 - 26.18)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { requireAuth, authGuard } from '@melodyflix/shared-auth';
 import { getDb } from '@melodyflix/shared-db';
 import {
   trackEvent,
@@ -64,7 +64,7 @@ export async function advancedAnalyticsRoutes(app: FastifyInstance) {
   });
 
   // ============ User profile ============
-  app.put('/analytics/profile', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/analytics/profile', { preHandler: [authGuard] }, async (req, reply) => {
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = ProfileSchema.safeParse(req.body ?? {});
@@ -73,7 +73,7 @@ export async function advancedAnalyticsRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: getUserProfile(userId) });
   });
 
-  app.get('/analytics/profile', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/analytics/profile', { preHandler: [authGuard] }, async (req, reply) => {
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     return reply.send({ success: true, data: getUserProfile(userId) });
@@ -91,7 +91,7 @@ export async function advancedAnalyticsRoutes(app: FastifyInstance) {
   }
 
   // 26.2 — Demographics
-  app.get('/analytics/channels/:channelId/demographics', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/analytics/channels/:channelId/demographics', { preHandler: [authGuard] }, async (req, reply) => {
     const ctx = requireOwner(req);
     if (!ctx) return reply.code(403).send({ success: false, error: 'Forbidden' });
     const days = Math.max(1, Math.min(365, parseInt((req.query as any).days ?? '30') || 30));
@@ -99,7 +99,7 @@ export async function advancedAnalyticsRoutes(app: FastifyInstance) {
   });
 
   // 26.3 — Traffic sources
-  app.get('/analytics/channels/:channelId/traffic', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/analytics/channels/:channelId/traffic', { preHandler: [authGuard] }, async (req, reply) => {
     const ctx = requireOwner(req);
     if (!ctx) return reply.code(403).send({ success: false, error: 'Forbidden' });
     const days = Math.max(1, Math.min(365, parseInt((req.query as any).days ?? '30') || 30));
@@ -107,7 +107,7 @@ export async function advancedAnalyticsRoutes(app: FastifyInstance) {
   });
 
   // 26.4 — Revenue
-  app.get('/analytics/channels/:channelId/revenue', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/analytics/channels/:channelId/revenue', { preHandler: [authGuard] }, async (req, reply) => {
     const ctx = requireOwner(req);
     if (!ctx) return reply.code(403).send({ success: false, error: 'Forbidden' });
     const days = Math.max(1, Math.min(365, parseInt((req.query as any).days ?? '30') || 30));
@@ -115,7 +115,7 @@ export async function advancedAnalyticsRoutes(app: FastifyInstance) {
   });
 
   // 26.5 — Report export
-  app.get('/analytics/channels/:channelId/export', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/analytics/channels/:channelId/export', { preHandler: [authGuard] }, async (req, reply) => {
     const ctx = requireOwner(req);
     if (!ctx) return reply.code(403).send({ success: false, error: 'Forbidden' });
     const q = req.query as { report?: string; format?: string; days?: string };
@@ -133,35 +133,35 @@ export async function advancedAnalyticsRoutes(app: FastifyInstance) {
   });
 
   // 26.6 — Predictive
-  app.get('/analytics/channels/:channelId/predictive', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/analytics/channels/:channelId/predictive', { preHandler: [authGuard] }, async (req, reply) => {
     const ctx = requireOwner(req);
     if (!ctx) return reply.code(403).send({ success: false, error: 'Forbidden' });
     return reply.send({ success: true, data: getPredictiveAnalytics(ctx.channelId, 30) });
   });
 
   // 26.7 — Churn
-  app.get('/analytics/channels/:channelId/churn', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/analytics/channels/:channelId/churn', { preHandler: [authGuard] }, async (req, reply) => {
     const ctx = requireOwner(req);
     if (!ctx) return reply.code(403).send({ success: false, error: 'Forbidden' });
     return reply.send({ success: true, data: getChurnRate(ctx.channelId, 90) });
   });
 
   // 26.8 — LTV
-  app.get('/analytics/channels/:channelId/ltv', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/analytics/channels/:channelId/ltv', { preHandler: [authGuard] }, async (req, reply) => {
     const ctx = requireOwner(req);
     if (!ctx) return reply.code(403).send({ success: false, error: 'Forbidden' });
     return reply.send({ success: true, data: getLifetimeValue(ctx.channelId, 12) });
   });
 
   // 26.9 — Cohort
-  app.get('/analytics/channels/:channelId/cohort', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/analytics/channels/:channelId/cohort', { preHandler: [authGuard] }, async (req, reply) => {
     const ctx = requireOwner(req);
     if (!ctx) return reply.code(403).send({ success: false, error: 'Forbidden' });
     return reply.send({ success: true, data: getCohortAnalysis(ctx.channelId, 12) });
   });
 
   // 26.10 — Funnel
-  app.get('/analytics/channels/:channelId/funnel', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/analytics/channels/:channelId/funnel', { preHandler: [authGuard] }, async (req, reply) => {
     const ctx = requireOwner(req);
     if (!ctx) return reply.code(403).send({ success: false, error: 'Forbidden' });
     const days = Math.max(1, Math.min(365, parseInt((req.query as any).days ?? '30') || 30));
@@ -169,7 +169,7 @@ export async function advancedAnalyticsRoutes(app: FastifyInstance) {
   });
 
   // 26.12 — Completion
-  app.get('/analytics/channels/:channelId/completion', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/analytics/channels/:channelId/completion', { preHandler: [authGuard] }, async (req, reply) => {
     const ctx = requireOwner(req);
     if (!ctx) return reply.code(403).send({ success: false, error: 'Forbidden' });
     const days = Math.max(1, Math.min(365, parseInt((req.query as any).days ?? '30') || 30));
@@ -177,7 +177,7 @@ export async function advancedAnalyticsRoutes(app: FastifyInstance) {
   });
 
   // 26.13 — Rewatch
-  app.get('/analytics/channels/:channelId/rewatch', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/analytics/channels/:channelId/rewatch', { preHandler: [authGuard] }, async (req, reply) => {
     const ctx = requireOwner(req);
     if (!ctx) return reply.code(403).send({ success: false, error: 'Forbidden' });
     const days = Math.max(1, Math.min(365, parseInt((req.query as any).days ?? '30') || 30));
@@ -185,7 +185,7 @@ export async function advancedAnalyticsRoutes(app: FastifyInstance) {
   });
 
   // 26.14 — Drop-off
-  app.get('/analytics/channels/:channelId/dropoff', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/analytics/channels/:channelId/dropoff', { preHandler: [authGuard] }, async (req, reply) => {
     const ctx = requireOwner(req);
     if (!ctx) return reply.code(403).send({ success: false, error: 'Forbidden' });
     const days = Math.max(1, Math.min(365, parseInt((req.query as any).days ?? '30') || 30));
@@ -193,7 +193,7 @@ export async function advancedAnalyticsRoutes(app: FastifyInstance) {
   });
 
   // 26.15 — Click tracking
-  app.get('/analytics/channels/:channelId/clicks', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/analytics/channels/:channelId/clicks', { preHandler: [authGuard] }, async (req, reply) => {
     const ctx = requireOwner(req);
     if (!ctx) return reply.code(403).send({ success: false, error: 'Forbidden' });
     const days = Math.max(1, Math.min(365, parseInt((req.query as any).days ?? '30') || 30));
@@ -201,7 +201,7 @@ export async function advancedAnalyticsRoutes(app: FastifyInstance) {
   });
 
   // 26.16 — Scroll depth
-  app.get('/analytics/channels/:channelId/scroll', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/analytics/channels/:channelId/scroll', { preHandler: [authGuard] }, async (req, reply) => {
     const ctx = requireOwner(req);
     if (!ctx) return reply.code(403).send({ success: false, error: 'Forbidden' });
     const days = Math.max(1, Math.min(365, parseInt((req.query as any).days ?? '30') || 30));
@@ -209,7 +209,7 @@ export async function advancedAnalyticsRoutes(app: FastifyInstance) {
   });
 
   // 26.17 — Sessions list
-  app.get('/analytics/channels/:channelId/sessions', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/analytics/channels/:channelId/sessions', { preHandler: [authGuard] }, async (req, reply) => {
     const ctx = requireOwner(req);
     if (!ctx) return reply.code(403).send({ success: false, error: 'Forbidden' });
     const q = req.query as { days?: string; limit?: string };
@@ -219,7 +219,7 @@ export async function advancedAnalyticsRoutes(app: FastifyInstance) {
   });
 
   // 26.17 — Session timeline
-  app.get('/analytics/sessions/:sessionId/timeline', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/analytics/sessions/:sessionId/timeline', { preHandler: [authGuard] }, async (req, reply) => {
     const { sessionId } = req.params as { sessionId: string };
     const t = getSessionTimeline(sessionId);
     if (!t) return reply.code(404).send({ success: false, error: 'Session not found' });
@@ -227,7 +227,7 @@ export async function advancedAnalyticsRoutes(app: FastifyInstance) {
   });
 
   // 26.18 — Heatmap
-  app.get('/analytics/channels/:channelId/heatmap/:videoId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/analytics/channels/:channelId/heatmap/:videoId', { preHandler: [authGuard] }, async (req, reply) => {
     const ctx = requireOwner(req);
     if (!ctx) return reply.code(403).send({ success: false, error: 'Forbidden' });
     const { videoId } = req.params as { videoId: string };

@@ -1,7 +1,7 @@
 // melodyflix videos - search route
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   searchVideos, countSearchResults,
   type SearchSort, type DurationFilter,
@@ -101,7 +101,7 @@ export async function searchRoutes(app: FastifyInstance) {
     result_count: z.number().int().min(0).max(1_000_000).optional(),
   });
 
-  app.get('/search/history', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/search/history', { preHandler: [authGuard] }, async (req, reply) => {
     const me = (req as any).user?.id ?? (req as any).user?.sub;
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { limit?: string };
@@ -109,7 +109,7 @@ export async function searchRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { history, count: history.length } });
   });
 
-  app.get('/search/history/distinct', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/search/history/distinct', { preHandler: [authGuard] }, async (req, reply) => {
     const me = (req as any).user?.id ?? (req as any).user?.sub;
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { limit?: string };
@@ -117,7 +117,7 @@ export async function searchRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { queries, count: queries.length } });
   });
 
-  app.post('/search/history', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/search/history', { preHandler: [authGuard] }, async (req, reply) => {
     const me = (req as any).user?.id ?? (req as any).user?.sub;
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = HistorySchema.safeParse(req.body);
@@ -133,7 +133,7 @@ export async function searchRoutes(app: FastifyInstance) {
     return reply.code(201).send({ success: true, data: { entry: row } });
   });
 
-  app.delete('/search/history/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/search/history/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = (req as any).user?.id ?? (req as any).user?.sub;
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -141,7 +141,7 @@ export async function searchRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { removed } });
   });
 
-  app.delete('/search/history', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/search/history', { preHandler: [authGuard] }, async (req, reply) => {
     const me = (req as any).user?.id ?? (req as any).user?.sub;
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const cleared = clearSearchHistory(me);
@@ -192,7 +192,7 @@ export async function searchRoutes(app: FastifyInstance) {
   });
 
   // GET /search/analytics/summary — aggregate stats (admin)
-  app.get('/search/analytics/summary', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/search/analytics/summary', { preHandler: [authGuard] }, async (req, reply) => {
     const me = (req as any).user;
     const roles = me?.roles ?? [];
     if (!Array.isArray(roles) || !roles.includes('admin')) {

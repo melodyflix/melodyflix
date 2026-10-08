@@ -1,7 +1,7 @@
 // melodyflix videos - player customization routes (30.1, 30.2, 30.4, 30.8)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import { getDb } from '@melodyflix/shared-db';
 import {
   getCustomization, setCustomization, resetCustomization,
@@ -55,7 +55,7 @@ export async function customizationRoutes(app: FastifyInstance) {
   });
 
   // PUT /channels/:channelId/customization — owner only
-  app.put('/channels/:channelId/customization', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/channels/:channelId/customization', { preHandler: [authGuard] }, async (req, reply) => {
     const { channelId } = req.params as { channelId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -76,7 +76,7 @@ export async function customizationRoutes(app: FastifyInstance) {
   });
 
   // DELETE /channels/:channelId/customization — owner only
-  app.delete('/channels/:channelId/customization', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/channels/:channelId/customization', { preHandler: [authGuard] }, async (req, reply) => {
     const { channelId } = req.params as { channelId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });

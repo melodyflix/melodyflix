@@ -1,7 +1,7 @@
 // melodyflix videos — Events & Ticketing routes (Section 23)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   createEvent, getEvent, listEvents, updateEvent, publishEvent, cancelEvent, deleteEvent,
   bookTicket, getTicket, getTicketByQr, markTicketPaid, cancelTicket, refundTicket,
@@ -61,7 +61,7 @@ export async function eventsRoutes(app: FastifyInstance) {
   });
 
   // Owner-scoped list
-  app.get('/events/mine', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/events/mine', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { status?: string; limit?: string };
@@ -94,7 +94,7 @@ export async function eventsRoutes(app: FastifyInstance) {
     is_public: z.boolean().optional(),
   });
 
-  app.post('/events', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/events', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = CreateSchema.safeParse(req.body);
@@ -109,7 +109,7 @@ export async function eventsRoutes(app: FastifyInstance) {
 
   const UpdateSchema = CreateSchema.partial().omit({ channel_id: true });
 
-  app.patch('/events/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/events/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -124,7 +124,7 @@ export async function eventsRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/events/:id/publish', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/events/:id/publish', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -137,7 +137,7 @@ export async function eventsRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/events/:id/cancel', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/events/:id/cancel', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -150,7 +150,7 @@ export async function eventsRoutes(app: FastifyInstance) {
     }
   });
 
-  app.delete('/events/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/events/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -171,7 +171,7 @@ export async function eventsRoutes(app: FastifyInstance) {
     seat_label: z.string().max(40).nullable().optional(),
   });
 
-  app.post('/events/:id/tickets', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/events/:id/tickets', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -185,7 +185,7 @@ export async function eventsRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/events/:id/tickets', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/events/:id/tickets', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -196,7 +196,7 @@ export async function eventsRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { tickets, count: tickets.length } });
   });
 
-  app.get('/events/tickets/mine', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/events/tickets/mine', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { limit?: string };
@@ -204,7 +204,7 @@ export async function eventsRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { tickets, count: tickets.length } });
   });
 
-  app.get('/events/tickets/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/events/tickets/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -217,7 +217,7 @@ export async function eventsRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { ticket: t } });
   });
 
-  app.post('/events/tickets/:id/pay', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/events/tickets/:id/pay', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -233,7 +233,7 @@ export async function eventsRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/events/tickets/:id/cancel', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/events/tickets/:id/cancel', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -246,7 +246,7 @@ export async function eventsRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/events/tickets/:id/refund', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/events/tickets/:id/refund', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -260,7 +260,7 @@ export async function eventsRoutes(app: FastifyInstance) {
   });
 
   // Check-in via QR (owner only)
-  app.post('/events/check-in', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/events/check-in', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const body = req.body as { qr_token?: string };
@@ -276,7 +276,7 @@ export async function eventsRoutes(app: FastifyInstance) {
 
   // ---- 23.3 Virtual join ----
 
-  app.get('/events/:id/join-info', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/events/:id/join-info', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     const { id } = req.params as { id: string };
     try {
@@ -293,7 +293,7 @@ export async function eventsRoutes(app: FastifyInstance) {
     remind_minutes_before: z.number().int().min(1).max(7 * 24 * 60).optional(),
   });
 
-  app.post('/events/:id/reminders', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/events/:id/reminders', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -307,7 +307,7 @@ export async function eventsRoutes(app: FastifyInstance) {
     }
   });
 
-  app.delete('/events/:id/reminders', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/events/:id/reminders', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -315,7 +315,7 @@ export async function eventsRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { removed } });
   });
 
-  app.get('/events/reminders/mine', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/events/reminders/mine', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const list = listMyReminders(me, 100);
@@ -330,7 +330,7 @@ export async function eventsRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { due, count: due.length } });
   });
 
-  app.post('/events/reminders/:reminderId/notified', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/events/reminders/:reminderId/notified', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { reminderId } = req.params as { reminderId: string };
@@ -340,7 +340,7 @@ export async function eventsRoutes(app: FastifyInstance) {
 
   // ---- Stats ----
 
-  app.get('/events/:id/stats', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/events/:id/stats', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };

@@ -1,7 +1,7 @@
 // melodyflix videos - tag routes
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import { getDb } from '@melodyflix/shared-db';
 import {
   addTag, removeTag, listTagsForVideo, replaceManualTags,
@@ -32,7 +32,7 @@ export async function tagRoutes(app: FastifyInstance) {
   });
 
   // POST /:videoId/tags  { tag }
-  app.post('/:videoId/tags', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/:videoId/tags', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -52,7 +52,7 @@ export async function tagRoutes(app: FastifyInstance) {
   });
 
   // PUT /:videoId/tags  { tags: [...] } — replace all manual tags
-  app.put('/:videoId/tags', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/:videoId/tags', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -68,7 +68,7 @@ export async function tagRoutes(app: FastifyInstance) {
   });
 
   // DELETE /:videoId/tags/:tag
-  app.delete('/:videoId/tags/:tag', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/:videoId/tags/:tag', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId, tag } = req.params as { videoId: string; tag: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -80,7 +80,7 @@ export async function tagRoutes(app: FastifyInstance) {
   });
 
   // POST /:videoId/tags/sync-hashtags  — scan title+description, extract #hashtags
-  app.post('/:videoId/tags/sync-hashtags', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/:videoId/tags/sync-hashtags', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -144,7 +144,7 @@ export async function tagRoutes(app: FastifyInstance) {
   });
 
   // POST /:videoId/tags/auto-apply — run auto-tagging and save
-  app.post('/:videoId/tags/auto-apply', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/:videoId/tags/auto-apply', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -160,7 +160,7 @@ export async function tagRoutes(app: FastifyInstance) {
   });
 
   // DELETE /:videoId/tags/auto — clear auto tags only
-  app.delete('/:videoId/tags/auto', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/:videoId/tags/auto', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });

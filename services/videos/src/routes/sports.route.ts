@@ -1,7 +1,7 @@
 // melodyflix videos — Sports Streaming routes (Section 68)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   createSportsTeam, getSportsTeam, listSportsTeams,
   createSportsMatch, getSportsMatch, listSportsMatches,
@@ -38,7 +38,7 @@ export async function sportsRoutes(app: FastifyInstance) {
     country: z.string().max(60).nullable().optional(),
   });
 
-  app.get('/sports/teams', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/sports/teams', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { limit?: string };
@@ -46,7 +46,7 @@ export async function sportsRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { teams, count: teams.length } });
   });
 
-  app.post('/sports/teams', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/sports/teams', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = TeamSchema.safeParse(req.body);
@@ -111,7 +111,7 @@ export async function sportsRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { match: m } });
   });
 
-  app.post('/sports/matches', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/sports/matches', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = MatchSchema.safeParse(req.body);
@@ -124,7 +124,7 @@ export async function sportsRoutes(app: FastifyInstance) {
     }
   });
 
-  app.patch('/sports/matches/:id/status', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/sports/matches/:id/status', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -140,7 +140,7 @@ export async function sportsRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { match: updated } });
   });
 
-  app.patch('/sports/matches/:id/score', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.patch('/sports/matches/:id/score', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -171,7 +171,7 @@ export async function sportsRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { events, count: events.length } });
   });
 
-  app.post('/sports/matches/:id/timeline', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/sports/matches/:id/timeline', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -184,7 +184,7 @@ export async function sportsRoutes(app: FastifyInstance) {
     return reply.code(201).send({ success: true, data: { event } });
   });
 
-  app.delete('/sports/timeline/:eventId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/sports/timeline/:eventId', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { eventId } = req.params as { eventId: string };
@@ -200,7 +200,7 @@ export async function sportsRoutes(app: FastifyInstance) {
     channel: z.enum(['push','email','inapp']).optional(),
   });
 
-  app.get('/sports/reminders', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/sports/reminders', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { limit?: string };
@@ -208,7 +208,7 @@ export async function sportsRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { reminders, count: reminders.length } });
   });
 
-  app.post('/sports/reminders', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/sports/reminders', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = ReminderSchema.safeParse(req.body);
@@ -221,7 +221,7 @@ export async function sportsRoutes(app: FastifyInstance) {
     }
   });
 
-  app.delete('/sports/reminders/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/sports/reminders/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -268,7 +268,7 @@ export async function sportsRoutes(app: FastifyInstance) {
   });
 
   // POST /sports/replays — save a replay clip
-  app.post('/sports/replays', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/sports/replays', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = SaveReplaySchema.safeParse(req.body);
@@ -282,7 +282,7 @@ export async function sportsRoutes(app: FastifyInstance) {
   });
 
   // GET /sports/replays/mine — my saved clips
-  app.get('/sports/replays/mine', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/sports/replays/mine', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { limit?: string };
@@ -303,7 +303,7 @@ export async function sportsRoutes(app: FastifyInstance) {
   });
 
   // DELETE /sports/replays/:id
-  app.delete('/sports/replays/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/sports/replays/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -316,7 +316,7 @@ export async function sportsRoutes(app: FastifyInstance) {
   });
 
   // POST /sports/replays/:id/link — link to timeline event
-  app.post('/sports/replays/:id/link', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/sports/replays/:id/link', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };

@@ -1,7 +1,7 @@
 // melodyflix videos — Playback Telemetry routes (Section 42.3, 42.5, 42.7)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   startSession, getSession, endSession,
   recordError, listErrors,
@@ -221,7 +221,7 @@ export async function telemetryRoutes(app: FastifyInstance) {
   });
 
   // PUT /videos/:videoId/streaming-config — upsert (owner only)
-  app.put('/videos/:videoId/streaming-config', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/videos/:videoId/streaming-config', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { videoId } = req.params as { videoId: string };
@@ -266,7 +266,7 @@ export async function telemetryRoutes(app: FastifyInstance) {
   });
 
   // POST /cdn-endpoints — register a CDN (owner or admin)
-  app.post('/cdn-endpoints', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/cdn-endpoints', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = CdnUpsertSchema.safeParse(req.body);
@@ -278,7 +278,7 @@ export async function telemetryRoutes(app: FastifyInstance) {
   });
 
   // POST /cdn-endpoints/:id/status — record CDN health status
-  app.post('/cdn-endpoints/:id/status', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/cdn-endpoints/:id/status', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -309,7 +309,7 @@ export async function telemetryRoutes(app: FastifyInstance) {
   });
 
   // POST /telemetry/alerts/:id/acknowledge
-  app.post('/telemetry/alerts/:id/acknowledge', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/telemetry/alerts/:id/acknowledge', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };

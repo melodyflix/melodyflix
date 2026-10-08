@@ -1,7 +1,7 @@
 // melodyflix live — Low-Latency + DVR routes (7.4, 7.7)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import { getStreamById } from '../services/live.service.js';
 import {
   getLatencyConfig, setLatencyConfig, getFfmpegLatencyHints, LATENCY_PRESETS,
@@ -46,7 +46,7 @@ export async function streamingConfigRoutes(app: FastifyInstance) {
     force_abr_low_start: z.boolean().optional(),
   });
 
-  app.put('/streams/:id/latency', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/streams/:id/latency', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -76,7 +76,7 @@ export async function streamingConfigRoutes(app: FastifyInstance) {
     keep_recordings_days: z.number().int().min(1).max(90).optional(),
   });
 
-  app.put('/streams/:id/dvr', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/streams/:id/dvr', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -129,7 +129,7 @@ export async function streamingConfigRoutes(app: FastifyInstance) {
     return reply.code(201).send({ success: true, data: { segment: seg } });
   });
 
-  app.post('/streams/:id/dvr/prune', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/streams/:id/dvr/prune', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -145,7 +145,7 @@ export async function streamingConfigRoutes(app: FastifyInstance) {
     offset_seconds: z.number().min(0).max(24 * 3600),
   });
 
-  app.post('/streams/:id/dvr/bookmarks', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/streams/:id/dvr/bookmarks', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -164,7 +164,7 @@ export async function streamingConfigRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/streams/:id/dvr/bookmarks', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/streams/:id/dvr/bookmarks', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -173,7 +173,7 @@ export async function streamingConfigRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { bookmarks, count: bookmarks.length } });
   });
 
-  app.delete('/streams/:id/dvr/bookmarks/:bmId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/streams/:id/dvr/bookmarks/:bmId', { preHandler: [authGuard] }, async (req, reply) => {
     const uid = userId(req as any);
     if (!uid) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { bmId } = req.params as { id: string; bmId: string };

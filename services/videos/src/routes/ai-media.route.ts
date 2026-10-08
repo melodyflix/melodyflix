@@ -1,7 +1,7 @@
 // melodyflix videos — AI Media routes (8.3, 8.5, 8.8, 8.9, 8.10)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   listThumbnails, selectThumbnail, generateThumbnails,
   getDub, listDubs, upsertDub, requestDubbing,
@@ -24,7 +24,7 @@ function checkInternalSecret(req: any): boolean {
 
 export async function aiMediaRoutes(app: FastifyInstance) {
   // ---- Dashboard ----
-  app.get('/ai/media/summary', { preHandler: [requireAuth] }, async (_req, reply) => {
+  app.get('/ai/media/summary', { preHandler: [authGuard] }, async (_req, reply) => {
     return reply.send({ success: true, data: getAiMediaSummary() });
   });
 
@@ -44,7 +44,7 @@ export async function aiMediaRoutes(app: FastifyInstance) {
     count: z.number().int().min(1).max(8).optional(),
   });
 
-  app.post('/ai/videos/:videoId/thumbnails/generate', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/videos/:videoId/thumbnails/generate', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { videoId } = req.params as { videoId: string };
@@ -58,7 +58,7 @@ export async function aiMediaRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/ai/videos/:videoId/thumbnails/:thumbId/select', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/videos/:videoId/thumbnails/:thumbId/select', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId, thumbId } = req.params as { videoId: string; thumbId: string };
     const t = selectThumbnail(videoId, thumbId);
     if (!t) return reply.code(404).send({ success: false, error: 'Thumbnail not found' });
@@ -87,7 +87,7 @@ export async function aiMediaRoutes(app: FastifyInstance) {
     voice_id: z.string().max(80).nullable().optional(),
   });
 
-  app.post('/ai/videos/:videoId/dubs', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/videos/:videoId/dubs', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { videoId } = req.params as { videoId: string };
@@ -134,7 +134,7 @@ export async function aiMediaRoutes(app: FastifyInstance) {
   // 8.9 Voice Cloning
   // ============================================================
 
-  app.get('/ai/voice-clones', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/ai/voice-clones', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const clones = listVoiceClones(me);
@@ -148,7 +148,7 @@ export async function aiMediaRoutes(app: FastifyInstance) {
     consent_confirmed: z.boolean(),
   });
 
-  app.post('/ai/voice-clones', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/voice-clones', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = VoiceCloneSchema.safeParse(req.body);
@@ -164,7 +164,7 @@ export async function aiMediaRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/ai/voice-clones/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/ai/voice-clones/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -174,7 +174,7 @@ export async function aiMediaRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: { clone: c } });
   });
 
-  app.post('/ai/voice-clones/:id/revoke', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/voice-clones/:id/revoke', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -198,7 +198,7 @@ export async function aiMediaRoutes(app: FastifyInstance) {
     latency_target_ms: z.number().int().min(300).max(4000).optional(),
   });
 
-  app.post('/ai/realtime/sessions', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/realtime/sessions', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = RealtimeSchema.safeParse(req.body);
@@ -211,7 +211,7 @@ export async function aiMediaRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/ai/realtime/sessions/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/ai/realtime/sessions/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -231,7 +231,7 @@ export async function aiMediaRoutes(app: FastifyInstance) {
     status: z.enum(['ready', 'active', 'ended']),
   });
 
-  app.post('/ai/realtime/sessions/:id/status', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/ai/realtime/sessions/:id/status', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };

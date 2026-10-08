@@ -1,7 +1,7 @@
 // melodyflix videos — Content Migration routes (Section 44)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth } from '@melodyflix/shared-auth';
+import { authGuard } from '@melodyflix/shared-auth';
 import {
   parseSourceUrl,
   createMigrationJob, bulkCreateMigrations, getMigrationJob,
@@ -46,7 +46,7 @@ export async function migrationRoutes(app: FastifyInstance) {
   });
 
   // GET /migration/jobs — list own jobs (filterable)
-  app.get('/migration/jobs', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/migration/jobs', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const q = req.query as { status?: string; source?: string; limit?: string };
@@ -60,14 +60,14 @@ export async function migrationRoutes(app: FastifyInstance) {
   });
 
   // GET /migration/stats
-  app.get('/migration/stats', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/migration/stats', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     return reply.send({ success: true, data: migrationStats(me) });
   });
 
   // GET /migration/jobs/:id
-  app.get('/migration/jobs/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/migration/jobs/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -78,7 +78,7 @@ export async function migrationRoutes(app: FastifyInstance) {
   });
 
   // POST /migration/jobs — create one
-  app.post('/migration/jobs', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/migration/jobs', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = CreateSchema.safeParse(req.body);
@@ -98,7 +98,7 @@ export async function migrationRoutes(app: FastifyInstance) {
   });
 
   // POST /migration/jobs/bulk — bulk create (up to 100 URLs)
-  app.post('/migration/jobs/bulk', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/migration/jobs/bulk', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const parsed = BulkSchema.safeParse(req.body);
@@ -122,7 +122,7 @@ export async function migrationRoutes(app: FastifyInstance) {
   });
 
   // POST /migration/jobs/:id/fetch — fetch oEmbed metadata
-  app.post('/migration/jobs/:id/fetch', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/migration/jobs/:id/fetch', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -138,7 +138,7 @@ export async function migrationRoutes(app: FastifyInstance) {
   });
 
   // POST /migration/jobs/:id/apply — apply preserved metadata to target video
-  app.post('/migration/jobs/:id/apply', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/migration/jobs/:id/apply', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -160,7 +160,7 @@ export async function migrationRoutes(app: FastifyInstance) {
   });
 
   // GET /migration/jobs/:id/metadata — extract preserved metadata (dry)
-  app.get('/migration/jobs/:id/metadata', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/migration/jobs/:id/metadata', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -172,7 +172,7 @@ export async function migrationRoutes(app: FastifyInstance) {
   });
 
   // POST /migration/jobs/:id/cancel
-  app.post('/migration/jobs/:id/cancel', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/migration/jobs/:id/cancel', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };
@@ -186,7 +186,7 @@ export async function migrationRoutes(app: FastifyInstance) {
   });
 
   // DELETE /migration/jobs/:id
-  app.delete('/migration/jobs/:id', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/migration/jobs/:id', { preHandler: [authGuard] }, async (req, reply) => {
     const me = userId(req as any);
     if (!me) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     const { id } = req.params as { id: string };

@@ -1,7 +1,7 @@
 // melodyflix videos - promotional banner routes (27.4)
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth, verifyJwt, extractBearerToken } from '@melodyflix/shared-auth';
+import { authGuard, verifyJwt, extractBearerToken } from '@melodyflix/shared-auth';
 import {
   listActiveBanners, listAllBanners, createBanner, updateBanner,
   deleteBanner, dismissBanner, getBanner, clearDismissals,
@@ -50,7 +50,7 @@ export async function bannerRoutes(app: FastifyInstance) {
   });
 
   // POST /banners/:id/dismiss — signed-in user dismisses a banner
-  app.post('/banners/:id/dismiss', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/banners/:id/dismiss', { preHandler: [authGuard] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });

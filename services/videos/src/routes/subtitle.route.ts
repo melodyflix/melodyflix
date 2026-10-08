@@ -1,7 +1,7 @@
 // melodyflix videos - subtitle routes
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAuth, verifyJwt, extractBearerToken } from '@melodyflix/shared-auth';
+import { authGuard, verifyJwt, extractBearerToken } from '@melodyflix/shared-auth';
 import { getDb } from '@melodyflix/shared-db';
 import {
   listSubtitles, getSubtitle, uploadSubtitle, deleteSubtitle,
@@ -75,7 +75,7 @@ export async function subtitleRoutes(app: FastifyInstance) {
   });
 
   // GET /subtitles/:trackId/raw — raw content for editor
-  app.get('/subtitles/:trackId/raw', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/subtitles/:trackId/raw', { preHandler: [authGuard] }, async (req, reply) => {
     const { trackId } = req.params as { trackId: string };
     const track = getSubtitle(trackId);
     if (!track) return reply.code(404).send({ success: false, error: 'Not found' });
@@ -87,7 +87,7 @@ export async function subtitleRoutes(app: FastifyInstance) {
   });
 
   // POST /:videoId/subtitles — upload a new track (SRT or VTT)
-  app.post('/:videoId/subtitles', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/:videoId/subtitles', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -107,7 +107,7 @@ export async function subtitleRoutes(app: FastifyInstance) {
   });
 
   // POST /subtitles/:trackId/set-default
-  app.post('/subtitles/:trackId/set-default', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/subtitles/:trackId/set-default', { preHandler: [authGuard] }, async (req, reply) => {
     const { trackId } = req.params as { trackId: string };
     const track = getSubtitle(trackId);
     if (!track) return reply.code(404).send({ success: false, error: 'Not found' });
@@ -120,7 +120,7 @@ export async function subtitleRoutes(app: FastifyInstance) {
   });
 
   // GET /subtitles/:trackId/cues — for editor (owner)
-  app.get('/subtitles/:trackId/cues', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.get('/subtitles/:trackId/cues', { preHandler: [authGuard] }, async (req, reply) => {
     const { trackId } = req.params as { trackId: string };
     const track = getSubtitle(trackId);
     if (!track) return reply.code(404).send({ success: false, error: 'Not found' });
@@ -133,7 +133,7 @@ export async function subtitleRoutes(app: FastifyInstance) {
   });
 
   // PUT /subtitles/:trackId/cues — save edited cues (owner)
-  app.put('/subtitles/:trackId/cues', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.put('/subtitles/:trackId/cues', { preHandler: [authGuard] }, async (req, reply) => {
     const { trackId } = req.params as { trackId: string };
     const track = getSubtitle(trackId);
     if (!track) return reply.code(404).send({ success: false, error: 'Not found' });
@@ -154,7 +154,7 @@ export async function subtitleRoutes(app: FastifyInstance) {
   });
 
   // POST /:videoId/subtitles/auto-preview — generate cues WITHOUT saving (owner)
-  app.post('/:videoId/subtitles/auto-preview', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/:videoId/subtitles/auto-preview', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -170,7 +170,7 @@ export async function subtitleRoutes(app: FastifyInstance) {
   });
 
   // POST /:videoId/subtitles/auto-generate — generate + save as draft track
-  app.post('/:videoId/subtitles/auto-generate', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.post('/:videoId/subtitles/auto-generate', { preHandler: [authGuard] }, async (req, reply) => {
     const { videoId } = req.params as { videoId: string };
     const userId = (req as any).user?.id ?? (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ success: false, error: 'Unauthorized' });
@@ -195,7 +195,7 @@ export async function subtitleRoutes(app: FastifyInstance) {
   });
 
   // DELETE /subtitles/:trackId
-  app.delete('/subtitles/:trackId', { preHandler: [requireAuth] }, async (req, reply) => {
+  app.delete('/subtitles/:trackId', { preHandler: [authGuard] }, async (req, reply) => {
     const { trackId } = req.params as { trackId: string };
     const track = getSubtitle(trackId);
     if (!track) return reply.code(404).send({ success: false, error: 'Not found' });
