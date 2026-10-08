@@ -1184,3 +1184,239 @@ export async function ingestQueuedJobs(limit = 20): Promise<{
     body: JSON.stringify({ limit }),
   });
 }
+
+
+// ============ Website Builder (Section 43) ============
+
+export interface SiteSettings {
+  id: string; site_name: string; logo_url: string | null; favicon_url: string | null;
+  tagline: string | null; meta_description: string | null; meta_keywords: string | null;
+  contact_email: string | null; support_url: string | null;
+  social: Record<string, string>; updated_at: string;
+}
+
+export interface SiteTheme {
+  id: string; name: string; is_active: boolean; mode: 'dark' | 'light' | 'auto';
+  primary_color: string; secondary_color: string; accent_color: string;
+  bg_color: string; text_color: string; heading_font: string; body_font: string;
+  custom_css: string | null; tokens: Record<string, string>; updated_at: string;
+}
+
+export interface HomepageSection {
+  id: string; section_key: string; section_type: string; title: string | null;
+  config: Record<string, unknown>; sort_order: number; enabled: boolean; updated_at: string;
+}
+
+export interface CustomPage {
+  id: string; slug: string; title: string; content_md: string | null;
+  content_html: string | null; meta_description: string | null;
+  is_published: boolean; show_in_nav: boolean; sort_order: number;
+  created_at: string; updated_at: string;
+}
+
+export interface NavItem {
+  id: string; location: 'header' | 'footer' | 'sidebar';
+  label: string; url: string; parent_id: string | null;
+  sort_order: number; is_external: boolean; enabled: boolean; updated_at: string;
+}
+
+export interface WidgetDefinition {
+  type: string; label: string;
+  category: 'basic' | 'media' | 'layout' | 'form' | 'pro' | 'dynamic';
+  icon?: string;
+  default_settings?: Record<string, unknown>;
+  default_style?: Record<string, unknown>;
+}
+
+export interface PageElement {
+  id: string; page_id: string; parent_id: string | null;
+  element_type: 'section' | 'column' | 'container' | 'widget';
+  widget_type: string | null;
+  settings: Record<string, unknown>; style: Record<string, unknown>;
+  responsive: Record<string, unknown>; advanced: Record<string, unknown>;
+  sort_order: number; is_hidden: boolean;
+  created_at: string; updated_at: string;
+}
+
+export interface PageElementNode extends PageElement { children: PageElementNode[]; }
+
+export interface PageRevision {
+  id: string; page_id: string;
+  snapshot: PageElementNode[]; note: string | null;
+  created_by: string | null; created_at: string;
+}
+
+export interface GlobalStyle {
+  id: string; kind: string; key: string; value: string;
+  label: string | null; updated_at: string;
+}
+
+export interface PageTemplate {
+  id: string; name: string; description: string | null;
+  thumbnail_url: string | null; category: string | null;
+  snapshot: PageElementNode[]; is_builtin: boolean;
+  created_at: string; updated_at: string;
+}
+
+export interface FormSubmission {
+  id: string; page_id: string; element_id: string;
+  data: Record<string, unknown>;
+  submitter_ip: string | null; submitter_user_id: string | null;
+  status: string; notes: string | null; created_at: string;
+}
+
+// --- Site settings ---
+export async function getSiteSettings(): Promise<SiteSettings> {
+  return request<SiteSettings>('/api/v1/videos/admin/site/settings');
+}
+export async function updateSiteSettings(patch: Partial<SiteSettings>): Promise<SiteSettings> {
+  return request<SiteSettings>('/api/v1/videos/admin/site/settings', { method: 'PUT', body: JSON.stringify(patch) });
+}
+
+// --- Themes ---
+export async function listThemes(): Promise<{ themes: SiteTheme[]; active: SiteTheme }> {
+  return request('/api/v1/videos/admin/site/themes');
+}
+export async function createTheme(input: Partial<SiteTheme> & { name: string }): Promise<SiteTheme> {
+  return request<SiteTheme>('/api/v1/videos/admin/site/themes', { method: 'POST', body: JSON.stringify(input) });
+}
+export async function updateTheme(id: string, patch: Partial<SiteTheme>): Promise<SiteTheme> {
+  return request<SiteTheme>(`/api/v1/videos/admin/site/themes/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+}
+export async function deleteTheme(id: string): Promise<{ deleted: boolean }> {
+  return request(`/api/v1/videos/admin/site/themes/${id}`, { method: 'DELETE' });
+}
+
+// --- Homepage sections ---
+export async function listHomepageSections(): Promise<{ sections: HomepageSection[] }> {
+  return request('/api/v1/videos/admin/site/homepage');
+}
+export async function upsertHomepageSection(input: {
+  section_key: string; section_type: string; title?: string | null;
+  config?: Record<string, unknown>; sort_order?: number; enabled?: boolean;
+}): Promise<HomepageSection> {
+  return request<HomepageSection>('/api/v1/videos/admin/site/homepage', { method: 'POST', body: JSON.stringify(input) });
+}
+export async function reorderHomepageSections(order: string[]): Promise<{ sections: HomepageSection[] }> {
+  return request('/api/v1/videos/admin/site/homepage/reorder', { method: 'PUT', body: JSON.stringify({ order }) });
+}
+export async function deleteHomepageSection(sectionKey: string): Promise<{ deleted: boolean }> {
+  return request(`/api/v1/videos/admin/site/homepage/${sectionKey}`, { method: 'DELETE' });
+}
+
+// --- Custom pages ---
+export async function listCustomPages(): Promise<{ pages: CustomPage[] }> {
+  return request('/api/v1/videos/admin/site/pages');
+}
+export async function createCustomPage(input: {
+  title: string; slug?: string; content_md?: string | null; content_html?: string | null;
+  meta_description?: string | null; is_published?: boolean; show_in_nav?: boolean; sort_order?: number;
+}): Promise<CustomPage> {
+  return request<CustomPage>('/api/v1/videos/admin/site/pages', { method: 'POST', body: JSON.stringify(input) });
+}
+export async function updateCustomPage(id: string, patch: Partial<CustomPage>): Promise<CustomPage> {
+  return request<CustomPage>(`/api/v1/videos/admin/site/pages/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+}
+export async function deleteCustomPage(id: string): Promise<{ deleted: boolean }> {
+  return request(`/api/v1/videos/admin/site/pages/${id}`, { method: 'DELETE' });
+}
+
+// --- Navigation ---
+export async function listNavItems(location?: string): Promise<{ items: NavItem[] }> {
+  const qs = location ? `?location=${encodeURIComponent(location)}` : '';
+  return request(`/api/v1/videos/admin/site/nav${qs}`);
+}
+export async function upsertNavItem(input: {
+  id?: string; location: 'header' | 'footer' | 'sidebar';
+  label: string; url: string; parent_id?: string | null;
+  sort_order?: number; is_external?: boolean; enabled?: boolean;
+}): Promise<NavItem> {
+  return request<NavItem>('/api/v1/videos/admin/site/nav', { method: 'POST', body: JSON.stringify(input) });
+}
+export async function deleteNavItem(id: string): Promise<{ deleted: boolean }> {
+  return request(`/api/v1/videos/admin/site/nav/${id}`, { method: 'DELETE' });
+}
+
+// --- Builder widgets ---
+export async function listWidgets(): Promise<{ widgets: WidgetDefinition[]; categories: string[] }> {
+  return request('/api/v1/videos/builder/widgets');
+}
+
+// --- Element tree ---
+export async function getPageTree(pageId: string): Promise<{ tree: PageElementNode[] }> {
+  return request(`/api/v1/videos/builder/pages/${pageId}/tree`);
+}
+export async function listPageElements(pageId: string): Promise<{ elements: PageElement[] }> {
+  return request(`/api/v1/videos/builder/pages/${pageId}/elements`);
+}
+export async function addElement(pageId: string, input: {
+  parent_id?: string | null; element_type: 'section' | 'column' | 'container' | 'widget';
+  widget_type?: string | null;
+  settings?: Record<string, unknown>; style?: Record<string, unknown>;
+  responsive?: Record<string, unknown>; advanced?: Record<string, unknown>;
+  sort_order?: number;
+}): Promise<PageElement> {
+  return request<PageElement>(`/api/v1/videos/builder/pages/${pageId}/elements`, { method: 'POST', body: JSON.stringify(input) });
+}
+export async function updateElement(id: string, patch: {
+  widget_type?: string | null;
+  settings?: Record<string, unknown>; style?: Record<string, unknown>;
+  responsive?: Record<string, unknown>; advanced?: Record<string, unknown>;
+  sort_order?: number; is_hidden?: boolean;
+}): Promise<PageElement> {
+  return request<PageElement>(`/api/v1/videos/builder/elements/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+}
+export async function deleteElement(id: string): Promise<{ deleted: number }> {
+  return request(`/api/v1/videos/builder/elements/${id}`, { method: 'DELETE' });
+}
+export async function moveElement(id: string, input: { new_parent_id?: string | null; new_sort_order?: number }): Promise<PageElement> {
+  return request<PageElement>(`/api/v1/videos/builder/elements/${id}/move`, { method: 'POST', body: JSON.stringify(input) });
+}
+export async function duplicateElement(id: string, parentId?: string | null): Promise<PageElement> {
+  return request<PageElement>(`/api/v1/videos/builder/elements/${id}/duplicate`, { method: 'POST', body: JSON.stringify({ parent_id: parentId }) });
+}
+export async function reorderElements(parentId: string | null, order: string[]): Promise<{ ok: boolean }> {
+  return request('/api/v1/videos/builder/reorder', { method: 'POST', body: JSON.stringify({ parent_id: parentId, order }) });
+}
+
+// --- Revisions ---
+export async function createRevision(pageId: string, note?: string): Promise<PageRevision> {
+  return request<PageRevision>(`/api/v1/videos/builder/pages/${pageId}/revisions`, { method: 'POST', body: JSON.stringify({ note }) });
+}
+export async function listRevisions(pageId: string): Promise<{ revisions: PageRevision[] }> {
+  return request(`/api/v1/videos/builder/pages/${pageId}/revisions`);
+}
+export async function restoreRevision(id: string): Promise<{ restored_elements: number }> {
+  return request(`/api/v1/videos/builder/revisions/${id}/restore`, { method: 'POST' });
+}
+
+// --- Global styles ---
+export async function getGlobalStyles(): Promise<{ grouped: Record<string, GlobalStyle[]>; list: GlobalStyle[] }> {
+  return request('/api/v1/videos/builder/global-styles');
+}
+export async function setGlobalStyle(input: { kind: string; key: string; value: string; label?: string }): Promise<GlobalStyle> {
+  return request<GlobalStyle>('/api/v1/videos/builder/global-styles', { method: 'PUT', body: JSON.stringify(input) });
+}
+export async function deleteGlobalStyle(kind: string, key: string): Promise<{ deleted: boolean }> {
+  return request(`/api/v1/videos/builder/global-styles/${kind}/${key}`, { method: 'DELETE' });
+}
+
+// --- Templates ---
+export async function listTemplates(category?: string): Promise<{ templates: PageTemplate[] }> {
+  const qs = category ? `?category=${encodeURIComponent(category)}` : '';
+  return request(`/api/v1/videos/builder/templates${qs}`);
+}
+export async function savePageAsTemplate(pageId: string, input: { name: string; description?: string; category?: string }): Promise<PageTemplate> {
+  return request<PageTemplate>(`/api/v1/videos/builder/pages/${pageId}/save-as-template`, { method: 'POST', body: JSON.stringify(input) });
+}
+export async function applyTemplate(pageId: string, templateId: string, replace = false): Promise<{ applied_elements: number }> {
+  return request(`/api/v1/videos/builder/pages/${pageId}/apply-template/${templateId}`, { method: 'POST', body: JSON.stringify({ replace }) });
+}
+export async function deleteTemplate(id: string): Promise<{ deleted: boolean }> {
+  return request(`/api/v1/videos/builder/templates/${id}`, { method: 'DELETE' });
+}
+
+// --- Form submissions ---
+export async function listFormSubmissions(pageId: string): Promise<{ submissions: FormSubmission[] }> {
+  return request(`/api/v1/videos/builder/pages/${pageId}/form-submissions`);
+}

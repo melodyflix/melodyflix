@@ -11,13 +11,14 @@ import AdminPayments from './pages/AdminPayments';
 import AdminSupport from './pages/AdminSupport';
 import EmailSettings from './pages/EmailSettings';
 import ContentUpload from './pages/ContentUpload';
+import PageBuilder from './pages/PageBuilder';
 import VideoChapters from './pages/VideoChapters';
 import AdminCampaigns from './pages/AdminCampaigns';
 import AdminInfluencers from './pages/AdminInfluencers';
 import AdminAdCampaigns from './pages/AdminAdCampaigns';
 import { api, getToken, clearToken, type User } from './lib/api';
 
-type Page = 'dashboard' | 'channels' | 'videos' | 'chapters' | 'users' | 'reports' | 'ads' | 'ad-campaigns' | 'payments' | 'support' | 'email' | 'content-upload' | 'campaigns' | 'influencers' | 'settings';
+type Page = 'dashboard' | 'channels' | 'videos' | 'chapters' | 'users' | 'reports' | 'ads' | 'ad-campaigns' | 'payments' | 'support' | 'email' | 'content-upload' | 'campaigns' | 'influencers' | 'settings' | 'builder';
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState<boolean>(!!getToken());
@@ -55,6 +56,7 @@ export default function App() {
     { key: 'content-upload', label: 'Auto Upload', icon: '📥' },
     { key: 'campaigns', label: 'Campaigns', icon: '📨' },
     { key: 'influencers', label: 'Influencers', icon: '⭐' },
+    { key: 'builder', label: 'Page Builder', icon: '🎨' },
     { key: 'settings', label: 'Settings', icon: '⚙️' },
   ];
 
@@ -128,6 +130,7 @@ export default function App() {
           {page === 'content-upload' && <ContentUpload />}
           {page === 'campaigns' && <AdminCampaigns />}
           {page === 'influencers' && <AdminInfluencers />}
+          {page === 'builder' && <PageBuilder />}
           {page === 'settings' && <Settings />}
         </main>
       </div>
