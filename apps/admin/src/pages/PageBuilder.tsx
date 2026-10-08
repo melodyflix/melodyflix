@@ -9,8 +9,22 @@ import {
   type PageRevision, type GlobalStyle, type PageTemplate,
 } from '../lib/api';
 import WidgetPreview from '../components/WidgetPreview';
+import {
+  DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
+  useDraggable, useDroppable, type DragEndEvent, type DragStartEvent,
+} from '@dnd-kit/core';
+import { useSortable } from '@dnd-kit/sortable';
 
 type Device = 'desktop' | 'tablet' | 'mobile';
+
+function findElement(ns: PageElementNode[], id: string): PageElementNode | null {
+  for (const n of ns) {
+    if (n.id === id) return n;
+    const hit = findElement(n.children, id);
+    if (hit) return hit;
+  }
+  return null;
+}
 
 export default function PageBuilder() {
   const [pages, setPages] = useState<CustomPage[]>([]);
@@ -28,6 +42,8 @@ export default function PageBuilder() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [globalStyles, setGlobalStyles] = useState<GlobalStyle[]>([]);
   const [inspectorTab, setInspectorTab] = useState<'content' | 'style' | 'advanced'>('content');
+  const [draggingWidgetType, setDraggingWidgetType] = useState<string | null>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   // ---- bootstrap ----
   useEffect(() => {
@@ -217,6 +233,68 @@ export default function PageBuilder() {
     } catch (e: any) { setError(e.message); }
   }
 
+  // ---- drag handlers ----
+  function handleDragStart(e: DragStartEvent) {
+    const data = e.active.data.current as { widgetType?: string } | undefined;
+    if (data?.widgetType) setDraggingWidgetType(data.widgetType);
+  }
+
+  async function handleDragEnd(e: DragEndEvent) {
+    setDraggingWidgetType(null);
+    if (!activePageId) return;
+    const overId = e.over?.id as string | undefined;
+    const activeData = e.active.data.current as { widgetType?: string; elementId?: string } | undefined;
+    if (!overId) return;
+
+    // Case A: palette widget dropped onto a container or between siblings
+    if (activeData?.widgetType) {
+      // Drop onto a container → insert inside; drop onto a widget/container → insert as sibling after
+      let parentId: string | null = null;
+      const dropEl = findElement(tree, overId);
+      if (dropEl) {
+        if (dropEl.element_type === 'section' || dropEl.element_type === 'container' || dropEl.element_type === 'column') {
+          // Drop into container; if section has a column child use that
+          const col = dropEl.children.find((c) => c.element_type === 'column');
+          if (dropEl.element_type === 'section' && col) parentId = col.id;
+          else parentId = dropEl.id;
+        } else {
+          parentId = dropEl.parent_id;
+        }
+      }
+      try {
+        const def = widgets.find((w) => w.type === activeData.widgetType);
+        await addElement(activePageId, {
+          parent_id: parentId,
+          element_type: 'widget',
+          widget_type: activeData.widgetType,
+          settings: (def?.default_settings ?? {}) as Record<string, unknown>,
+          style: (def?.default_style ?? {}) as Record<string, unknown>,
+        });
+        await reloadTree(activePageId);
+      } catch (err: any) { setError(err.message); }
+      return;
+    }
+
+    // Case B: existing element dragged onto another → move/reorder
+    if (activeData?.elementId && activeData.elementId !== overId) {
+      const dragged = findElement(tree, activeData.elementId);
+      const target = findElement(tree, overId);
+      if (!dragged || !target) return;
+      try {
+        // if target is a container → move inside
+        if (target.element_type === 'section' || target.element_type === 'container' || target.element_type === 'column') {
+          const col = target.children.find((c) => c.element_type === 'column');
+          const newParent = target.element_type === 'section' && col ? col.id : target.id;
+          await moveElement(dragged.id, { new_parent_id: newParent });
+        } else {
+          // reorder: move under same parent, before target's sort_order
+          await moveElement(dragged.id, { new_parent_id: target.parent_id, new_sort_order: target.sort_order - 1 });
+        }
+        await reloadTree(activePageId);
+      } catch (err: any) { setError(err.message); }
+    }
+  }
+
   // ---- render ----
   if (loading && !tree.length) return <div className="mf-page">Loading builder…</div>;
   if (!pages.length) return (
@@ -227,6 +305,7 @@ export default function PageBuilder() {
   );
 
   return (
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
     <div className="mf-builder">
       {/* ===== Top bar ===== */}
       <div className="mf-builder-topbar">
@@ -264,10 +343,7 @@ export default function PageBuilder() {
           </div>
           <div className="mf-widget-list">
             {filteredWidgets.map((w) => (
-              <button key={w.type} className="mf-widget-btn" onClick={() => addWidget(w.type)} title={w.type}>
-                <span>{w.label}</span>
-                <small>{w.category}</small>
-              </button>
+              <DraggableWidget key={w.type} widget={w} onAdd={() => addWidget(w.type)} />
             ))}
           </div>
         </aside>
@@ -375,6 +451,14 @@ export default function PageBuilder() {
         <GlobalColorInput label="Text" kind="color" gkey="text" value={globalStyles.find((g) => g.kind === 'color' && g.key === 'text')?.value ?? '#f5f5f5'} onChange={updateGlobal} />
       </div>
     </div>
+    <DragOverlay>
+      {draggingWidgetType && (
+        <div className="mf-drag-overlay">
+          {widgets.find((w) => w.type === draggingWidgetType)?.label ?? draggingWidgetType}
+        </div>
+      )}
+    </DragOverlay>
+    </DndContext>
   );
 }
 
@@ -400,16 +484,19 @@ function CanvasNode({ node, selectedId, onSelect, device }: { node: PageElementN
   if (style.min_height) css.minHeight = style.min_height;
   if (node.element_type === 'column') { css.flex = 1; css.minWidth = 0; }
 
+  const { setNodeRef, isOver } = useDroppable({ id: node.id, data: { elementId: node.id } });
+
   if (isContainer) {
     return (
       <div
-        className={`mf-cnode mf-cnode-${node.element_type} ${selectedId === node.id ? 'selected' : ''}`}
+        ref={setNodeRef}
+        className={`mf-cnode mf-cnode-${node.element_type} ${selectedId === node.id ? 'selected' : ''} ${isOver ? 'over' : ''}`}
         style={{ display: 'flex', flexDirection: node.element_type === 'column' ? 'column' : 'row', gap: 8, ...css }}
         onClick={(e) => { e.stopPropagation(); onSelect(node.id); }}
         data-el-id={node.id}
       >
         {node.children.length === 0 && (
-          <div className="mf-cnode-empty">Drop widget here — select this {node.element_type} then click a widget on the left</div>
+          <div className="mf-cnode-empty">Drop widget here</div>
         )}
         {node.children.map((c) => (
           <CanvasNode key={c.id} node={c} selectedId={selectedId} onSelect={onSelect} device={device} />
@@ -418,8 +505,34 @@ function CanvasNode({ node, selectedId, onSelect, device }: { node: PageElementN
     );
   }
 
+  // widget node — also droppable so others can be placed after
   return (
-    <WidgetPreview element={node} selected={selectedId === node.id} onSelect={onSelect} />
+    <div ref={setNodeRef} className={isOver ? 'mf-widget-drop-over' : ''}>
+      <WidgetPreview element={node} selected={selectedId === node.id} onSelect={onSelect} />
+    </div>
+  );
+}
+
+// ============ Draggable widget (palette) ============
+
+function DraggableWidget({ widget, onAdd }: { widget: WidgetDefinition; onAdd: () => void }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `palette-${widget.type}`,
+    data: { widgetType: widget.type },
+  });
+  return (
+    <button
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className={`mf-widget-btn ${isDragging ? 'dragging' : ''}`}
+      onClick={onAdd}
+      title={`${widget.type} — drag onto canvas or click to add`}
+      style={{ cursor: 'grab' }}
+    >
+      <span>{widget.label}</span>
+      <small>{widget.category}</small>
+    </button>
   );
 }
 
