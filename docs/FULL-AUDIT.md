@@ -576,6 +576,16 @@ All 12 items [DONE] accessibility.service (16.1–16.12)
 | 30.7 | Transition Presets | [DONE] editor |
 | 30.8 | Color Grading Presets | [DONE] editor |
 
+**Verified 2026-10-08**: All 8 items smoke-tested via curl.
+- GET /customizations/presets → 7 filters + grading presets
+- GET /channels/:id/customization → 200
+- GET /intros/templates → template catalog (logo-fade, swoosh, ...)
+- GET /channels/:id/intros → 200
+- GET /overlays/presets → lower-third styles + animations
+- GET /channels/:id/lower-thirds → 200
+- GET /channels/:id/transition → 200
+- GET /editor/jobs + /editor/summary → 200
+
 ## Section 31 — Video Distribution
 
 | 31.1 | Multi-Platform Publishing | [DONE] distribution.service.ts |
