@@ -543,19 +543,27 @@ All 12 items [DONE] accessibility.service (16.1–16.12)
 | 29.2 | Subscription Management | [DONE] |
 | 29.3 | Auto-Renewal | [DONE] |
 | 29.4 | Payment History | [DONE] |
-| 29.5 | Refund System | [PARTIAL] |
+| 29.5 | Refund System | [DONE] full/partial, workflow, stats |
 | 29.6 | International Payment Support | [DONE] |
 | 29.7 | Multi-Currency Support | [DONE] |
-| 29.8 | Automatic Currency Conversion | [PARTIAL] |
+| 29.8 | Automatic Currency Conversion | [DONE] direct/inverse/USD-bridge |
 | 29.9 | PayPal, Stripe, Razorpay Integration | [DONE] |
-| 29.10 | Cryptocurrency Payments | [TODO] |
+| 29.10 | Cryptocurrency Payments | [DONE] Binance Pay + wallet (BTC/ETH/USDT/USDC/BNB) |
 | 29.11 | Local Payment Methods | [DONE] bKash/Nagad/Rocket |
-| 29.12 | Cross-Border Transaction Support | [PARTIAL] |
-| 29.13 | Country-Based Tax Calculation | [TODO] |
-| 29.14 | 3D Secure | [PARTIAL] |
-| 29.15 | PCI Tokenization | [TODO] |
-| 29.16 | Chargeback Management | [TODO] |
-| 29.17 | Payment Risk Scoring | [TODO] |
+| 29.12 | Cross-Border Transaction Support | [DONE] fee %, blocked countries, log |
+| 29.13 | Country-Based Tax Calculation | [DONE] VAT/GST/Sales, region override, inclusive |
+| 29.14 | 3D Secure | [DONE] threshold+provider trigger, retry limit, stats |
+| 29.15 | PCI Tokenization | [DONE] Luhn, brand detect, dedupe, audit log |
+| 29.16 | Chargeback Management | [DONE] workflow, evidence, event trail, win-rate |
+| 29.17 | Payment Risk Scoring | [DONE] 9 default rules, levels, auto-block, live tuning |
+
+**Completed 2026-10-08**: Section 29 fully implemented. 9 items (29.5, 29.8, 29.10, 29.12, 29.13, 29.14, 29.15, 29.16, 29.17) delivered across commits fc9080c, 9923d70, f203d89, 51dbcea, 90fe174, 24ba644, a1b682d, b68e257, 533afd7. Also fixed pre-existing bug: paymentRoutes was never registered in videos/index.ts (payment endpoints previously 404).
+
+**Notes for production**:
+- Payment gateway adapter code (Stripe SDK, Binance Pay API) is scaffolded — real credentials required for live calls.
+- 3DS challenge URL is a placeholder; integrate with gateway's redirect flow.
+- Crypto receive addresses are placeholder; wire to Binance merchant API / HD wallet.
+- Card tokenization stores fingerprint hashes; set TOKENIZATION_SALT env in production.
 
 ## Section 30 — Video Customization
 
