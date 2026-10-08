@@ -605,13 +605,26 @@ All 12 items [DONE] accessibility.service (16.1–16.12)
 ## Section 32 — Video Encoding and Quality
 
 | 32.1 | Multi-Bitrate Encoding | [DONE] transcode.service.ts |
-| 32.2 | 4K/8K Support | [PARTIAL] |
+| 32.2 | 4K/8K Support | [DONE] ladder 240p→4320p, source-aware |
 | 32.3 | Adaptive Bitrate Streaming | [DONE] |
-| 32.4 | Codec Selection (H.264/H.265/AV1) | [PARTIAL] |
+| 32.4 | Codec Selection (H.264/H.265/AV1) | [DONE] 3 profiles, per-quality CRF |
 | 32.5 | Automatic Video Compression | [DONE] |
 | 32.6 | Bandwidth Optimization | [DONE] |
 | 32.7 | Storage Management | [DONE] storage.service.ts |
-| 32.8 | Smart Caching | [PARTIAL] |
+| 32.8 | Smart Caching | [DONE] transcode_cache, LRU evict, stats |
+
+**Completed 2026-10-08**: 32.2, 32.4, 32.8 delivered in commit e68c694.
+- Quality ladder expanded to 8 levels (240p/360p/480p/720p/1080p/
+  1440p/2160p/4320p) with per-level bandwidth; filtered to source height.
+- 3 codec profiles (h264/libx264, h265/libx265, av1/libsvtav1) with
+  per-quality CRF; HLS CODECS string per codec; hvc1 tag for H.265.
+- transcode_cache table with sha256-based keys (input + videoId + codec
+  + qualities); cache hits short-circuit; LRU eviction endpoint; stats.
+- transcodeToHls now accepts optional {codec, qualities,
+  segmentDuration, maxSourceHeight} — backward compatible.
+
+Verified via service-level call: H.264 480p+720p encoded, cache hit
+on repeat, H.265 separate cache entry, stats/list correct.
 
 ## Section 33 — User Retention
 
