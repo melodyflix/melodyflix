@@ -58,6 +58,24 @@ export function ensurePaymentSchema(): void {
     CREATE INDEX IF NOT EXISTS idx_pt_user ON payment_transactions(user_id);
     CREATE INDEX IF NOT EXISTS idx_pt_status ON payment_transactions(status);
     CREATE INDEX IF NOT EXISTS idx_pt_purpose ON payment_transactions(purpose);
+
+    CREATE TABLE IF NOT EXISTS payment_refunds (
+      id TEXT PRIMARY KEY,
+      transaction_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      amount REAL NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'BDT',
+      reason TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      refunded_by TEXT,
+      external_refund_id TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_pr_tx ON payment_refunds(transaction_id);
+    CREATE INDEX IF NOT EXISTS idx_pr_user ON payment_refunds(user_id);
+    CREATE INDEX IF NOT EXISTS idx_pr_status ON payment_refunds(status);
   `);
 }
 
@@ -251,4 +269,169 @@ export function getPaymentStats(): PaymentStats {
     total_revenue: totalRev,
     revenue_last_30d: rev30,
   };
+}
+
+// ============ Refund System (29.5) ============
+
+export interface PaymentRefund {
+  id: string;
+  transaction_id: string;
+  user_id: string;
+  amount: number;
+  currency: string;
+  reason: string | null;
+  status: 'pending' | 'approved' | 'rejected' | 'completed';
+  refunded_by: string | null;
+  external_refund_id: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateRefundInput {
+  transaction_id: string;
+  user_id: string;
+  amount: number;
+  currency?: string;
+  reason?: string;
+}
+
+export function createRefund(input: CreateRefundInput): PaymentRefund {
+  const db = getDb();
+  const tx = getTransactionById(input.transaction_id);
+  if (!tx) throw new Error('Transaction not found');
+  if (tx.status !== 'completed') throw new Error('Only completed transactions can be refunded');
+
+  // Count pending + approved + completed refunds to prevent double-booking.
+  // Rejected refunds free up their reserved amount.
+  const alreadyRefunded = (db.prepare(
+    "SELECT COALESCE(SUM(amount), 0) as s FROM payment_refunds WHERE transaction_id = ? AND status IN ('pending','approved','completed')"
+  ).get(input.transaction_id) as { s: number }).s;
+
+  const remaining = tx.amount - alreadyRefunded;
+  if (remaining <= 0) throw new Error('Transaction already fully refunded');
+  if (input.amount <= 0) throw new Error('Refund amount must be positive');
+  if (input.amount > remaining + 1e-9) {
+    throw new Error(`Refund amount exceeds remaining refundable amount (${remaining.toFixed(2)})`);
+  }
+
+  const now = new Date().toISOString();
+  const refund: PaymentRefund = {
+    id: randomUUID(),
+    transaction_id: input.transaction_id,
+    user_id: input.user_id,
+    amount: input.amount,
+    currency: input.currency ?? tx.currency,
+    reason: input.reason ?? null,
+    status: 'pending',
+    refunded_by: null,
+    external_refund_id: null,
+    notes: null,
+    created_at: now,
+    updated_at: now,
+  };
+
+  db.prepare(`
+    INSERT INTO payment_refunds (id, transaction_id, user_id, amount, currency, reason,
+      status, refunded_by, external_refund_id, notes, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    refund.id, refund.transaction_id, refund.user_id, refund.amount, refund.currency,
+    refund.reason, refund.status, refund.refunded_by, refund.external_refund_id,
+    refund.notes, refund.created_at, refund.updated_at
+  );
+  return refund;
+}
+
+export function getRefundById(id: string): PaymentRefund | null {
+  const db = getDb();
+  return (db.prepare('SELECT * FROM payment_refunds WHERE id = ?').get(id) as PaymentRefund | undefined) ?? null;
+}
+
+export function listRefundsByTransaction(transactionId: string): PaymentRefund[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM payment_refunds WHERE transaction_id = ? ORDER BY created_at DESC')
+    .all(transactionId) as PaymentRefund[];
+}
+
+export function listRefundsByUser(userId: string, limit = 100): PaymentRefund[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM payment_refunds WHERE user_id = ? ORDER BY created_at DESC LIMIT ?')
+    .all(userId, limit) as PaymentRefund[];
+}
+
+export function listAllRefunds(limit = 100, offset = 0, status?: string): PaymentRefund[] {
+  const db = getDb();
+  if (status) {
+    return db.prepare('SELECT * FROM payment_refunds WHERE status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?')
+      .all(status, limit, offset) as PaymentRefund[];
+  }
+  return db.prepare('SELECT * FROM payment_refunds ORDER BY created_at DESC LIMIT ? OFFSET ?')
+    .all(limit, offset) as PaymentRefund[];
+}
+
+export function updateRefundStatus(
+  id: string,
+  status: PaymentRefund['status'],
+  reviewerId?: string,
+  notes?: string,
+  externalRefundId?: string,
+): PaymentRefund | null {
+  const db = getDb();
+  const existing = getRefundById(id);
+  if (!existing) return null;
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    UPDATE payment_refunds
+    SET status = ?, refunded_by = COALESCE(?, refunded_by),
+        notes = COALESCE(?, notes),
+        external_refund_id = COALESCE(?, external_refund_id),
+        updated_at = ?
+    WHERE id = ?
+  `).run(status, reviewerId ?? null, notes ?? null, externalRefundId ?? null, now, id);
+
+  // If refund completed, mark transaction status as 'refunded' when fully refunded
+  if (status === 'completed') {
+    const tx = getTransactionById(existing.transaction_id);
+    if (tx) {
+      const totalRefunded = (db.prepare(
+        "SELECT COALESCE(SUM(amount), 0) as s FROM payment_refunds WHERE transaction_id = ? AND status = 'completed'"
+      ).get(tx.id) as { s: number }).s;
+      if (totalRefunded >= tx.amount - 1e-9) {
+        db.prepare('UPDATE payment_transactions SET status = ?, updated_at = ? WHERE id = ?')
+          .run('refunded', now, tx.id);
+      }
+    }
+  }
+  return getRefundById(id);
+}
+
+export interface RefundStats {
+  total_refunds: number;
+  pending_refunds: number;
+  approved_refunds: number;
+  completed_refunds: number;
+  rejected_refunds: number;
+  total_refunded_amount: number;
+}
+
+export function getRefundStats(): RefundStats {
+  const db = getDb();
+  const rows = db.prepare(
+    "SELECT status, COUNT(*) as n, COALESCE(SUM(amount), 0) as amt FROM payment_refunds GROUP BY status"
+  ).all() as Array<{ status: string; n: number; amt: number }>;
+  const stats: RefundStats = {
+    total_refunds: 0, pending_refunds: 0, approved_refunds: 0,
+    completed_refunds: 0, rejected_refunds: 0, total_refunded_amount: 0,
+  };
+  for (const r of rows) {
+    stats.total_refunds += r.n;
+    if (r.status === 'pending') stats.pending_refunds = r.n;
+    else if (r.status === 'approved') stats.approved_refunds = r.n;
+    else if (r.status === 'completed') stats.completed_refunds = r.n;
+    else if (r.status === 'rejected') stats.rejected_refunds = r.n;
+    if (r.status === 'completed') stats.total_refunded_amount += r.amt;
+  }
+  return stats;
 }

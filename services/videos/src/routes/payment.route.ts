@@ -6,6 +6,8 @@ import {
   createGateway, listGateways, getGatewayById, updateGateway, deleteGateway,
   createTransaction, listTransactions, getPaymentStats, getDefaultGateway,
   updateTransactionStatus, getTransactionById,
+  createRefund, getRefundById, listRefundsByTransaction, listRefundsByUser,
+  listAllRefunds, updateRefundStatus, getRefundStats,
 } from '../services/payment.service.js';
 import { grantMessagePack } from '../services/chatlimits.service.js';
 import { getDb } from '@melodyflix/shared-db';
@@ -204,5 +206,132 @@ export async function paymentRoutes(app: FastifyInstance) {
       'SELECT * FROM payment_transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT 100'
     ).all(user.sub);
     return reply.send({ success: true, data: { transactions: rows } });
+  });
+
+  // ============ REFUNDS (29.5) ============
+
+  // POST /payment/refunds/request — user requests a refund
+  app.post('/payment/refunds/request', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+
+    const BodySchema = z.object({
+      transaction_id: z.string().min(1),
+      amount: z.number().positive(),
+      reason: z.string().max(500).optional(),
+    });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+
+    const tx = getTransactionById(parsed.data.transaction_id);
+    if (!tx) return reply.code(404).send({ success: false, error: 'Transaction not found' });
+    if (tx.user_id !== user.sub) return reply.code(403).send({ success: false, error: 'Not authorized' });
+
+    try {
+      const refund = createRefund({
+        transaction_id: parsed.data.transaction_id,
+        user_id: user.sub,
+        amount: parsed.data.amount,
+        reason: parsed.data.reason,
+      });
+      return reply.code(201).send({ success: true, data: refund });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // GET /payment/refunds/mine — user's own refunds
+  app.get('/payment/refunds/mine', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    return reply.send({ success: true, data: { refunds: listRefundsByUser(user.sub) } });
+  });
+
+  // GET /payment/refunds/:id — owner or admin
+  app.get('/payment/refunds/:id', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const refund = getRefundById(id);
+    if (!refund) return reply.code(404).send({ success: false, error: 'Refund not found' });
+    if (refund.user_id !== user.sub && user.role !== 'admin') {
+      return reply.code(403).send({ success: false, error: 'Not authorized' });
+    }
+    return reply.send({ success: true, data: refund });
+  });
+
+  // GET /payment/refunds/by-transaction/:txId — owner or admin
+  app.get('/payment/refunds/by-transaction/:txId', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { txId } = req.params as { txId: string };
+    const tx = getTransactionById(txId);
+    if (!tx) return reply.code(404).send({ success: false, error: 'Transaction not found' });
+    if (tx.user_id !== user.sub && user.role !== 'admin') {
+      return reply.code(403).send({ success: false, error: 'Not authorized' });
+    }
+    return reply.send({ success: true, data: { refunds: listRefundsByTransaction(txId) } });
+  });
+
+  // ============ REFUNDS — ADMIN ============
+
+  // GET /payment/admin/refunds
+  app.get('/payment/admin/refunds', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const q = req.query as { limit?: string; offset?: string; status?: string };
+    const limit = Math.min(Number(q.limit ?? 100), 500);
+    const offset = Number(q.offset ?? 0);
+    return reply.send({
+      success: true,
+      data: { refunds: listAllRefunds(limit, offset, q.status), stats: getRefundStats() },
+    });
+  });
+
+  // POST /payment/admin/refunds/:id/approve
+  app.post('/payment/admin/refunds/:id/approve', async (req, reply) => {
+    let admin;
+    try { admin = requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const { notes } = (req.body ?? {}) as { notes?: string };
+    const r = updateRefundStatus(id, 'approved', admin.sub, notes);
+    if (!r) return reply.code(404).send({ success: false, error: 'Refund not found' });
+    return reply.send({ success: true, data: r });
+  });
+
+  // POST /payment/admin/refunds/:id/reject
+  app.post('/payment/admin/refunds/:id/reject', async (req, reply) => {
+    let admin;
+    try { admin = requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const { notes } = (req.body ?? {}) as { notes?: string };
+    const r = updateRefundStatus(id, 'rejected', admin.sub, notes);
+    if (!r) return reply.code(404).send({ success: false, error: 'Refund not found' });
+    return reply.send({ success: true, data: r });
+  });
+
+  // POST /payment/admin/refunds/:id/complete — mark refund fully executed (post to gateway)
+  app.post('/payment/admin/refunds/:id/complete', async (req, reply) => {
+    let admin;
+    try { admin = requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const { external_refund_id, notes } = (req.body ?? {}) as { external_refund_id?: string; notes?: string };
+    const r = updateRefundStatus(id, 'completed', admin.sub, notes, external_refund_id);
+    if (!r) return reply.code(404).send({ success: false, error: 'Refund not found' });
+    return reply.send({ success: true, data: r });
+  });
+
+  // GET /payment/admin/refunds/stats
+  app.get('/payment/admin/refunds/stats', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    return reply.send({ success: true, data: getRefundStats() });
   });
 }
