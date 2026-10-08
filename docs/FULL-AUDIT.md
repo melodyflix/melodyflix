@@ -535,7 +535,7 @@ All 12 items [DONE] accessibility.service (16.1–16.12)
 
 ## Section 28 — Mobile App Features
 
-All items [TODO] — mobile apps separately built
+**[DEFERRED 2026-10-08]** All items deferred. Mobile apps (iOS/Android) will be built as separate repositories/projects after backend + web are complete. Backend APIs consumed by mobile are already covered by earlier sections.
 
 ## Section 29 — Payment and Billing
 
