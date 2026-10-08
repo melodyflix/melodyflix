@@ -628,10 +628,23 @@ on repeat, H.265 separate cache entry, stats/list correct.
 
 ## Section 33 — User Retention
 
-| 33.1 | Watch Later | [DONE] watchlater.route.ts |
+| 33.1 | Watch Later | [DONE] full CRUD (list/ids/add/remove/check) |
 | 33.2 | Continue Watching | [DONE] history.route.ts |
 | 33.3 | History Management | [DONE] |
-| 33.4 | Favorites/Bookmarks | [DONE] |
+| 33.4 | Favorites/Bookmarks | [DONE] dual-kind + collections + notes |
+
+**Completed 2026-10-08 (commit a8861ae)**:
+- 33.1 watchlater.route.ts expanded from list-only to full CRUD:
+  GET list / GET ids / POST toggle / DELETE remove / GET check
+- 33.4 new favorites.service.ts + favorites.route.ts:
+  - table favorites (user_id, video_id, kind, collection, note)
+  - kind ∈ {favorite, bookmark} — tracked independently
+  - collection grouping + per-item note
+  - endpoints: list / ids / collections / stats / check / POST / PATCH / DELETE
+- 33.2, 33.3 already complete (history route + resume)
+
+Verified: watch-later add/check/list/remove; favorites with mixed kinds,
+collections, note update, stats, and 401 guards.
 
 ## Section 34 — Cross-Platform Sync
 
