@@ -977,6 +977,21 @@ binaural preview, quality 100 (good) vs 0 (7 issues).
 | 46.4 | Genre Classification | [DONE] genre.service.ts |
 | 46.5 | Cast and Crew Information | [DONE] castcrew.service.ts |
 
+**Verified 2026-10-08**: All 5 items tested via curl.
+- 46.1 auto-suggest (phrase extraction with score) + auto-apply stores
+  tags with source='auto'
+- 46.2 add/list/delete tags; `#trending` normalized to 'trending'
+- 46.3 sync-hashtags endpoint; tag_normalized column
+- 46.4 20 canonical genres (id-based); add/list/remove/list-videos
+- 46.5 cast & crew with name + role + character_name; list people;
+  roles catalog endpoint; person→videos lookup
+
+All routes under /api/v1/videos prefix:
+- /:videoId/tags, /tags/top, /tags/suggest, /tags/:tag/videos,
+  /:videoId/tags/auto-suggest, /:videoId/tags/auto-apply
+- /genres, /genres/list, /:videoId/genres, /genres/:genre/videos
+- /roles, /:videoId/credits, /people/:name/videos
+
 ## Section 47 — Social Media Integration
 
 | 47.1 | Facebook Integration | [DONE] social-share.service.ts |
