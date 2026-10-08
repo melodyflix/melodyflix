@@ -666,8 +666,17 @@ collections, note update, stats, and 401 guards.
 
 | 35.1 | Automatic Transcript Generation | [DONE] transcript.service.ts |
 | 35.2 | Searchable Transcript | [DONE] |
-| 35.3 | Downloadable Transcript | [PARTIAL] |
+| 35.3 | Downloadable Transcript | [DONE] SRT / VTT / TXT |
 | 35.4 | Timestamp Navigation | [DONE] |
+
+**Verified 2026-10-08**: All 4 items smoke-tested via curl (subtitle
+source path). 35.3 was incorrectly marked [PARTIAL] — exportTranscript
+already handles txt/srt/vtt with proper MIME types and
+Content-Disposition attachment headers.
+- 35.1: subtitle → cues parsed (correct start/end per cue)
+- 35.2: search returns hits with `[[match]]` snippets
+- 35.3: SRT (application/x-subrip), VTT (text/vtt), TXT (text/plain)
+- 35.4: cue.start / cue.end consumed by clients for timestamp nav
 
 ## Section 36 — Gamification
 
