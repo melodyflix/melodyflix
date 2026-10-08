@@ -783,6 +783,18 @@ inserted inside helper function scope).
 | 39.7 | Team Task Assignment | [DONE] |
 | 39.8 | Deadline Reminders | [DONE] |
 
+**Verified 2026-10-08**: All 8 items tested via curl.
+- Calendar + editorial require {channel_id, from, to} — return windowed items
+- Batch creates N items in one call
+- Recurring items tracked (is_recurring + recurrence_rule); expand
+  validates parent is recurring
+- Per-item timezone + priority; dashboard aggregates
+  total/by_status/by_priority/upcoming_7d/overdue/assigned_to_me
+- Tasks with assignee + due_at; reminders endpoint lists due deadlines
+
+Note: routes use {publish_at, assignee_id, due_at} field names
+(different from generic-sounding scheduled_for/assigned_to/due_date).
+
 ## Section 40 — Live TV Broadcasting
 
 | 40.1 | Live TV Channels | [DONE] livetv.service.ts |
