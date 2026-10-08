@@ -49,3 +49,39 @@ export function requireRole(authorization: string | undefined, allowedRoles: str
   }
   return payload;
 }
+
+// Fastify preHandler: verifies Bearer token, sets req.user
+// Usage: app.get('/x', { preHandler: [authGuard] }, handler)
+export function authGuard(
+  req: { headers: { authorization?: string }; user?: JwtPayload },
+  reply: { code: (n: number) => { send: (body: unknown) => void } },
+  done: (err?: Error) => void,
+): void {
+  try {
+    req.user = requireAuth(req.headers.authorization);
+    done();
+  } catch (e) {
+    reply.code(401).send({ error: 'Unauthorized', message: (e as Error).message });
+  }
+}
+
+// Fastify preHandler factory for role-gated routes
+export function roleGuard(allowedRoles: string[]) {
+  return function (
+    req: { headers: { authorization?: string }; user?: JwtPayload },
+    reply: { code: (n: number) => { send: (body: unknown) => void } },
+    done: (err?: Error) => void,
+  ): void {
+    try {
+      const payload = requireAuth(req.headers.authorization);
+      if (!allowedRoles.includes(payload.role)) {
+        reply.code(403).send({ error: 'Forbidden', message: 'Insufficient permissions' });
+        return;
+      }
+      req.user = payload;
+      done();
+    } catch (e) {
+      reply.code(401).send({ error: 'Unauthorized', message: (e as Error).message });
+    }
+  };
+}
