@@ -8,6 +8,8 @@ import {
   updateTransactionStatus, getTransactionById,
   createRefund, getRefundById, listRefundsByTransaction, listRefundsByUser,
   listAllRefunds, updateRefundStatus, getRefundStats,
+  SUPPORTED_CURRENCIES, setCurrencyRate, listCurrencyRates, deleteCurrencyRate,
+  convertCurrency, getCurrencyRate,
 } from '../services/payment.service.js';
 import { grantMessagePack } from '../services/chatlimits.service.js';
 import { getDb } from '@melodyflix/shared-db';
@@ -333,5 +335,74 @@ export async function paymentRoutes(app: FastifyInstance) {
     try { requireRole(req.headers.authorization, ['admin']); }
     catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
     return reply.send({ success: true, data: getRefundStats() });
+  });
+
+  // ============ CURRENCIES (29.8) ============
+
+  // GET /payment/currencies — public, supported currencies
+  app.get('/payment/currencies', async (_req, reply) => {
+    return reply.send({ success: true, data: { currencies: SUPPORTED_CURRENCIES } });
+  });
+
+  // GET /payment/currencies/rates — public, list rates (optionally base)
+  app.get('/payment/currencies/rates', async (req, reply) => {
+    const q = req.query as { base?: string };
+    return reply.send({ success: true, data: { rates: listCurrencyRates(q.base) } });
+  });
+
+  // GET /payment/currencies/convert?amount=&from=&to= — public
+  app.get('/payment/currencies/convert', async (req, reply) => {
+    const q = req.query as { amount?: string; from?: string; to?: string };
+    const amount = Number(q.amount);
+    if (!q.from || !q.to) return reply.code(400).send({ success: false, error: 'from and to are required' });
+    if (!Number.isFinite(amount) || amount < 0) return reply.code(400).send({ success: false, error: 'amount must be non-negative number' });
+    try {
+      const result = convertCurrency(amount, q.from, q.to);
+      return reply.send({ success: true, data: result });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // PUT /payment/admin/currencies/rates — upsert rate (admin)
+  app.put('/payment/admin/currencies/rates', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+
+    const BodySchema = z.object({
+      base: z.string().min(3).max(3),
+      quote: z.string().min(3).max(3),
+      rate: z.number().positive(),
+      source: z.string().max(50).optional(),
+    });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+
+    try {
+      const r = setCurrencyRate(parsed.data.base, parsed.data.quote, parsed.data.rate, parsed.data.source);
+      return reply.send({ success: true, data: r });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // GET /payment/admin/currencies/rates/:base/:quote — admin, single rate lookup
+  app.get('/payment/admin/currencies/rates/:base/:quote', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { base, quote } = req.params as { base: string; quote: string };
+    const rate = getCurrencyRate(base, quote);
+    if (rate === null) return reply.code(404).send({ success: false, error: 'No rate available' });
+    return reply.send({ success: true, data: { base: base.toUpperCase(), quote: quote.toUpperCase(), rate } });
+  });
+
+  // DELETE /payment/admin/currencies/rates/:base/:quote — admin
+  app.delete('/payment/admin/currencies/rates/:base/:quote', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { base, quote } = req.params as { base: string; quote: string };
+    const ok = deleteCurrencyRate(base, quote);
+    if (!ok) return reply.code(404).send({ success: false, error: 'Rate not found' });
+    return reply.send({ success: true, data: { deleted: true } });
   });
 }

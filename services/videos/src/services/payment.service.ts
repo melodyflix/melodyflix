@@ -76,6 +76,16 @@ export function ensurePaymentSchema(): void {
     CREATE INDEX IF NOT EXISTS idx_pr_tx ON payment_refunds(transaction_id);
     CREATE INDEX IF NOT EXISTS idx_pr_user ON payment_refunds(user_id);
     CREATE INDEX IF NOT EXISTS idx_pr_status ON payment_refunds(status);
+
+    CREATE TABLE IF NOT EXISTS currency_rates (
+      base_currency TEXT NOT NULL,
+      quote_currency TEXT NOT NULL,
+      rate REAL NOT NULL,
+      source TEXT NOT NULL DEFAULT 'manual',
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (base_currency, quote_currency)
+    );
+    CREATE INDEX IF NOT EXISTS idx_cr_base ON currency_rates(base_currency);
   `);
 }
 
@@ -434,4 +444,139 @@ export function getRefundStats(): RefundStats {
     if (r.status === 'completed') stats.total_refunded_amount += r.amt;
   }
   return stats;
+}
+
+// ============ Currency Conversion (29.8) ============
+
+export const SUPPORTED_CURRENCIES = [
+  'BDT', 'USD', 'EUR', 'GBP', 'INR', 'PKR', 'JPY', 'AUD', 'CAD', 'CNY',
+  'SGD', 'MYR', 'AED', 'SAR', 'CHF', 'HKD', 'KRW', 'THB', 'IDR', 'PHP',
+] as const;
+
+export interface CurrencyRate {
+  base_currency: string;
+  quote_currency: string;
+  rate: number;
+  source: string;
+  updated_at: string;
+}
+
+export function setCurrencyRate(
+  base: string,
+  quote: string,
+  rate: number,
+  source = 'manual',
+): CurrencyRate {
+  const db = getDb();
+  const b = base.toUpperCase().trim();
+  const q = quote.toUpperCase().trim();
+  if (!b || !q) throw new Error('base and quote required');
+  if (b === q) throw new Error('base and quote must differ');
+  if (!(rate > 0) || !Number.isFinite(rate)) throw new Error('rate must be positive number');
+
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO currency_rates (base_currency, quote_currency, rate, source, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(base_currency, quote_currency)
+    DO UPDATE SET rate = excluded.rate, source = excluded.source, updated_at = excluded.updated_at
+  `).run(b, q, rate, source, now);
+
+  return { base_currency: b, quote_currency: q, rate, source, updated_at: now };
+}
+
+export function getCurrencyRate(base: string, quote: string): number | null {
+  const db = getDb();
+  const b = base.toUpperCase().trim();
+  const q = quote.toUpperCase().trim();
+  if (b === q) return 1;
+
+  const direct = db.prepare(
+    'SELECT rate FROM currency_rates WHERE base_currency = ? AND quote_currency = ?'
+  ).get(b, q) as { rate: number } | undefined;
+  if (direct) return direct.rate;
+
+  const inverse = db.prepare(
+    'SELECT rate FROM currency_rates WHERE base_currency = ? AND quote_currency = ?'
+  ).get(q, b) as { rate: number } | undefined;
+  if (inverse && inverse.rate > 0) return 1 / inverse.rate;
+
+  return null;
+}
+
+export function listCurrencyRates(base?: string): CurrencyRate[] {
+  const db = getDb();
+  if (base) {
+    return db.prepare(
+      'SELECT * FROM currency_rates WHERE base_currency = ? ORDER BY quote_currency'
+    ).all(base.toUpperCase()) as CurrencyRate[];
+  }
+  return db.prepare('SELECT * FROM currency_rates ORDER BY base_currency, quote_currency')
+    .all() as CurrencyRate[];
+}
+
+export function deleteCurrencyRate(base: string, quote: string): boolean {
+  const db = getDb();
+  const r = db.prepare(
+    'DELETE FROM currency_rates WHERE base_currency = ? AND quote_currency = ?'
+  ).run(base.toUpperCase(), quote.toUpperCase());
+  return r.changes > 0;
+}
+
+export interface ConversionResult {
+  amount: number;
+  from: string;
+  to: string;
+  rate: number;
+  converted: number;
+  bridged: boolean;
+}
+
+/**
+ * Convert an amount from one currency to another.
+ * Strategy:
+ *  1. direct rate
+ *  2. inverse rate
+ *  3. bridge via USD (from -> USD -> to)
+ * Throws if no path exists.
+ */
+export function convertCurrency(amount: number, from: string, to: string): ConversionResult {
+  const f = from.toUpperCase().trim();
+  const t = to.toUpperCase().trim();
+  if (!(amount >= 0) || !Number.isFinite(amount)) throw new Error('amount must be non-negative number');
+  if (f === t) {
+    return { amount, from: f, to: t, rate: 1, converted: amount, bridged: false };
+  }
+
+  const direct = getCurrencyRate(f, t);
+  if (direct !== null) {
+    return {
+      amount, from: f, to: t,
+      rate: direct,
+      converted: round2(amount * direct),
+      bridged: false,
+    };
+  }
+
+  // Bridge via USD
+  const BRIDGE = 'USD';
+  if (f !== BRIDGE && t !== BRIDGE) {
+    const r1 = getCurrencyRate(f, BRIDGE);
+    const r2 = getCurrencyRate(BRIDGE, t);
+    if (r1 !== null && r2 !== null) {
+      const rate = r1 * r2;
+      return {
+        amount, from: f, to: t,
+        rate,
+        converted: round2(amount * rate),
+        bridged: true,
+      };
+    }
+  }
+
+  throw new Error(`No conversion path from ${f} to ${t}`);
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }
