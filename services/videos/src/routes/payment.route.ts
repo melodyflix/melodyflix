@@ -12,6 +12,9 @@ import {
   convertCurrency, getCurrencyRate,
   getCrossBorderConfig, setCrossBorderConfig, computeCrossBorderFee,
   logCrossBorder, listCrossBorderLog, getCrossBorderStats,
+  getThreeDSConfig, setThreeDSConfig, requiresThreeDS, createThreeDSSession,
+  getThreeDSSession, listThreeDSSessions, listThreeDSSessionsByTransaction,
+  completeThreeDSSession, getThreeDSStats,
 } from '../services/payment.service.js';
 import { grantMessagePack } from '../services/chatlimits.service.js';
 import { getDb } from '@melodyflix/shared-db';
@@ -177,6 +180,24 @@ export async function paymentRoutes(app: FastifyInstance) {
       }
     }
 
+    // 3DS — auto-create session when threshold+provider match
+    const bodyReturnUrl = (req.body as { return_url?: string })?.return_url;
+    let threeDs = null;
+    if (requiresThreeDS(gateway.provider, tx.amount)) {
+      try {
+        threeDs = createThreeDSSession({
+          transaction_id: tx.id,
+          user_id: user.sub,
+          amount: tx.amount,
+          currency: tx.currency,
+          gateway_provider: gateway.provider,
+          return_url: bodyReturnUrl,
+        });
+      } catch (err) {
+        return reply.code(500).send({ success: false, error: (err as Error).message });
+      }
+    }
+
     return reply.send({
       success: true,
       data: {
@@ -184,6 +205,8 @@ export async function paymentRoutes(app: FastifyInstance) {
         amount: tx.amount,
         currency: tx.currency,
         cross_border: crossBorder,
+        requires_3ds: threeDs !== null,
+        three_ds_session: threeDs,
         gateway: {
           provider: gateway.provider,
           display_name: gateway.display_name,
@@ -489,5 +512,103 @@ export async function paymentRoutes(app: FastifyInstance) {
     const limit = Math.min(Number(q.limit ?? 100), 500);
     const offset = Number(q.offset ?? 0);
     return reply.send({ success: true, data: { entries: listCrossBorderLog(limit, offset) } });
+  });
+
+  // ============ 3D SECURE (29.14) ============
+
+  // GET /payment/3ds/config — public (client needs to know threshold)
+  app.get('/payment/3ds/config', async (_req, reply) => {
+    return reply.send({ success: true, data: getThreeDSConfig() });
+  });
+
+  // PUT /payment/admin/3ds/config — admin
+  app.put('/payment/admin/3ds/config', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+
+    const BodySchema = z.object({
+      threshold_amount: z.number().min(0).optional(),
+      supported_providers: z.array(z.string()).optional(),
+      session_ttl_minutes: z.number().int().min(1).max(1440).optional(),
+    });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+
+    try {
+      return reply.send({ success: true, data: setThreeDSConfig(parsed.data) });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // GET /payment/3ds/sessions/:id — owner or admin
+  app.get('/payment/3ds/sessions/:id', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const session = getThreeDSSession(id);
+    if (!session) return reply.code(404).send({ success: false, error: 'Session not found' });
+    if (session.user_id !== user.sub && user.role !== 'admin') {
+      return reply.code(403).send({ success: false, error: 'Not authorized' });
+    }
+    return reply.send({ success: true, data: session });
+  });
+
+  // GET /payment/3ds/by-transaction/:txId — owner or admin
+  app.get('/payment/3ds/by-transaction/:txId', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { txId } = req.params as { txId: string };
+    const tx = getTransactionById(txId);
+    if (!tx) return reply.code(404).send({ success: false, error: 'Transaction not found' });
+    if (tx.user_id !== user.sub && user.role !== 'admin') {
+      return reply.code(403).send({ success: false, error: 'Not authorized' });
+    }
+    return reply.send({ success: true, data: { sessions: listThreeDSSessionsByTransaction(txId) } });
+  });
+
+  // POST /payment/3ds/sessions/:id/complete — owner submits 3DS outcome
+  app.post('/payment/3ds/sessions/:id/complete', async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const session = getThreeDSSession(id);
+    if (!session) return reply.code(404).send({ success: false, error: 'Session not found' });
+    if (session.user_id !== user.sub && user.role !== 'admin') {
+      return reply.code(403).send({ success: false, error: 'Not authorized' });
+    }
+
+    const BodySchema = z.object({
+      outcome: z.enum(['passed', 'failed']),
+      notes: z.string().max(500).optional(),
+    });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+
+    const updated = completeThreeDSSession(id, parsed.data.outcome, parsed.data.notes);
+    if (!updated) return reply.code(404).send({ success: false, error: 'Session not found' });
+    return reply.send({ success: true, data: updated });
+  });
+
+  // ============ 3DS — ADMIN ============
+
+  // GET /payment/admin/3ds/sessions — admin
+  app.get('/payment/admin/3ds/sessions', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const q = req.query as { limit?: string; offset?: string; status?: string };
+    const limit = Math.min(Number(q.limit ?? 100), 500);
+    const offset = Number(q.offset ?? 0);
+    return reply.send({ success: true, data: { sessions: listThreeDSSessions(limit, offset, q.status) } });
+  });
+
+  // GET /payment/admin/3ds/stats — admin
+  app.get('/payment/admin/3ds/stats', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    return reply.send({ success: true, data: getThreeDSStats() });
   });
 }

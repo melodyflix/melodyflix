@@ -105,6 +105,35 @@ export function ensurePaymentSchema(): void {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_cbl_tx ON cross_border_log(transaction_id);
+
+    CREATE TABLE IF NOT EXISTS three_ds_sessions (
+      id TEXT PRIMARY KEY,
+      transaction_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      amount REAL NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'BDT',
+      challenge_url TEXT,
+      return_url TEXT,
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      max_attempts INTEGER NOT NULL DEFAULT 3,
+      expires_at TEXT NOT NULL,
+      completed_at TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_3ds_tx ON three_ds_sessions(transaction_id);
+    CREATE INDEX IF NOT EXISTS idx_3ds_user ON three_ds_sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_3ds_status ON three_ds_sessions(status);
+
+    CREATE TABLE IF NOT EXISTS three_ds_config (
+      id TEXT PRIMARY KEY,
+      threshold_amount REAL NOT NULL DEFAULT 5000,
+      supported_providers TEXT NOT NULL DEFAULT '["stripe","razorpay"]',
+      session_ttl_minutes INTEGER NOT NULL DEFAULT 15,
+      updated_at TEXT NOT NULL
+    );
   `);
 
   // Lightweight column migrations for existing databases
@@ -112,6 +141,8 @@ export function ensurePaymentSchema(): void {
   try { db.exec(`ALTER TABLE payment_transactions ADD COLUMN target_country TEXT`); } catch {}
   try { db.exec(`ALTER TABLE payment_transactions ADD COLUMN is_cross_border INTEGER NOT NULL DEFAULT 0`); } catch {}
   try { db.exec(`ALTER TABLE payment_transactions ADD COLUMN cross_border_fee REAL NOT NULL DEFAULT 0`); } catch {}
+  try { db.exec(`ALTER TABLE payment_transactions ADD COLUMN requires_3ds INTEGER NOT NULL DEFAULT 0`); } catch {}
+  try { db.exec(`ALTER TABLE payment_transactions ADD COLUMN three_ds_session_id TEXT`); } catch {}
 }
 
 export interface CreateGatewayInput {
@@ -792,4 +823,269 @@ export function getCrossBorderStats(): CrossBorderStats {
     total_fees_collected: fees,
     by_origin_country: byCountry,
   };
+}
+
+// ============ 3D Secure (29.14) ============
+
+export interface ThreeDSConfig {
+  id: string;
+  threshold_amount: number;
+  supported_providers: string[];
+  session_ttl_minutes: number;
+  updated_at: string;
+}
+
+const THREE_DS_CONFIG_ID = 'default';
+
+export function getThreeDSConfig(): ThreeDSConfig {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM three_ds_config WHERE id = ?').get(THREE_DS_CONFIG_ID) as
+    | { id: string; threshold_amount: number; supported_providers: string; session_ttl_minutes: number; updated_at: string }
+    | undefined;
+
+  if (!row) {
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO three_ds_config (id, threshold_amount, supported_providers, session_ttl_minutes, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(THREE_DS_CONFIG_ID, 5000, JSON.stringify(['stripe', 'razorpay']), 15, now);
+    return {
+      id: THREE_DS_CONFIG_ID,
+      threshold_amount: 5000,
+      supported_providers: ['stripe', 'razorpay'],
+      session_ttl_minutes: 15,
+      updated_at: now,
+    };
+  }
+
+  let providers: string[] = [];
+  try { providers = JSON.parse(row.supported_providers) as string[]; } catch { providers = []; }
+
+  return {
+    id: row.id,
+    threshold_amount: row.threshold_amount,
+    supported_providers: providers,
+    session_ttl_minutes: row.session_ttl_minutes,
+    updated_at: row.updated_at,
+  };
+}
+
+export interface SetThreeDSConfigInput {
+  threshold_amount?: number;
+  supported_providers?: string[];
+  session_ttl_minutes?: number;
+}
+
+export function setThreeDSConfig(input: SetThreeDSConfigInput): ThreeDSConfig {
+  const db = getDb();
+  const current = getThreeDSConfig();
+  const now = new Date().toISOString();
+
+  const threshold = input.threshold_amount !== undefined ? input.threshold_amount : current.threshold_amount;
+  if (threshold < 0) throw new Error('threshold_amount must be non-negative');
+
+  const ttl = input.session_ttl_minutes !== undefined ? input.session_ttl_minutes : current.session_ttl_minutes;
+  if (ttl < 1 || ttl > 1440) throw new Error('session_ttl_minutes must be between 1 and 1440');
+
+  const providers = input.supported_providers !== undefined
+    ? input.supported_providers.map((p) => p.toLowerCase().trim()).filter(Boolean)
+    : current.supported_providers;
+
+  db.prepare(`
+    UPDATE three_ds_config
+    SET threshold_amount = ?, supported_providers = ?, session_ttl_minutes = ?, updated_at = ?
+    WHERE id = ?
+  `).run(threshold, JSON.stringify(providers), ttl, now, THREE_DS_CONFIG_ID);
+
+  return getThreeDSConfig();
+}
+
+export interface ThreeDSSession {
+  id: string;
+  transaction_id: string;
+  user_id: string;
+  status: 'pending' | 'challenged' | 'passed' | 'failed' | 'expired';
+  amount: number;
+  currency: string;
+  challenge_url: string | null;
+  return_url: string | null;
+  attempt_count: number;
+  max_attempts: number;
+  expires_at: string;
+  completed_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Decide if a transaction requires 3DS based on:
+ *  - gateway provider is in supported_providers
+ *  - amount >= threshold_amount
+ */
+export function requiresThreeDS(gatewayProvider: string, amount: number): boolean {
+  const cfg = getThreeDSConfig();
+  const provider = gatewayProvider.toLowerCase().trim();
+  if (!cfg.supported_providers.includes(provider)) return false;
+  return amount >= cfg.threshold_amount;
+}
+
+export interface CreateThreeDSSessionInput {
+  transaction_id: string;
+  user_id: string;
+  amount: number;
+  currency?: string;
+  gateway_provider: string;
+  return_url?: string;
+}
+
+export function createThreeDSSession(input: CreateThreeDSSessionInput): ThreeDSSession {
+  const db = getDb();
+  const tx = getTransactionById(input.transaction_id);
+  if (!tx) throw new Error('Transaction not found');
+
+  const cfg = getThreeDSConfig();
+  const now = new Date();
+  const expires = new Date(now.getTime() + cfg.session_ttl_minutes * 60 * 1000);
+  const sessionId = randomUUID();
+  // Challenge URL — real gateway would provide a URL; here we produce a
+  // deterministic placeholder that a frontend or gateway adapter can consume.
+  const challengeUrl = `https://3ds.melodyflix.local/challenge/${sessionId}?provider=${input.gateway_provider}`;
+
+  const session: ThreeDSSession = {
+    id: sessionId,
+    transaction_id: input.transaction_id,
+    user_id: input.user_id,
+    status: 'challenged',
+    amount: input.amount,
+    currency: input.currency ?? tx.currency,
+    challenge_url: challengeUrl,
+    return_url: input.return_url ?? null,
+    attempt_count: 0,
+    max_attempts: 3,
+    expires_at: expires.toISOString(),
+    completed_at: null,
+    notes: null,
+    created_at: now.toISOString(),
+    updated_at: now.toISOString(),
+  };
+
+  db.prepare(`
+    INSERT INTO three_ds_sessions (id, transaction_id, user_id, status, amount, currency,
+      challenge_url, return_url, attempt_count, max_attempts, expires_at, completed_at,
+      notes, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    session.id, session.transaction_id, session.user_id, session.status,
+    session.amount, session.currency, session.challenge_url, session.return_url,
+    session.attempt_count, session.max_attempts, session.expires_at, session.completed_at,
+    session.notes, session.created_at, session.updated_at
+  );
+
+  // Mark transaction as requiring 3DS
+  db.prepare(`
+    UPDATE payment_transactions
+    SET requires_3ds = 1, three_ds_session_id = ?, updated_at = ?
+    WHERE id = ?
+  `).run(session.id, session.updated_at, session.transaction_id);
+
+  return session;
+}
+
+export function getThreeDSSession(id: string): ThreeDSSession | null {
+  const db = getDb();
+  return (db.prepare('SELECT * FROM three_ds_sessions WHERE id = ?').get(id) as ThreeDSSession | undefined) ?? null;
+}
+
+export function listThreeDSSessionsByTransaction(txId: string): ThreeDSSession[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM three_ds_sessions WHERE transaction_id = ? ORDER BY created_at DESC')
+    .all(txId) as ThreeDSSession[];
+}
+
+export function listThreeDSSessions(limit = 100, offset = 0, status?: string): ThreeDSSession[] {
+  const db = getDb();
+  if (status) {
+    return db.prepare('SELECT * FROM three_ds_sessions WHERE status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?')
+      .all(status, limit, offset) as ThreeDSSession[];
+  }
+  return db.prepare('SELECT * FROM three_ds_sessions ORDER BY created_at DESC LIMIT ? OFFSET ?')
+    .all(limit, offset) as ThreeDSSession[];
+}
+
+/**
+ * Complete 3DS session.
+ * outcome = 'passed' → mark tx completed (if not already)
+ * outcome = 'failed' → increment attempt; if attempts >= max → fail session
+ */
+export function completeThreeDSSession(
+  sessionId: string,
+  outcome: 'passed' | 'failed',
+  notes?: string,
+): ThreeDSSession | null {
+  const db = getDb();
+  const s = getThreeDSSession(sessionId);
+  if (!s) return null;
+
+  const now = new Date().toISOString();
+
+  // Expiry check
+  if (s.status !== 'passed' && s.status !== 'failed' && new Date(s.expires_at) < new Date()) {
+    db.prepare(`UPDATE three_ds_sessions SET status = 'expired', updated_at = ? WHERE id = ?`)
+      .run(now, sessionId);
+    return getThreeDSSession(sessionId);
+  }
+
+  if (outcome === 'passed') {
+    db.prepare(`
+      UPDATE three_ds_sessions
+      SET status = 'passed', completed_at = ?, notes = COALESCE(?, notes), updated_at = ?
+      WHERE id = ?
+    `).run(now, notes ?? null, now, sessionId);
+
+    // Mark transaction completed (3DS success == payment success for our flow)
+    updateTransactionStatus(s.transaction_id, 'completed');
+
+    return getThreeDSSession(sessionId);
+  }
+
+  // Failed attempt — increment; if at max, mark failed, else keep challenged
+  const attempts = s.attempt_count + 1;
+  const finalStatus = attempts >= s.max_attempts ? 'failed' : 'challenged';
+  db.prepare(`
+    UPDATE three_ds_sessions
+    SET status = ?, attempt_count = ?, notes = COALESCE(?, notes), updated_at = ?
+    WHERE id = ?
+  `).run(finalStatus, attempts, notes ?? null, now, sessionId);
+
+  return getThreeDSSession(sessionId);
+}
+
+export interface ThreeDSStats {
+  total_sessions: number;
+  passed_sessions: number;
+  failed_sessions: number;
+  challenged_sessions: number;
+  expired_sessions: number;
+  pass_rate: number;
+}
+
+export function getThreeDSStats(): ThreeDSStats {
+  const db = getDb();
+  const rows = db.prepare('SELECT status, COUNT(*) as n FROM three_ds_sessions GROUP BY status')
+    .all() as Array<{ status: string; n: number }>;
+  const stats: ThreeDSStats = {
+    total_sessions: 0, passed_sessions: 0, failed_sessions: 0,
+    challenged_sessions: 0, expired_sessions: 0, pass_rate: 0,
+  };
+  for (const r of rows) {
+    stats.total_sessions += r.n;
+    if (r.status === 'passed') stats.passed_sessions = r.n;
+    else if (r.status === 'failed') stats.failed_sessions = r.n;
+    else if (r.status === 'challenged' || r.status === 'pending') stats.challenged_sessions += r.n;
+    else if (r.status === 'expired') stats.expired_sessions = r.n;
+  }
+  const completed = stats.passed_sessions + stats.failed_sessions;
+  stats.pass_rate = completed > 0 ? Math.round((stats.passed_sessions / completed) * 10000) / 100 : 0;
+  return stats;
 }
