@@ -653,6 +653,15 @@ collections, note update, stats, and 401 guards.
 | 34.3 | Watch Progress Sync | [DONE] |
 | 34.4 | Settings Sync | [DONE] |
 
+**Verified 2026-10-08**: All 4 items smoke-tested via curl.
+- Device registry (label/platform/fingerprint) + heartbeat + summary
+- Cursor-based change log (incremental pull from any device)
+- Scopes: watch_progress, settings, playlist, (sync.service also covers
+  device/settings state)
+- Watch progress: push position+duration, pull by video id
+- Settings: push {theme, language, autoplay...}, pull returns latest
+- Summary reports active_devices, latest_cursor, by_scope breakdown
+
 ## Section 35 — Video Transcript
 
 | 35.1 | Automatic Transcript Generation | [DONE] transcript.service.ts |
