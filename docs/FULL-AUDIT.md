@@ -727,6 +727,32 @@ challenge kind when that feature lands.
 | 37.21 | Automatic Publishing Rules | [DONE] decidePublishAction |
 | 37.22 | Failed Import Retry | [DONE] scheduleRetry |
 
+**Verified 2026-10-08**: All 22 items smoke-tested. Ingest pipeline,
+content-source CRUD, jobs lifecycle, dedupe/copyright/quality checks,
+TMDB + OMDb integration, AI thumbnails, publish decisions, retry — all
+endpoints respond correctly.
+
+**Extension (from user requirements)**: 3 architectural additions built
+on top of Section 37 foundations (commits 92306e2, 62661b2, 54f52ab):
+
+- **Phase A — Multi-Server External Playback** (92306e2)
+  Content streams from third-party servers, not stored locally.
+  4+ alternative servers with priority; users switch servers when one
+  is unavailable. Tables: external_servers, video_external_sources,
+  video_source_health_log. Playback endpoint falls back automatically.
+
+- **Phase B — Content-Type Segregation** (62661b2)
+  13 content types: video/movie/tv/drama/web_series/music_video/song/
+  album/podcast/short/news/article/other. Each renders its own category
+  page; home page shows 2-3 trending per category with "See more" via
+  GET /trending/by-category → GET /content-type/:type.
+
+- **Phase C — Provider Adapter Pattern** (54f52ab)
+  No lock-in to any single API. ContentProvider interface + registry.
+  Built-in: rss (any RSS/Atom feed), generic-rest (any JSON REST API
+  with field mappings). New providers register by implementing the
+  interface — zero pipeline changes.
+
 ## Section 38 — Subtitle and Caption Management
 
 | 38.1 | Multi-Language Subtitle Support | [DONE] subtitle.service.ts |
