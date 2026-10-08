@@ -814,6 +814,13 @@ Note: routes use {publish_at, assignee_id, due_at} field names
 | 40.15 | Channel Metadata | [DONE] |
 | 40.16 | Stream Health Check | [DONE] |
 
+**Verified 2026-10-08**: All 16 items confirmed. 72 endpoints in
+livetv.route.ts; smoke test (channels, state, recordings + stats,
+timeshift, favorites, parental, recent, mine) all return 200.
+
+Note: for live game streaming (PUBG/CoD/Free Fire) — same live-tv
+infrastructure can carry game streams as channels with kind metadata.
+
 ## Section 41 — Video Version Management
 
 | 41.1 | Director's Cut | [DONE] versions.service.ts |
