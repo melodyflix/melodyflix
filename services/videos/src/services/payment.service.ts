@@ -272,6 +272,41 @@ export function ensurePaymentSchema(): void {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_ce_cb ON chargeback_events(chargeback_id);
+
+    CREATE TABLE IF NOT EXISTS risk_config (
+      id TEXT PRIMARY KEY,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      low_max INTEGER NOT NULL DEFAULT 30,
+      medium_max INTEGER NOT NULL DEFAULT 70,
+      block_threshold INTEGER NOT NULL DEFAULT 90,
+      auto_block INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS risk_rules (
+      code TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      weight INTEGER NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS risk_assessments (
+      id TEXT PRIMARY KEY,
+      transaction_id TEXT,
+      user_id TEXT NOT NULL,
+      score INTEGER NOT NULL,
+      level TEXT NOT NULL,
+      decision TEXT NOT NULL,
+      triggered_rules TEXT NOT NULL DEFAULT '[]',
+      context TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_ra_tx ON risk_assessments(transaction_id);
+    CREATE INDEX IF NOT EXISTS idx_ra_user ON risk_assessments(user_id);
+    CREATE INDEX IF NOT EXISTS idx_ra_level ON risk_assessments(level);
+    CREATE INDEX IF NOT EXISTS idx_ra_decision ON risk_assessments(decision);
   `);
 
   // Lightweight column migrations for existing databases
@@ -2566,4 +2601,435 @@ export function getChargebackStats(): ChargebackStats {
   ).get(nowIso) as { n: number }).n;
 
   return stats;
+}
+
+// ============ Payment Risk Scoring (29.17) ============
+
+export interface RiskConfig {
+  id: string;
+  enabled: boolean;
+  low_max: number;
+  medium_max: number;
+  block_threshold: number;
+  auto_block: boolean;
+  updated_at: string;
+}
+
+const RISK_CONFIG_ID = 'default';
+
+export function getRiskConfig(): RiskConfig {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM risk_config WHERE id = ?').get(RISK_CONFIG_ID) as
+    | { id: string; enabled: number; low_max: number; medium_max: number; block_threshold: number; auto_block: number; updated_at: string }
+    | undefined;
+
+  if (row) {
+    return {
+      id: row.id,
+      enabled: row.enabled === 1,
+      low_max: row.low_max,
+      medium_max: row.medium_max,
+      block_threshold: row.block_threshold,
+      auto_block: row.auto_block === 1,
+      updated_at: row.updated_at,
+    };
+  }
+
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO risk_config (id, enabled, low_max, medium_max, block_threshold, auto_block, updated_at)
+    VALUES (?, 1, 30, 70, 90, 1, ?)
+  `).run(RISK_CONFIG_ID, now);
+
+  ensureDefaultRiskRules();
+
+  return {
+    id: RISK_CONFIG_ID, enabled: true,
+    low_max: 30, medium_max: 70, block_threshold: 90,
+    auto_block: true, updated_at: now,
+  };
+}
+
+function ensureDefaultRiskRules(): void {
+  const db = getDb();
+  const defaults: Array<[string, string, string, number, number]> = [
+    ['very_high_amount', 'Very High Amount', 'Amount > 50000 in tx currency', 40, 1],
+    ['high_amount', 'High Amount', 'Amount > 10000 in tx currency', 20, 1],
+    ['new_user', 'New User', 'Account age < 1 day (approx via first tx)', 15, 1],
+    ['blocked_country', 'Blocked Country', 'Origin country in blocked list', 100, 1],
+    ['many_attempts_24h', 'Many Attempts (24h)', 'More than 10 transactions in last 24h', 25, 1],
+    ['failed_payments_24h', 'Failed Payments (24h)', 'More than 5 failed transactions in last 24h', 30, 1],
+    ['crypto_high_value', 'Crypto High Value', 'Crypto payment with amount > 1000 fiat equivalent', 15, 1],
+    ['cross_border', 'Cross-Border', 'Origin country differs from home country', 5, 1],
+    ['mismatch_currency', 'Currency Mismatch', 'Transaction currency differs from home currency', 10, 0],
+  ];
+  const now = new Date().toISOString();
+  const stmt = db.prepare(`
+    INSERT INTO risk_rules (code, name, description, weight, enabled, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(code) DO NOTHING
+  `);
+  for (const [code, name, desc, weight, enabled] of defaults) {
+    stmt.run(code, name, desc, weight, enabled, now);
+  }
+}
+
+export interface SetRiskConfigInput {
+  enabled?: boolean;
+  low_max?: number;
+  medium_max?: number;
+  block_threshold?: number;
+  auto_block?: boolean;
+}
+
+export function setRiskConfig(input: SetRiskConfigInput): RiskConfig {
+  const db = getDb();
+  const cur = getRiskConfig();
+  const now = new Date().toISOString();
+
+  const enabled = input.enabled !== undefined ? (input.enabled ? 1 : 0) : (cur.enabled ? 1 : 0);
+  const low = input.low_max !== undefined ? input.low_max : cur.low_max;
+  const med = input.medium_max !== undefined ? input.medium_max : cur.medium_max;
+  const blk = input.block_threshold !== undefined ? input.block_threshold : cur.block_threshold;
+  const auto = input.auto_block !== undefined ? (input.auto_block ? 1 : 0) : (cur.auto_block ? 1 : 0);
+
+  if (low < 0 || med <= low || blk <= med) {
+    throw new Error('Thresholds must satisfy 0 <= low_max < medium_max < block_threshold');
+  }
+
+  db.prepare(`
+    UPDATE risk_config
+    SET enabled = ?, low_max = ?, medium_max = ?, block_threshold = ?, auto_block = ?, updated_at = ?
+    WHERE id = ?
+  `).run(enabled, low, med, blk, auto, now, RISK_CONFIG_ID);
+
+  return getRiskConfig();
+}
+
+export interface RiskRule {
+  code: string;
+  name: string;
+  description: string | null;
+  weight: number;
+  enabled: boolean;
+  updated_at: string;
+}
+
+interface RiskRuleRow {
+  code: string; name: string; description: string | null;
+  weight: number; enabled: number; updated_at: string;
+}
+
+function riskRuleRowToObj(row: RiskRuleRow): RiskRule {
+  return {
+    code: row.code,
+    name: row.name,
+    description: row.description,
+    weight: row.weight,
+    enabled: row.enabled === 1,
+    updated_at: row.updated_at,
+  };
+}
+
+export function listRiskRules(): RiskRule[] {
+  const db = getDb();
+  // Ensure default rules exist
+  const n = (db.prepare('SELECT COUNT(*) as n FROM risk_rules').get() as { n: number }).n;
+  if (n === 0) ensureDefaultRiskRules();
+  const rows = db.prepare('SELECT * FROM risk_rules ORDER BY weight DESC, code')
+    .all() as RiskRuleRow[];
+  return rows.map(riskRuleRowToObj);
+}
+
+export interface UpsertRiskRuleInput {
+  code: string;
+  name: string;
+  description?: string;
+  weight: number;
+  enabled?: boolean;
+}
+
+export function upsertRiskRule(input: UpsertRiskRuleInput): RiskRule {
+  const db = getDb();
+  const code = input.code.toLowerCase().trim().replace(/[^a-z0-9_]/g, '_');
+  if (!code || code.length < 2) throw new Error('Invalid rule code');
+  if (!input.name) throw new Error('name required');
+  if (input.weight < 0 || input.weight > 500) throw new Error('weight must be between 0 and 500');
+
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO risk_rules (code, name, description, weight, enabled, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(code) DO UPDATE SET
+      name = excluded.name,
+      description = excluded.description,
+      weight = excluded.weight,
+      enabled = excluded.enabled,
+      updated_at = excluded.updated_at
+  `).run(
+    code, input.name, input.description ?? null, input.weight,
+    input.enabled === false ? 0 : 1, now
+  );
+
+  const row = db.prepare('SELECT * FROM risk_rules WHERE code = ?').get(code) as RiskRuleRow;
+  return riskRuleRowToObj(row);
+}
+
+export function deleteRiskRule(code: string): boolean {
+  const db = getDb();
+  const r = db.prepare('DELETE FROM risk_rules WHERE code = ?').run(code.toLowerCase());
+  return r.changes > 0;
+}
+
+export interface RiskContext {
+  user_id: string;
+  amount: number;
+  currency: string;
+  origin_country?: string;
+  home_country?: string;
+  gateway_provider?: string;
+  is_crypto?: boolean;
+}
+
+export interface RiskEvaluation {
+  score: number;
+  level: 'low' | 'medium' | 'high' | 'critical';
+  decision: 'allow' | 'review' | 'block';
+  triggered: Array<{ code: string; name: string; weight: number; detail?: string }>;
+}
+
+/**
+ * Compute risk score based on enabled rules.
+ */
+export function computeRiskScore(ctx: RiskContext): RiskEvaluation {
+  const db = getDb();
+  const cfg = getRiskConfig();
+  const rules = listRiskRules().filter((r) => r.enabled);
+
+  const triggered: RiskEvaluation['triggered'] = [];
+  let score = 0;
+
+  const ruleMap = new Map(rules.map((r) => [r.code, r]));
+  const fire = (code: string, detail?: string) => {
+    const r = ruleMap.get(code);
+    if (!r) return;
+    triggered.push({ code: r.code, name: r.name, weight: r.weight, detail });
+    score += r.weight;
+  };
+
+  // Amount rules
+  if (ctx.amount > 50000) fire('very_high_amount', `amount=${ctx.amount}`);
+  else if (ctx.amount > 10000) fire('high_amount', `amount=${ctx.amount}`);
+
+  // New user — check first seen in payment_transactions
+  if (ruleMap.has('new_user')) {
+    const row = db.prepare(
+      'SELECT MIN(created_at) as first_at FROM payment_transactions WHERE user_id = ?'
+    ).get(ctx.user_id) as { first_at: string | null };
+    if (row.first_at) {
+      const ageMs = Date.now() - new Date(row.first_at).getTime();
+      if (ageMs < 24 * 60 * 60 * 1000) fire('new_user', `first_tx=${row.first_at}`);
+    } else {
+      fire('new_user', 'no previous transactions');
+    }
+  }
+
+  // Blocked country — check via cross_border config
+  if (ctx.origin_country && ruleMap.has('blocked_country')) {
+    try {
+      if (isCountryBlocked(ctx.origin_country)) fire('blocked_country', `country=${ctx.origin_country}`);
+    } catch {}
+  }
+
+  // Velocity: many attempts in 24h
+  if (ruleMap.has('many_attempts_24h')) {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const n = (db.prepare(
+      'SELECT COUNT(*) as n FROM payment_transactions WHERE user_id = ? AND created_at >= ?'
+    ).get(ctx.user_id, cutoff) as { n: number }).n;
+    if (n > 10) fire('many_attempts_24h', `count=${n}`);
+  }
+
+  // Failed payments in 24h
+  if (ruleMap.has('failed_payments_24h')) {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const n = (db.prepare(
+      "SELECT COUNT(*) as n FROM payment_transactions WHERE user_id = ? AND created_at >= ? AND status = 'failed'"
+    ).get(ctx.user_id, cutoff) as { n: number }).n;
+    if (n > 5) fire('failed_payments_24h', `count=${n}`);
+  }
+
+  // Crypto high value
+  if (ctx.is_crypto && ctx.amount > 1000) fire('crypto_high_value', `amount=${ctx.amount}`);
+
+  // Cross-border
+  if (ctx.origin_country && ctx.home_country && ctx.origin_country !== ctx.home_country) {
+    fire('cross_border', `${ctx.origin_country} != ${ctx.home_country}`);
+  }
+
+  // Currency mismatch
+  if (ctx.currency && ctx.home_country) {
+    // home currency heuristic: BDT for BD, USD otherwise — but simply check vs stored home currency if provided.
+    // We'll rely on caller passing home_country; skip if currency matches known defaults.
+    // For safety: treat explicit mismatch when caller passes hint via currency != expected.
+    // Disabled by default anyway.
+    if (ruleMap.has('mismatch_currency')) {
+      // Heuristic: BDT vs home_country BD is expected; else likely mismatch
+      const expected = ctx.home_country === 'BD' ? 'BDT' : 'USD';
+      if (ctx.currency.toUpperCase() !== expected) fire('mismatch_currency', `currency=${ctx.currency} expected=${expected}`);
+    }
+  }
+
+  // Level from score
+  let level: RiskEvaluation['level'];
+  let decision: RiskEvaluation['decision'];
+
+  if (!cfg.enabled) {
+    return { score: 0, level: 'low', decision: 'allow', triggered: [] };
+  }
+
+  if (score >= cfg.block_threshold) {
+    level = 'critical';
+    decision = cfg.auto_block ? 'block' : 'review';
+  } else if (score > cfg.medium_max) {
+    level = 'high';
+    decision = 'review';
+  } else if (score > cfg.low_max) {
+    level = 'medium';
+    decision = 'review';
+  } else {
+    level = 'low';
+    decision = 'allow';
+  }
+
+  return { score, level, decision, triggered };
+}
+
+export interface RiskAssessment {
+  id: string;
+  transaction_id: string | null;
+  user_id: string;
+  score: number;
+  level: 'low' | 'medium' | 'high' | 'critical';
+  decision: 'allow' | 'review' | 'block';
+  triggered_rules: Array<{ code: string; name: string; weight: number; detail?: string }>;
+  context: Record<string, unknown>;
+  created_at: string;
+}
+
+interface RiskAssessmentRow {
+  id: string; transaction_id: string | null; user_id: string; score: number;
+  level: string; decision: string; triggered_rules: string; context: string; created_at: string;
+}
+
+function riskAssessmentRowToObj(row: RiskAssessmentRow): RiskAssessment {
+  let triggered: RiskAssessment['triggered_rules'] = [];
+  let ctx: Record<string, unknown> = {};
+  try { triggered = JSON.parse(row.triggered_rules) as RiskAssessment['triggered_rules']; } catch {}
+  try { ctx = JSON.parse(row.context) as Record<string, unknown>; } catch {}
+  return {
+    id: row.id,
+    transaction_id: row.transaction_id,
+    user_id: row.user_id,
+    score: row.score,
+    level: row.level as RiskAssessment['level'],
+    decision: row.decision as RiskAssessment['decision'],
+    triggered_rules: triggered,
+    context: ctx,
+    created_at: row.created_at,
+  };
+}
+
+export function assessTransaction(
+  ctx: RiskContext,
+  transactionId?: string,
+): RiskAssessment {
+  const db = getDb();
+  const evalResult = computeRiskScore(ctx);
+
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO risk_assessments (id, transaction_id, user_id, score, level, decision,
+      triggered_rules, context, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, transactionId ?? null, ctx.user_id, evalResult.score,
+    evalResult.level, evalResult.decision,
+    JSON.stringify(evalResult.triggered), JSON.stringify(ctx), now
+  );
+
+  return {
+    id,
+    transaction_id: transactionId ?? null,
+    user_id: ctx.user_id,
+    score: evalResult.score,
+    level: evalResult.level,
+    decision: evalResult.decision,
+    triggered_rules: evalResult.triggered,
+    context: ctx,
+    created_at: now,
+  };
+}
+
+export function getRiskAssessmentById(id: string): RiskAssessment | null {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM risk_assessments WHERE id = ?').get(id) as RiskAssessmentRow | undefined;
+  return row ? riskAssessmentRowToObj(row) : null;
+}
+
+export function listRiskAssessments(
+  limit = 100, offset = 0,
+  filter?: { level?: string; decision?: string },
+): RiskAssessment[] {
+  const db = getDb();
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (filter?.level) { where.push('level = ?'); params.push(filter.level); }
+  if (filter?.decision) { where.push('decision = ?'); params.push(filter.decision); }
+  const sql = `SELECT * FROM risk_assessments${where.length ? ' WHERE ' + where.join(' AND ') : ''} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+  const rows = db.prepare(sql).all(...params, limit, offset) as RiskAssessmentRow[];
+  return rows.map(riskAssessmentRowToObj);
+}
+
+export function listRiskAssessmentsByTransaction(txId: string): RiskAssessment[] {
+  const db = getDb();
+  const rows = db.prepare('SELECT * FROM risk_assessments WHERE transaction_id = ? ORDER BY created_at DESC')
+    .all(txId) as RiskAssessmentRow[];
+  return rows.map(riskAssessmentRowToObj);
+}
+
+export interface RiskStats {
+  total: number;
+  by_level: Array<{ level: string; count: number }>;
+  by_decision: Array<{ decision: string; count: number }>;
+  avg_score: number;
+  last_24h_total: number;
+  last_24h_blocked: number;
+}
+
+export function getRiskStats(): RiskStats {
+  const db = getDb();
+  const total = (db.prepare('SELECT COUNT(*) as n FROM risk_assessments').get() as { n: number }).n;
+  const byLevel = db.prepare('SELECT level, COUNT(*) as count FROM risk_assessments GROUP BY level')
+    .all() as Array<{ level: string; count: number }>;
+  const byDecision = db.prepare('SELECT decision, COUNT(*) as count FROM risk_assessments GROUP BY decision')
+    .all() as Array<{ decision: string; count: number }>;
+  const avg = (db.prepare('SELECT COALESCE(AVG(score), 0) as a FROM risk_assessments').get() as { a: number }).a;
+
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const last24 = (db.prepare('SELECT COUNT(*) as n FROM risk_assessments WHERE created_at >= ?')
+    .get(cutoff) as { n: number }).n;
+  const last24Blocked = (db.prepare(
+    "SELECT COUNT(*) as n FROM risk_assessments WHERE created_at >= ? AND decision = 'block'"
+  ).get(cutoff) as { n: number }).n;
+
+  return {
+    total,
+    by_level: byLevel,
+    by_decision: byDecision,
+    avg_score: Math.round(avg * 100) / 100,
+    last_24h_total: last24,
+    last_24h_blocked: last24Blocked,
+  };
 }

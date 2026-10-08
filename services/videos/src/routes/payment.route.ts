@@ -26,6 +26,9 @@ import {
   CHARGEBACK_REASON_CODES, createChargeback, getChargebackById, listChargebacks,
   listChargebacksByUser, listChargebacksByTransaction, addChargebackEvidence,
   respondToChargeback, resolveChargeback, listChargebackEvents, getChargebackStats,
+  getRiskConfig, setRiskConfig, listRiskRules, upsertRiskRule, deleteRiskRule,
+  computeRiskScore, assessTransaction, getRiskAssessmentById, listRiskAssessments,
+  listRiskAssessmentsByTransaction, getRiskStats,
 } from '../services/payment.service.js';
 import { grantMessagePack } from '../services/chatlimits.service.js';
 import { getDb } from '@melodyflix/shared-db';
@@ -203,6 +206,29 @@ export async function paymentRoutes(app: FastifyInstance) {
       }
     }
 
+    // Risk assessment (29.17)
+    let risk = null;
+    try {
+      const homeCountry = getCrossBorderConfig().home_country;
+      risk = assessTransaction({
+        user_id: user.sub,
+        amount: tx.amount,
+        currency: tx.currency,
+        origin_country: parsed.data.origin_country,
+        home_country: homeCountry,
+        gateway_provider: gateway.provider,
+        is_crypto: false,
+      }, tx.id);
+    } catch { /* risk assessment failure should not block checkout by default */ }
+
+    if (risk && risk.decision === 'block') {
+      return reply.code(403).send({
+        success: false,
+        error: 'Transaction blocked by risk scoring',
+        risk,
+      });
+    }
+
     // 3DS — auto-create session when threshold+provider match
     const bodyReturnUrl = (req.body as { return_url?: string })?.return_url;
     let threeDs = null;
@@ -229,6 +255,7 @@ export async function paymentRoutes(app: FastifyInstance) {
         currency: tx.currency,
         cross_border: crossBorder,
         tax: tax,
+        risk: risk,
         requires_3ds: threeDs !== null,
         three_ds_session: threeDs,
         gateway: {
@@ -1181,5 +1208,153 @@ export async function paymentRoutes(app: FastifyInstance) {
     } catch (err) {
       return reply.code(400).send({ success: false, error: (err as Error).message });
     }
+  });
+
+  // ============ RISK SCORING (29.17) ============
+
+  // GET /payment/risk/config — public (client may show level thresholds)
+  app.get('/payment/risk/config', async (_req, reply) => {
+    return reply.send({ success: true, data: getRiskConfig() });
+  });
+
+  // PUT /payment/admin/risk/config — admin
+  app.put('/payment/admin/risk/config', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+
+    const BodySchema = z.object({
+      enabled: z.boolean().optional(),
+      low_max: z.number().int().min(0).max(1000).optional(),
+      medium_max: z.number().int().min(0).max(1000).optional(),
+      block_threshold: z.number().int().min(0).max(1000).optional(),
+      auto_block: z.boolean().optional(),
+    });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+
+    try {
+      return reply.send({ success: true, data: setRiskConfig(parsed.data) });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // GET /payment/risk/rules — public summary (code + name only)
+  app.get('/payment/risk/rules', async (_req, reply) => {
+    const rules = listRiskRules().filter((r) => r.enabled).map((r) => ({
+      code: r.code, name: r.name, description: r.description,
+    }));
+    return reply.send({ success: true, data: { rules } });
+  });
+
+  // GET /payment/admin/risk/rules — admin (full, with weights)
+  app.get('/payment/admin/risk/rules', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    return reply.send({ success: true, data: { rules: listRiskRules() } });
+  });
+
+  // PUT /payment/admin/risk/rules — admin upsert
+  app.put('/payment/admin/risk/rules', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+
+    const BodySchema = z.object({
+      code: z.string().min(2).max(60),
+      name: z.string().min(1).max(100),
+      description: z.string().max(500).optional(),
+      weight: z.number().int().min(0).max(500),
+      enabled: z.boolean().optional(),
+    });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+
+    try {
+      return reply.send({ success: true, data: upsertRiskRule(parsed.data) });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // DELETE /payment/admin/risk/rules/:code — admin
+  app.delete('/payment/admin/risk/rules/:code', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { code } = req.params as { code: string };
+    const ok = deleteRiskRule(code);
+    if (!ok) return reply.code(404).send({ success: false, error: 'Rule not found' });
+    return reply.send({ success: true, data: { deleted: true } });
+  });
+
+  // POST /payment/risk/score — public preview (no persistence)
+  app.post('/payment/risk/score', async (req, reply) => {
+    const BodySchema = z.object({
+      amount: z.number().positive(),
+      currency: z.string().max(10),
+      origin_country: z.string().length(2).optional(),
+      is_crypto: z.boolean().optional(),
+    });
+    const parsed = BodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: parsed.error.issues[0].message });
+
+    let userSub = 'anonymous';
+    try {
+      const u = requireAuth(req.headers.authorization);
+      userSub = u.sub;
+    } catch { /* anonymous allowed */ }
+
+    try {
+      const evalResult = computeRiskScore({
+        user_id: userSub,
+        amount: parsed.data.amount,
+        currency: parsed.data.currency,
+        origin_country: parsed.data.origin_country,
+        home_country: getCrossBorderConfig().home_country,
+        is_crypto: parsed.data.is_crypto,
+      });
+      return reply.send({ success: true, data: evalResult });
+    } catch (err) {
+      return reply.code(400).send({ success: false, error: (err as Error).message });
+    }
+  });
+
+  // ============ RISK — ADMIN ============
+
+  // GET /payment/admin/risk/assessments — list (?level=&decision=)
+  app.get('/payment/admin/risk/assessments', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const q = req.query as { limit?: string; offset?: string; level?: string; decision?: string };
+    const limit = Math.min(Number(q.limit ?? 100), 500);
+    const offset = Number(q.offset ?? 0);
+    return reply.send({
+      success: true,
+      data: { assessments: listRiskAssessments(limit, offset, { level: q.level, decision: q.decision }) },
+    });
+  });
+
+  // GET /payment/admin/risk/assessments/by-tx/:txId — lookup by tx
+  app.get('/payment/admin/risk/assessments/by-tx/:txId', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { txId } = req.params as { txId: string };
+    return reply.send({ success: true, data: { assessments: listRiskAssessmentsByTransaction(txId) } });
+  });
+
+  // GET /payment/admin/risk/assessments/:id — single
+  app.get('/payment/admin/risk/assessments/:id', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    const { id } = req.params as { id: string };
+    const a = getRiskAssessmentById(id);
+    if (!a) return reply.code(404).send({ success: false, error: 'Assessment not found' });
+    return reply.send({ success: true, data: a });
+  });
+
+  // GET /payment/admin/risk/stats — stats
+  app.get('/payment/admin/risk/stats', async (req, reply) => {
+    try { requireRole(req.headers.authorization, ['admin']); }
+    catch (err) { return reply.code(403).send({ success: false, error: (err as Error).message }); }
+    return reply.send({ success: true, data: getRiskStats() });
   });
 }
