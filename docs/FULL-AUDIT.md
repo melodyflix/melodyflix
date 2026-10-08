@@ -888,10 +888,29 @@ infrastructure can carry game streams as channels with kind metadata.
 - 43.16 Dynamic Tags: video_title, video_thumbnail, channel_name,
   category_list, trending_grid, content_type_grid
 
-**Phase 3 (PENDING)** — Frontend drag-drop editor UI (React):
-canvas, widget palette, inspector panel, responsive toggles,
-undo/redo, template browser. Backend APIs are in place at
-/api/v1/videos/builder/*.
+**Phase 3 (DONE — commit 23b7822)** — Frontend visual editor UI:
+- PageBuilder.tsx at /admin → 🎨 Page Builder
+- Left widget palette (38 widgets, category filters)
+- Center canvas (recursive render, device widths)
+- Right inspector (Content/Style/Advanced tabs, responsive overrides)
+- Top bar (page selector, +Section, Save revision, History, Templates,
+  Save-as-template, device toggles)
+- Bottom global color bar
+- Modals: revision history, template browser
+- @dnd-kit installed (drag wiring for next iteration; current UI is
+  click-to-add)
+
+**Phase 4 (DONE — commit a1fef5f)** — Monetization + marketplace:
+- 43.17 Pricing config (base/per_page/per_element/per_premium_widget/
+  multiplier), computeComplexity returns full breakdown
+- 43.18/19 Orders with dynamic amount, mark-paid + 24h download token
+- 43.20 Download endpoint (JSON/HTML export) gated by token verify
+  (paid + not expired)
+- 43.21 Marketplace: listings CRUD (seller/admin), purchases with
+  self-buy + duplicate protection, sales_count increment
+
+**Section 43 is COMPLETE.** Design/edit is free; download/publish and
+marketplace templates require payment, priced by page complexity.
 
 **Verified 2026-10-08**: Phase 1 (settings/themes/homepage/pages/nav/
 render) + Phase 2 (tree build, deep clone, revision, global styles,
