@@ -57,3 +57,8 @@ services/*/src/*.backup-*
 # DVR recordings (video files — do not commit)
 data/recordings/
 *.mp4
+
+# TypeScript build info
+*.tsbuildinfo
+logs/
+pids/
