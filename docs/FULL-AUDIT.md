@@ -590,8 +590,17 @@ All 12 items [DONE] accessibility.service (16.1–16.12)
 
 | 31.1 | Multi-Platform Publishing | [DONE] distribution.service.ts |
 | 31.2 | Scheduled Cross-Posting | [DONE] |
-| 31.3 | Automatic Social Media Sharing | [PARTIAL] |
-| 31.4 | Content Syndication | [PARTIAL] |
+| 31.3 | Automatic Social Media Sharing | [DONE] auto_share_rules + runAutoShare |
+| 31.4 | Content Syndication | [DONE] RSS feeds at /feeds/:slug.xml |
+
+**Verified & fixed 2026-10-08**: All 4 items confirmed via curl.
+- 7 platforms (YouTube, FB, IG, Twitter, TikTok, LinkedIn, Telegram)
+- Job lifecycle: pending → scheduled → publishing → published/failed
+- Auto-share rule per channel with share_on_publish + platforms + message
+- Syndication feeds with RSS 2.0 XML output (iTunes podcast namespace)
+- Fixed pre-existing bug: checkChannelOwner + getChannelName crashed
+  with "no such table: channels" — now graceful fallback (channels live
+  in separate service).
 
 ## Section 32 — Video Encoding and Quality
 
