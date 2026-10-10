@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import TopBar from './components/TopBar';
+import ErrorBoundary from './components/ErrorBoundary';
 import Sidebar from './components/Sidebar';
 import PromoBannerDisplay from './components/PromoBannerDisplay';
 import LoginModal from './components/LoginModal';
@@ -148,6 +149,7 @@ function AppInner() {
           <main className="mf-content">
           <PromoBannerDisplay placement="top" />
           <VerifyEmailBanner />
+          <ErrorBoundary>
           <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/search" element={<Search />} />
@@ -198,6 +200,7 @@ function AppInner() {
         <Route path="/channel/me/edit" element={<EditChannel user={user} onSignIn={() => setShowLogin(true)} />} />
         <Route path="/channel/:id" element={<Channel />} />
           </Routes>
+          </ErrorBoundary>
           </main>
         </div>
       </div>
