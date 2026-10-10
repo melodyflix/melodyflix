@@ -216,7 +216,7 @@ export function uploadVideo(
     form.append('file', file);
 
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', 'http://127.0.0.1:4003/api/v1/videos/upload');
+    xhr.open('POST', '/api/v1/videos/upload');
     const token = getToken();
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
@@ -1936,7 +1936,7 @@ export function uploadChannelAvatar(channelId: string, file: File): Promise<{ ur
     form.append('file', file);
 
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `http://127.0.0.1:4002/api/v1/channels/${channelId}/avatar`);
+    xhr.open('POST', `/api/v1/channels/${channelId}/avatar`);
     const token = getToken();
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
@@ -1960,7 +1960,7 @@ export function uploadChannelBanner(channelId: string, file: File): Promise<{ ur
     form.append('file', file);
 
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `http://127.0.0.1:4002/api/v1/channels/${channelId}/banner`);
+    xhr.open('POST', `/api/v1/channels/${channelId}/banner`);
     const token = getToken();
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 

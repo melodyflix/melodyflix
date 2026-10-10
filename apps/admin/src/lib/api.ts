@@ -140,49 +140,49 @@ export function parseTimeInput(input: string): number | null {
 export const api = {
   // auth
   login: (email: string, password: string) =>
-    request<{ user: User; token: string }>('/api/auth/login', {
+    request<{ user: User; token: string }>('/api/v1/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
 
   signup: (email: string, username: string, password: string, displayName?: string) =>
-    request<User>('/api/auth/signup', {
+    request<User>('/api/v1/auth/signup', {
       method: 'POST',
       body: JSON.stringify({ email, username, password, displayName }),
     }),
 
-  me: () => request<User>('/api/auth/me'),
+  me: () => request<User>('/api/v1/auth/me'),
 
   // channels
   listChannels: (limit = 50, offset = 0) =>
-    request<Channel[]>(`/api/channels?limit=${limit}&offset=${offset}`),
+    request<Channel[]>(`/api/v1/channels?limit=${limit}&offset=${offset}`),
 
-  getMyChannel: () => request<Channel>('/api/channels/me'),
+  getMyChannel: () => request<Channel>('/api/v1/channels/me'),
 
   createChannel: (name: string, handle: string, description?: string) =>
-    request<Channel>('/api/channels', {
+    request<Channel>('/api/v1/channels', {
       method: 'POST',
       body: JSON.stringify({ name, handle, description }),
     }),
 
   // admin - users
   listUsers: (limit = 50, offset = 0) =>
-    request<UsersListResponse>(`/api/admin/users?limit=${limit}&offset=${offset}`),
+    request<UsersListResponse>(`/api/v1/auth/admin/users?limit=${limit}&offset=${offset}`),
 
   changeUserRole: (userId: string, role: string) =>
-    request<User>(`/api/admin/users/${userId}/role`, {
+    request<User>(`/api/v1/auth/admin/users/${userId}/role`, {
       method: 'PATCH',
       body: JSON.stringify({ role }),
     }),
 
   deleteUser: (userId: string) =>
-    request<{ deleted: boolean }>(`/api/admin/users/${userId}`, { method: 'DELETE' }),
+    request<{ deleted: boolean }>(`/api/v1/auth/admin/users/${userId}`, { method: 'DELETE' }),
 
   verifyUserEmail: (userId: string) =>
-    request<User>(`/api/admin/users/${userId}/verify-email`, { method: 'POST' }),
+    request<User>(`/api/v1/auth/admin/users/${userId}/verify-email`, { method: 'POST' }),
 
   unverifyUserEmail: (userId: string) =>
-    request<User>(`/api/admin/users/${userId}/unverify-email`, { method: 'POST' }),
+    request<User>(`/api/v1/auth/admin/users/${userId}/unverify-email`, { method: 'POST' }),
 
   // videos
   listVideos: (limit = 50, offset = 0) =>
@@ -195,8 +195,8 @@ export const api = {
     request<{ deleted: boolean }>(`/api/v1/videos/${id}`, { method: 'DELETE' }),
 
   // health
-  healthAuth: () => request<HealthStatus>('/api/auth/health'),
-  healthChannel: () => request<HealthStatus>('/api/channels/health'),
+  healthAuth: () => request<HealthStatus>('/api/v1/auth/health'),
+  healthChannel: () => request<HealthStatus>('/api/v1/channels/health'),
 };
 
 export function uploadVideo(
@@ -285,11 +285,11 @@ export async function deleteReportedComment(id: string): Promise<{ status: strin
 
 // ============ Channel Verification ============
 export async function verifyChannel(channelId: string): Promise<Channel> {
-  return request<Channel>(`/api/channels/admin/${channelId}/verify`, { method: 'POST' });
+  return request<Channel>(`/api/v1/channels/admin/${channelId}/verify`, { method: 'POST' });
 }
 
 export async function unverifyChannel(channelId: string): Promise<Channel> {
-  return request<Channel>(`/api/channels/admin/${channelId}/unverify`, { method: 'POST' });
+  return request<Channel>(`/api/v1/channels/admin/${channelId}/unverify`, { method: 'POST' });
 }
 
 // ============ Ad Networks (external — Adsterra, Monetag, AdSense) ============
@@ -561,7 +561,7 @@ export interface EmailLog {
 }
 
 export async function getSmtpSettings(): Promise<SmtpSettings | null> {
-  return request<SmtpSettings | null>('/api/admin/email/smtp');
+  return request<SmtpSettings | null>('/api/v1/auth/admin/email/smtp');
 }
 
 export async function saveSmtpSettings(input: {
@@ -574,21 +574,21 @@ export async function saveSmtpSettings(input: {
   from_email: string;
   enabled?: boolean;
 }): Promise<SmtpSettings> {
-  return request<SmtpSettings>('/api/admin/email/smtp', {
+  return request<SmtpSettings>('/api/v1/auth/admin/email/smtp', {
     method: 'POST',
     body: JSON.stringify(input),
   });
 }
 
 export async function sendTestEmail(to: string): Promise<{ sent: boolean }> {
-  return request<{ sent: boolean }>('/api/admin/email/test', {
+  return request<{ sent: boolean }>('/api/v1/auth/admin/email/test', {
     method: 'POST',
     body: JSON.stringify({ to }),
   });
 }
 
 export async function getEmailLogs(limit = 100): Promise<{ logs: EmailLog[] }> {
-  return request<{ logs: EmailLog[] }>(`/api/admin/email/logs?limit=${limit}`);
+  return request<{ logs: EmailLog[] }>(`/api/v1/auth/admin/email/logs?limit=${limit}`);
 }
 
 
