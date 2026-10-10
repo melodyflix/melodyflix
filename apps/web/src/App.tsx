@@ -56,9 +56,42 @@ import VerifyEmail from './pages/VerifyEmail';
 import Legal from './pages/Legal';
 import { api, getCachedUser, getToken, clearAuth, type User } from './lib/api';
 
+
+const HOME_CHIPS = [
+  { icon: '🎓', label: 'Study' },
+  { icon: '🎬', label: 'Movies' },
+  { icon: '🎭', label: 'Drama' },
+  { icon: '📺', label: 'Web Series' },
+  { icon: '🎵', label: 'Video Song' },
+  { icon: '🎧', label: 'Audio Song' },
+  { icon: '📡', label: 'Live TV' },
+  { icon: '📻', label: 'Radio' },
+  { icon: '🔴', label: 'Live Streaming' },
+  { icon: '📰', label: 'Article' },
+  { icon: '🎵', label: 'Music' },
+  { icon: '⚽', label: 'Sports' },
+  { icon: '🎮', label: 'Gaming' },
+  { icon: '💎', label: 'Memberships' },
+];
+
+function CategoryChips() {
+  return (
+    <div className="mf-sub-header">
+      <button className="mf-chip-fixed">All</button>
+      <div className="mf-chips-scroll">
+        <div className="mf-chips-track">
+          {[...HOME_CHIPS, ...HOME_CHIPS].map((c, i) => (
+            <button key={i} className="mf-chip">{c.icon} {c.label}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AppInner() {
   const [user, setUser] = useState<User | null>(getCachedUser());
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [showLogin, setShowLogin] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -104,35 +137,15 @@ function AppInner() {
     <>
       <TopBar
         user={user}
-        onLogoClick={() => navigate('/')}
-        onSearch={handleSearch}
-        onSignIn={() => setShowLogin(true)}
-        onSignOut={handleSignOut}
-        onMyChannel={() => navigate('/channel/me')}
-        onUpload={() => navigate('/upload')}
-        onWatchLater={() => navigate('/watch-later')}
-        onSubscriptions={() => navigate('/subscriptions')}
-        onNotifications={() => navigate('/notifications')}
-        onHistory={() => navigate('/history')}
-        onPlaylists={() => navigate('/playlists')}
-        onMyVideos={() => navigate('/my-videos')}
-        onGoLive={() => navigate('/go-live')}
-        onLive={() => navigate('/live')}
-        onSettings={() => navigate('/settings/security')}
-        onPreferences={() => navigate('/settings/preferences')}
-        onReferrals={() => navigate('/referrals')}
-        onStudio={() => navigate('/studio')}
-        onPodcasts={() => navigate('/podcasts')}
-        onSeries={() => navigate('/series')}
-        onShorts={() => navigate('/shorts')}
-        onMemberships={() => navigate('/my-memberships')}
-        onAnalytics={() => navigate('/analytics')}
-        onHelp={() => navigate('/help')}
         onToggleSidebar={() => setSidebarCollapsed((v) => !v)}
+        onOpenLogin={() => setShowLogin(true)}
+        onLogout={handleSignOut}
       />
       <div className="mf-layout">
-        <Sidebar collapsed={sidebarCollapsed} user={user} onSignIn={() => setShowLogin(true)} />
-        <main className="mf-content">
+        <Sidebar expanded={!sidebarCollapsed} />
+        <div className="mf-main-col">
+          <CategoryChips />
+          <main className="mf-content">
           <PromoBannerDisplay placement="top" />
           <VerifyEmailBanner />
           <Routes>
@@ -185,7 +198,8 @@ function AppInner() {
         <Route path="/channel/me/edit" element={<EditChannel user={user} onSignIn={() => setShowLogin(true)} />} />
         <Route path="/channel/:id" element={<Channel />} />
           </Routes>
-        </main>
+          </main>
+        </div>
       </div>
 
 

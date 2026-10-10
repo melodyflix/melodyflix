@@ -1,278 +1,129 @@
+// melodyflix web - TopBar (based on mockups/homepage.html)
 import { useState } from 'react';
-import type { User } from '../lib/api';
-import NotificationBell from './NotificationBell';
-import Logo from './Logo';
+import { Link, useNavigate } from 'react-router-dom';
 
-interface Props {
-  user: User | null;
-  onLogoClick: () => void;
-  onSearch: (q: string) => void;
-  onSignIn: () => void;
-  onSignOut: () => void;
-  onMyChannel: () => void;
-  onUpload: () => void;
-  onWatchLater: () => void;
-  onSubscriptions: () => void;
-  onNotifications: () => void;
-  onHistory: () => void;
-  onPlaylists: () => void;
-  onMyVideos: () => void;
-  onGoLive: () => void;
-  onLive: () => void;
-  onSettings: () => void;
-  onPodcasts: () => void;
-  onSeries: () => void;
-  onShorts: () => void;
-  onMemberships: () => void;
-  onAnalytics: () => void;
-  onHelp: () => void;
-  onPreferences: () => void;
-  onReferrals: () => void;
-  onStudio: () => void;
-  onToggleSidebar?: () => void;
+interface TopBarProps {
+  user: { username?: string; display_name?: string } | null;
+  onToggleSidebar: () => void;
+  onOpenLogin: () => void;
+  onLogout: () => void;
 }
 
-export default function TopBar({
-  user, onLogoClick, onSearch, onSignIn, onSignOut, onMyChannel, onUpload,
-  onWatchLater, onSubscriptions, onHistory, onPlaylists, onMyVideos, onGoLive, onLive, onSettings, onPreferences, onReferrals, onStudio, onPodcasts, onSeries, onShorts, onMemberships, onAnalytics, onHelp, onToggleSidebar,
-}: Props) {
-  const [query, setQuery] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
+const NAV_ITEMS = [
+  { icon: '🎓', label: 'Study', path: '/genre/education' },
+  { icon: '🎬', label: 'Movies', path: '/genre/movie' },
+  { icon: '🎭', label: 'Drama', path: '/genre/drama' },
+  { icon: '🎵', label: 'Music', path: '/genre/music' },
+  { icon: '📻', label: 'Radio', path: '/radio' },
+  { icon: '📺', label: 'Live TV', path: '/live-tv' },
+  { icon: '📡', label: 'Go Live', path: '/go-live' },
+];
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    onSearch(query.trim());
+export default function TopBar({ user, onToggleSidebar, onOpenLogin, onLogout }: TopBarProps) {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQ, setSearchQ] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const navigate = useNavigate();
+
+  function doSearch() {
+    if (!searchQ.trim()) return;
+    navigate(`/search?q=${encodeURIComponent(searchQ.trim())}`);
+    setSearchOpen(false);
   }
 
-  const initial = user?.display_name?.[0] ?? user?.username?.[0] ?? '?';
-
   return (
-    <header className="mf-topbar">
-      <button
-        className="mf-hamburger"
-        onClick={onToggleSidebar}
-        aria-label="Toggle sidebar"
-        title="Menu"
-      >
-        ☰
-      </button>
-      <div onClick={onLogoClick} style={{ cursor: 'pointer' }}>
-        <Logo size={36} />
-      </div>
-
-      <form className="mf-search" onSubmit={submit}>
+    <>
+      {/* SEARCH OVERLAY */}
+      <div className={`mf-search-overlay ${searchOpen ? 'open' : ''}`}>
+        <button className="mf-icon-btn" onClick={() => setSearchOpen(false)} style={{ fontSize: 16 }}>←</button>
         <input
           type="text"
-          placeholder="Search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search MelodyFlix..."
+          value={searchQ}
+          onChange={(e) => setSearchQ(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && doSearch()}
+          autoFocus={searchOpen}
         />
-        <button type="submit">🔍</button>
-      </form>
-
-      <div className="mf-topbar-right">
-        {/* Live button */}
+        <button className="mf-icon-btn">🎤</button>
         <button
-          onClick={onLive}
-          title="Live streams"
+          onClick={doSearch}
           style={{
-            background: 'transparent',
-            border: 'none',
-            fontSize: 22,
-            cursor: 'pointer',
-            padding: '4px 8px',
-            color: '#0f0f0f',
-            lineHeight: 1,
-            position: 'relative',
+            padding: '0 18px', height: 34, border: 'none', borderRadius: 17,
+            background: 'var(--mf-purple)', color: '#fff', fontWeight: 600,
+            fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
           }}
         >
-          📡
+          🔍 Search
+        </button>
+      </div>
+
+      {/* MAIN HEADER */}
+      <header className="mf-main-header">
+        <button className="mf-hamburger" onClick={onToggleSidebar}>☰</button>
+        <Link to="/" className="mf-logo" style={{ textDecoration: 'none' }}>
+          <span className="mf-logo-mark">♪</span>
+          <span>MelodyFlix</span>
+        </Link>
+        <button className="mf-icon-btn" onClick={() => setSearchOpen(true)} title="Search" style={{ fontSize: 18 }}>
+          🔍
         </button>
 
-        {/* Go Live button */}
-        {user && (
-          <button
-            onClick={onGoLive}
-            title="Go Live"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              fontSize: 22,
-              cursor: 'pointer',
-              padding: '4px 8px',
-              color: '#dc2626',
-              lineHeight: 1,
-            }}
-          >
-            🔴
-          </button>
-        )}
+        <nav className="mf-nav-icons">
+          {NAV_ITEMS.map((it) => (
+            <Link key={it.label} to={it.path} style={{ textDecoration: 'none' }}>
+              <button className="mf-nav-icon">
+                <span className="emoji">{it.icon}</span>
+                <span className="lbl">{it.label}</span>
+              </button>
+            </Link>
+          ))}
+        </nav>
 
-        {user && (
-          <button
-            onClick={onUpload}
-            title="Upload video"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              fontSize: 22,
-              cursor: 'pointer',
-              padding: '4px 8px',
-              color: '#0f0f0f',
-              lineHeight: 1,
-            }}
-          >
-            📤
-          </button>
-        )}
-
-        <NotificationBell />
-
-        {user ? (
-          <div style={{ position: 'relative' }}>
-            <div className="mf-avatar" onClick={() => setMenuOpen(!menuOpen)}>{initial}</div>
-            {menuOpen && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  right: 0,
-                  marginTop: 8,
-                  background: '#fff',
-                  border: '1px solid #e5e5e5',
-                  borderRadius: 8,
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                  minWidth: 240,
-                  padding: '8px 0',
-                  zIndex: 200,
-                }}
-                onMouseLeave={() => setMenuOpen(false)}
+        <div className="mf-user-zone">
+          {!user && (
+            <button className="mf-signin" onClick={onOpenLogin}>👤 Sign in</button>
+          )}
+          {user && (
+            <div style={{ position: 'relative' }}>
+              <button
+                className="mf-icon-btn"
+                onClick={() => setMenuOpen(!menuOpen)}
+                style={{ fontSize: 18 }}
               >
-                <div style={{ padding: '8px 16px', borderBottom: '1px solid #f0f0f0' }}>
-                  <div style={{ fontWeight: 500 }}>{user.username}</div>
-                  <div style={{ fontSize: 12, color: '#606060' }}>{user.email}</div>
+                👤
+              </button>
+              {menuOpen && (
+                <div style={{
+                  position: 'absolute', top: '100%', right: 0, marginTop: 6,
+                  background: '#fff', border: '1px solid #ebe8f0', borderRadius: 8,
+                  minWidth: 180, boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                  zIndex: 400, padding: '6px 0',
+                }}>
+                  <Link to="/my-channel" style={{ display: 'block', padding: '10px 16px', color: '#0f0f0f', textDecoration: 'none', fontSize: 13 }}>
+                    📺 Your channel
+                  </Link>
+                  <Link to="/creator-studio" style={{ display: 'block', padding: '10px 16px', color: '#0f0f0f', textDecoration: 'none', fontSize: 13 }}>
+                    🎨 Creator Studio
+                  </Link>
+                  <Link to="/my-videos" style={{ display: 'block', padding: '10px 16px', color: '#0f0f0f', textDecoration: 'none', fontSize: 13 }}>
+                    🎬 Your videos
+                  </Link>
+                  <Link to="/preferences" style={{ display: 'block', padding: '10px 16px', color: '#0f0f0f', textDecoration: 'none', fontSize: 13 }}>
+                    ⚙️ Settings
+                  </Link>
+                  <hr style={{ border: 'none', borderTop: '1px solid #ebe8f0', margin: '4px 0' }} />
+                  <button
+                    onClick={() => { setMenuOpen(false); onLogout(); }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', color: '#b91c1c', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}
+                  >
+                    🚪 Log out
+                  </button>
                 </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onGoLive(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14, color: '#dc2626', fontWeight: 500 }}
-                >
-                  🔴 Go Live
-                </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onMyChannel(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
-                >
-                  📺 My Channel
-                </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onAnalytics(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
-                >
-                  📊 Analytics
-                </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onMyVideos(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
-                >
-                  🎬 My Videos
-                </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onSubscriptions(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
-                >
-                  📬 Subscriptions
-                </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onHistory(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
-                >
-                  🕐 History
-                </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onPlaylists(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
-                >
-                  📁 Playlists
-                </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onWatchLater(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
-                >
-                  🔖 Watch Later
-                </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onUpload(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
-                >
-                  📤 Upload video
-                </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onMemberships(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
-                >
-                  🏅 My Memberships
-                </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onShorts(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
-                >
-                  📱 Shorts
-                </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onSeries(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
-                >
-                  📺 Series
-                </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onPodcasts(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
-                >
-                  🎙️ Podcasts
-                </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onReferrals(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14, borderTop: '1px solid #f0f0f0' }}
-                >
-                  🎁 Invite Friends
-                </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onStudio(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
-                >
-                  🎬 Creator Studio
-                </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onPreferences(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
-                >
-                  ⚙️ Preferences
-                </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onSettings(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14 }}
-                >
-                  🔐 Security settings
-                </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onHelp(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14, borderTop: '1px solid #f0f0f0' }}
-                >
-                  🆘 Help Center
-                </div>
-                <div
-                  onClick={() => { setMenuOpen(false); onSignOut(); }}
-                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14, borderTop: '1px solid #f0f0f0' }}
-                >
-                  Sign out
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <button className="mf-btn-signin" onClick={onSignIn}>Sign in</button>
-        )}
-      </div>
-    </header>
+              )}
+            </div>
+          )}
+        </div>
+      </header>
+    </>
   );
 }

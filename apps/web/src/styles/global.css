@@ -116,12 +116,12 @@ a { color: inherit; text-decoration: none; }
 /* LAYOUT */
 .mf-container { max-width: 1800px; margin: 0 auto; padding: 20px 24px; }
 
-/* VIDEO GRID */
-.mf-grid {
+/* VIDEO GRID — disabled; mockup.css provides the layout */
+/* .mf-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 20px 16px;
-}
+} */
 
 .mf-video-card {
   cursor: pointer;
@@ -2260,6 +2260,7 @@ a { color: inherit; text-decoration: none; }
 .mf-hamburger:hover {
   background: var(--mf-bg-hover);
 }
+/* ===== DISABLED (mockup.css provides layout) =====
 
 .mf-layout {
   display: flex;
@@ -2357,6 +2358,7 @@ a { color: inherit; text-decoration: none; }
     width: 240px;
   }
 }
+===== END DISABLED ===== */
 
 /* Dark mode adjustments */
 @media (prefers-color-scheme: dark) {
