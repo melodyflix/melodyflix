@@ -69,9 +69,9 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
   usePlayerKeyboard({ videoRef, containerRef, fps: 30 });
   const hdrDetection = useHdrDetect({
     videoRef,
-    manifestUrl: (props as any).src ?? null,
-    serverIsHdr: (props as any).isHdr,
-    serverHdrFormat: (props as any).hdrFormat,
+    manifestUrl: src ?? null,
+    serverIsHdr: undefined,
+    serverHdrFormat: undefined,
   });
   const castCtl = useChromecast();
 
@@ -1113,12 +1113,12 @@ export default function HlsPlayer({ src, poster, startTime = 0, seekTo, onStateC
           onClick={async () => {
             if (castCtl.connected) {
               castCtl.disconnect();
-            } else if ((props as any).src) {
+            } else if (src) {
               await castCtl.cast({
-                contentId: (props as any).src,
+                contentId: src,
                 contentType: 'application/x-mpegurl',
-                title: (props as any).mediaTitle ?? undefined,
-                poster: (props as any).poster ?? undefined,
+                title: mediaTitle ?? undefined,
+                poster: poster ?? undefined,
               });
             }
           }}

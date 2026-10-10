@@ -184,7 +184,10 @@ export default function Watch({ onSignIn }: Props) {
       historySavedAtRef.current = now;
       recordHistory(video.id, st.currentTime).catch(() => {});
     }, 5000);
-    useEffect(() => {
+    return () => clearInterval(interval);
+  }, [me?.id, video?.id]);
+
+  useEffect(() => {
     if (!me) return;
     getPreferences()
       .then((p) => setAutoplayNext(p.autoplay_next === 1))
@@ -215,8 +218,6 @@ export default function Watch({ onSignIn }: Props) {
     }
   }
 
-  return () => clearInterval(interval);
-  }, [me?.id, video?.id]);
 
   // On unmount: save history + set mini player
   useEffect(() => {
