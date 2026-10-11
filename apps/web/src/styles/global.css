@@ -3114,3 +3114,50 @@ body.theme-light .mf-sb-item:hover { background: #f3e8ff; }
   visibility: visible !important;
   opacity: 1 !important;
 }
+
+/* ===================================================== */
+/* TopBar fix #4 (2026-10-12) — icon above label         */
+/* ===================================================== */
+
+.mf-nav-icons {
+  gap: 2px !important;
+  margin: 0 6px !important;
+}
+
+.mf-nav-icon {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 2px !important;
+  padding: 5px 8px !important;
+  font-size: 11px !important;
+  line-height: 1.05 !important;
+  min-width: 60px !important;
+}
+
+.mf-nav-icon .emoji {
+  font-size: 18px !important;
+  line-height: 1 !important;
+  display: block !important;
+}
+
+.mf-nav-icon .lbl {
+  font-size: 10.5px !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  max-width: none !important;
+  letter-spacing: -0.1px !important;
+}
+
+/* Wider space on smaller screens */
+@media (max-width: 1400px) {
+  .mf-nav-icon {
+    min-width: 52px !important;
+    padding: 4px 6px !important;
+  }
+  .mf-nav-icon .lbl { font-size: 10px !important; }
+  .mf-nav-icon .emoji { font-size: 17px !important; }
+}
