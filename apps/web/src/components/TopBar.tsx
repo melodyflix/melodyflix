@@ -1,4 +1,5 @@
-// melodyflix web - TopBar (based on mockups/homepage.html)
+// melodyflix web - TopBar (per master UI spec)
+// Header: hamburger + logo + search (voice) + 7 category links + create + messenger + settings + sign in
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -11,18 +12,19 @@ interface TopBarProps {
 
 const NAV_ITEMS = [
   { icon: '🎓', label: 'Study', path: '/genre/education' },
-  { icon: '🎬', label: 'Movies', path: '/genre/movie' },
-  { icon: '🎭', label: 'Drama', path: '/genre/drama' },
-  { icon: '🎵', label: 'Music', path: '/genre/music' },
+  { icon: '🎬', label: 'Movies & Dramas', path: '/genre/movie' },
+  { icon: '🎵', label: 'Music & Videos', path: '/genre/music' },
+  { icon: '📺', label: 'Web Series', path: '/series' },
+  { icon: '📡', label: 'Live TV', path: '/live-tv' },
   { icon: '📻', label: 'Radio', path: '/radio' },
-  { icon: '📺', label: 'Live TV', path: '/live-tv' },
-  { icon: '📡', label: 'Go Live', path: '/go-live' },
+  { icon: '📰', label: 'Article & News', path: '/help' },
 ];
 
 export default function TopBar({ user, onToggleSidebar, onOpenLogin, onLogout }: TopBarProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQ, setSearchQ] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const navigate = useNavigate();
 
   function doSearch() {
@@ -31,43 +33,73 @@ export default function TopBar({ user, onToggleSidebar, onOpenLogin, onLogout }:
     setSearchOpen(false);
   }
 
+  function voiceSearch() {
+    const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    if (!SR) {
+      alert('Voice search not supported in this browser');
+      return;
+    }
+    const rec = new SR();
+    rec.lang = 'en-US';
+    rec.onresult = (e: any) => {
+      const text = e.results[0][0].transcript;
+      setSearchQ(text);
+      navigate(`/search?q=${encodeURIComponent(text)}`);
+      setSearchOpen(false);
+    };
+    rec.start();
+  }
+
   return (
     <>
-      {/* SEARCH OVERLAY */}
-      <div className={`mf-search-overlay ${searchOpen ? 'open' : ''}`}>
-        <button className="mf-icon-btn" onClick={() => setSearchOpen(false)} style={{ fontSize: 16 }}>←</button>
-        <input
-          type="text"
-          placeholder="Search MelodyFlix..."
-          value={searchQ}
-          onChange={(e) => setSearchQ(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && doSearch()}
-          autoFocus={searchOpen}
-        />
-        <button className="mf-icon-btn">🎤</button>
-        <button
-          onClick={doSearch}
-          style={{
-            padding: '0 18px', height: 34, border: 'none', borderRadius: 17,
-            background: 'var(--mf-purple)', color: '#fff', fontWeight: 600,
-            fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
-          }}
-        >
-          🔍 Search
-        </button>
-      </div>
+      {/* SEARCH OVERLAY (mobile / expanded) */}
+      {searchOpen && (
+        <div className="mf-search-overlay open">
+          <button className="mf-icon-btn" onClick={() => setSearchOpen(false)} style={{ fontSize: 16 }}>←</button>
+          <input
+            type="text"
+            placeholder="Search MelodyFlix..."
+            value={searchQ}
+            onChange={(e) => setSearchQ(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && doSearch()}
+            autoFocus
+          />
+          <button className="mf-icon-btn" onClick={voiceSearch} title="Voice search">🎤</button>
+          <button
+            onClick={doSearch}
+            style={{
+              padding: '0 18px', height: 34, border: 'none', borderRadius: 17,
+              background: 'var(--mf-purple)', color: '#fff', fontWeight: 600,
+              fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            🔍 Search
+          </button>
+        </div>
+      )}
 
       {/* MAIN HEADER */}
       <header className="mf-main-header">
-        <button className="mf-hamburger" onClick={onToggleSidebar}>☰</button>
+        <button className="mf-hamburger" onClick={onToggleSidebar} title="Menu">☰</button>
         <Link to="/" className="mf-logo" style={{ textDecoration: 'none' }}>
           <span className="mf-logo-mark">♪</span>
           <span>MelodyFlix</span>
         </Link>
-        <button className="mf-icon-btn" onClick={() => setSearchOpen(true)} title="Search" style={{ fontSize: 18 }}>
-          🔍
-        </button>
 
+        {/* SEARCH (desktop inline) */}
+        <div className="mf-header-search">
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchQ}
+            onChange={(e) => setSearchQ(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && doSearch()}
+          />
+          <button onClick={doSearch} title="Search">🔍</button>
+          <button onClick={voiceSearch} title="Voice search">🎤</button>
+        </div>
+
+        {/* CATEGORY FAST-LINKS */}
         <nav className="mf-nav-icons">
           {NAV_ITEMS.map((it) => (
             <Link key={it.label} to={it.path} style={{ textDecoration: 'none' }}>
@@ -79,43 +111,66 @@ export default function TopBar({ user, onToggleSidebar, onOpenLogin, onLogout }:
           ))}
         </nav>
 
-        <div className="mf-user-zone">
+        {/* RIGHT ACTIONS */}
+        <div className="mf-header-actions">
+          <button className="mf-icon-btn" onClick={() => setSearchOpen(true)} title="Search" style={{ fontSize: 18 }}>🔍</button>
+
+          <Link to="/upload" style={{ textDecoration: 'none' }}>
+            <button className="mf-icon-btn" title="Create">＋</button>
+          </Link>
+
+          <Link to="/notifications" style={{ textDecoration: 'none' }}>
+            <button className="mf-icon-btn" title="Messenger">💬</button>
+          </Link>
+
+          <div style={{ position: 'relative' }}>
+            <button className="mf-icon-btn" onClick={() => setSettingsOpen(!settingsOpen)} title="Settings">⋮</button>
+            {settingsOpen && (
+              <div className="mf-dropdown-menu">
+                <button onClick={() => { document.body.classList.toggle('theme-light'); setSettingsOpen(false); }}>
+                  🌓 Dark / Light Theme
+                </button>
+                <button onClick={() => { alert('Language settings'); setSettingsOpen(false); }}>
+                  🌐 Language
+                </button>
+                <button onClick={() => { alert('Location settings'); setSettingsOpen(false); }}>
+                  📍 Location
+                </button>
+                <button onClick={() => { alert('Restricted Mode toggle'); setSettingsOpen(false); }}>
+                  🔞 Restricted Mode
+                </button>
+                <button onClick={() => { alert('Keyboard shortcuts'); setSettingsOpen(false); }}>
+                  ⌨️ Keyboard Shortcuts
+                </button>
+                <Link to="/help" style={{ textDecoration: 'none' }}>
+                  <button onClick={() => setSettingsOpen(false)}>❓ Help & Feedback</button>
+                </Link>
+              </div>
+            )}
+          </div>
+
           {!user && (
             <button className="mf-signin" onClick={onOpenLogin}>👤 Sign in</button>
           )}
           {user && (
             <div style={{ position: 'relative' }}>
-              <button
-                className="mf-icon-btn"
-                onClick={() => setMenuOpen(!menuOpen)}
-                style={{ fontSize: 18 }}
-              >
-                👤
-              </button>
-              {menuOpen && (
-                <div style={{
-                  position: 'absolute', top: '100%', right: 0, marginTop: 6,
-                  background: '#fff', border: '1px solid #ebe8f0', borderRadius: 8,
-                  minWidth: 180, boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                  zIndex: 400, padding: '6px 0',
-                }}>
-                  <Link to="/my-channel" style={{ display: 'block', padding: '10px 16px', color: '#0f0f0f', textDecoration: 'none', fontSize: 13 }}>
-                    📺 Your channel
+              <button className="mf-icon-btn" onClick={() => setUserMenuOpen(!userMenuOpen)} style={{ fontSize: 18 }}>👤</button>
+              {userMenuOpen && (
+                <div className="mf-dropdown-menu" style={{ right: 0 }}>
+                  <Link to="/my-channel" style={{ textDecoration: 'none' }}>
+                    <button onClick={() => setUserMenuOpen(false)}>📺 Your channel</button>
                   </Link>
-                  <Link to="/creator-studio" style={{ display: 'block', padding: '10px 16px', color: '#0f0f0f', textDecoration: 'none', fontSize: 13 }}>
-                    🎨 Creator Studio
+                  <Link to="/studio" style={{ textDecoration: 'none' }}>
+                    <button onClick={() => setUserMenuOpen(false)}>🎨 Creator Studio</button>
                   </Link>
-                  <Link to="/my-videos" style={{ display: 'block', padding: '10px 16px', color: '#0f0f0f', textDecoration: 'none', fontSize: 13 }}>
-                    🎬 Your videos
+                  <Link to="/my-videos" style={{ textDecoration: 'none' }}>
+                    <button onClick={() => setUserMenuOpen(false)}>🎬 Your videos</button>
                   </Link>
-                  <Link to="/preferences" style={{ display: 'block', padding: '10px 16px', color: '#0f0f0f', textDecoration: 'none', fontSize: 13 }}>
-                    ⚙️ Settings
+                  <Link to="/preferences" style={{ textDecoration: 'none' }}>
+                    <button onClick={() => setUserMenuOpen(false)}>⚙️ Settings</button>
                   </Link>
                   <hr style={{ border: 'none', borderTop: '1px solid #ebe8f0', margin: '4px 0' }} />
-                  <button
-                    onClick={() => { setMenuOpen(false); onLogout(); }}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', color: '#b91c1c', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}
-                  >
+                  <button onClick={() => { setUserMenuOpen(false); onLogout(); }} style={{ color: '#b91c1c' }}>
                     🚪 Log out
                   </button>
                 </div>
