@@ -1,7 +1,6 @@
 // melodyflix web - Home page (YouTube-style, based on mockups/homepage.html)
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import '../styles/mockup.css';
 
 interface VideoCard {
   id: string;
