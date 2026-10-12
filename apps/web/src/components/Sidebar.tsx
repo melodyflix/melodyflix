@@ -1,54 +1,63 @@
-// melodyflix web - Sidebar (based on mockups/homepage.html)
+// melodyflix web - Sidebar (two-mode: fixed icon bar + hamburger drawer)
+// Per master UI spec: 72px icon bar always visible; 240px drawer overlay on ☰
 import { Link, useLocation } from 'react-router-dom';
 
 interface SidebarProps {
-  expanded: boolean;
+  expanded: boolean;   // when true → drawer open (overlay)
 }
 
-const MAIN_ITEMS = [
+// Compact icon bar (always visible, 72px)
+const ICON_BAR_ITEMS = [
   { icon: '🏠', label: 'Home', path: '/' },
   { icon: '⚡', label: 'Shorts', path: '/shorts' },
-  { icon: '📬', label: 'Subscriptions', path: '/subscriptions' },
+  { icon: '🔔', label: 'Subscriptions', path: '/subscriptions' },
+  { icon: '💬', label: 'Messenger', path: '/notifications' },
+  { icon: '📚', label: 'Study', path: '/genre/education' },
+  { icon: '🎬', label: 'Movies', path: '/genre/movie' },
+  { icon: '🎵', label: 'Music', path: '/genre/music' },
+  { icon: '📻', label: 'Radio', path: '/radio' },
+  { icon: '👤', label: 'You', path: '/my-channel' },
 ];
 
-const YOU_ITEMS = [
-  { icon: '👤', label: 'You', path: '/my-channel' },
-  { icon: '📺', label: 'Your channel', path: '/my-channel' },
+// Full drawer sections
+const DRAWER_PRIMARY = [
+  { icon: '🏠', label: 'Home', path: '/' },
+  { icon: '⚡', label: 'Shorts', path: '/shorts' },
+  { icon: '🔔', label: 'Subscriptions', path: '/subscriptions' },
+];
+
+const DRAWER_MESSENGER = [
+  { icon: '💬', label: 'Quick Chat', path: '/notifications' },
+  { icon: '📇', label: 'Saved Contacts', path: '/notifications' },
+];
+
+const DRAWER_YOU = [
   { icon: '🕐', label: 'History', path: '/history' },
   { icon: '📁', label: 'Playlists', path: '/playlists' },
-  { icon: '🔖', label: 'Watch later', path: '/watch-later' },
-  { icon: '👍', label: 'Liked videos', path: '/history' },
-  { icon: '🎬', label: 'Your videos', path: '/my-videos' },
-  { icon: '⬇️', label: 'Downloads', path: '/watch-later' },
+  { icon: '🔖', label: 'Watch Later', path: '/watch-later' },
+  { icon: '👍', label: 'Liked Videos', path: '/history' },
 ];
 
-const EXPLORE_ITEMS = [
-  { icon: '🎓', label: 'Study', path: '/genre/education' },
-  { icon: '🎬', label: 'Movies', path: '/genre/movie' },
-  { icon: '🎭', label: 'Drama', path: '/genre/drama' },
+const DRAWER_CATEGORIES = [
+  { icon: '📚', label: 'Study', path: '/genre/education' },
+  { icon: '🎬', label: 'Movies & Dramas', path: '/genre/movie' },
+  { icon: '🎵', label: 'Music & Videos', path: '/genre/music' },
   { icon: '📺', label: 'Web Series', path: '/series' },
-  { icon: '🎵', label: 'Video Song', path: '/genre/music' },
-  { icon: '🎧', label: 'Audio Song', path: '/podcasts' },
   { icon: '📡', label: 'Live TV', path: '/live-tv' },
   { icon: '📻', label: 'Radio', path: '/radio' },
-  { icon: '🔴', label: 'Live Streaming', path: '/live' },
-  { icon: '📰', label: 'Article', path: '/help' },
-  { icon: '🎵', label: 'Music', path: '/genre/music' },
-  { icon: '⚽', label: 'Sports', path: '/sports' },
-  { icon: '🎮', label: 'Gaming', path: '/genre/gaming' },
-  { icon: '🎮', label: 'Playables', path: '/shorts' },
+  { icon: '📰', label: 'Article & News', path: '/help' },
 ];
 
-const MORE_ITEMS = [
-  { icon: '💎', label: 'MelodyFlix Premium', path: '/memberships' },
-  { icon: '🎵', label: 'MelodyFlix Music', path: '/genre/music' },
-  { icon: '👶', label: 'MelodyFlix Kids', path: '/genre/family' },
+const DRAWER_SYSTEM = [
+  { icon: '⚙️', label: 'Settings', path: '/preferences' },
+  { icon: '📊', label: 'Report History', path: '/help' },
+  { icon: '❓', label: 'Help & Send Feedback', path: '/help' },
 ];
 
 const FOOTER_LINKS_1 = ['About', 'Press', 'Copyright', 'Contact us', 'Creators', 'Advertise', 'Developers'];
 const FOOTER_LINKS_2 = ['Terms', 'Privacy', 'Policy & Safety', 'How MelodyFlix works'];
 
-function SidebarItem({ icon, label, path, expanded }: { icon: string; label: string; path: string; expanded: boolean }) {
+function Item({ icon, label, path }: { icon: string; label: string; path: string }) {
   const location = useLocation();
   const active = location.pathname === path;
   return (
@@ -61,37 +70,71 @@ function SidebarItem({ icon, label, path, expanded }: { icon: string; label: str
   );
 }
 
+function IconBarItem({ icon, label, path }: { icon: string; label: string; path: string }) {
+  const location = useLocation();
+  const active = location.pathname === path;
+  return (
+    <Link to={path} style={{ textDecoration: 'none' }} title={label}>
+      <button className={`mf-icon-bar-item ${active ? 'active' : ''}`} type="button" aria-label={label}>
+        <span className="mf-icon-bar-emoji">{icon}</span>
+        <span className="mf-icon-bar-label">{label}</span>
+      </button>
+    </Link>
+  );
+}
+
 export default function Sidebar({ expanded }: SidebarProps) {
   return (
-    <aside className={`mf-sidebar-wrap ${expanded ? 'expanded' : ''}`}>
-      <div className="mf-sidebar">
-        {MAIN_ITEMS.map((it) => <SidebarItem key={it.label} {...it} expanded={expanded} />)}
+    <>
+      {/* FIXED ICON BAR (72px, always visible) */}
+      <aside className="mf-icon-bar">
+        {ICON_BAR_ITEMS.map((it) => (
+          <IconBarItem key={it.label} {...it} />
+        ))}
+      </aside>
+
+      {/* OVERLAY BACKDROP (only when drawer open) */}
+      {expanded && (
+        <div
+          className="mf-drawer-backdrop"
+          onClick={() => {
+            // close by simulating toggle — handled by parent via context; fallback: remove class
+            document.body.classList.remove('sidebar-expanded');
+          }}
+        />
+      )}
+
+      {/* HAMBURGER DRAWER (240px, overlay) */}
+      <aside className={`mf-drawer ${expanded ? 'open' : ''}`}>
+        {/* Primary */}
+        {DRAWER_PRIMARY.map((it) => <Item key={it.label} {...it} />)}
         <div className="mf-sb-divider" />
 
+        {/* Messenger */}
+        <div className="mf-sb-section-title">Messenger</div>
+        {DRAWER_MESSENGER.map((it) => <Item key={it.label} {...it} />)}
+        <div className="mf-sb-divider" />
+
+        {/* You */}
         <div className="mf-sb-section-title">You</div>
-        {YOU_ITEMS.map((it, i) => <SidebarItem key={`${it.label}-${i}`} {...it} expanded={expanded} />)}
+        {DRAWER_YOU.map((it) => <Item key={it.label} {...it} />)}
         <div className="mf-sb-divider" />
 
-        <div className="mf-sb-section-title">Explore</div>
-        {EXPLORE_ITEMS.map((it, i) => <SidebarItem key={`${it.label}-${i}`} {...it} expanded={expanded} />)}
+        {/* Categories */}
+        <div className="mf-sb-section-title">Categories</div>
+        {DRAWER_CATEGORIES.map((it) => <Item key={it.label} {...it} />)}
         <div className="mf-sb-divider" />
 
-        <div className="mf-sb-section-title">More from MelodyFlix</div>
-        {MORE_ITEMS.map((it) => <SidebarItem key={it.label} {...it} expanded={expanded} />)}
-        <div className="mf-sb-divider" />
+        {/* System */}
+        {DRAWER_SYSTEM.map((it) => <Item key={it.label} {...it} />)}
 
-        <SidebarItem icon="📊" label="Report history" path="/help" expanded={expanded} />
-
+        {/* Footer */}
         <div className="mf-sb-footer">
-          <div>
-            {FOOTER_LINKS_1.map((l) => <a key={l}>{l}</a>)}
-          </div>
-          <div style={{ marginTop: 10 }}>
-            {FOOTER_LINKS_2.map((l) => <a key={l}>{l}</a>)}
-          </div>
+          <div>{FOOTER_LINKS_1.map((l) => <a key={l}>{l}</a>)}</div>
+          <div style={{ marginTop: 10 }}>{FOOTER_LINKS_2.map((l) => <a key={l}>{l}</a>)}</div>
           <div className="mf-sb-copyright">© Melodyflix Technologies 2026</div>
         </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }
