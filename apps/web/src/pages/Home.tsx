@@ -190,6 +190,11 @@ function CategorySection({ def, initial }: { def: CategoryDef; initial: SectionS
   const [state, setState] = useState<SectionState>(initial);
   const [subcat, setSubcat] = useState<string>(def.subcats[0] ?? '');
 
+  // Sync state when parent passes new data (initial load / fallback / error)
+  useEffect(() => {
+    setState(initial);
+  }, [initial.loading, initial.videos.length, initial.loaded]);
+
   // Load more (adds 6 more cards; if none left, says "no more")
   function loadMore() {
     if (state.loaded >= state.videos.length) {
