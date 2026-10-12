@@ -118,6 +118,36 @@ function formatAgo(iso: string): string {
   return `${mo} mo ago`;
 }
 
+// Generate dummy placeholder cards when a category has no real content
+function makeDummyVideos(def: CategoryDef, count = 12): VideoCard[] {
+  const titles: Record<string, string[]> = {
+    movies: ['Action Film Trailer', 'Romantic Drama', 'Comedy Movie', 'Thriller Movie', 'Horror Story', 'Adventure Film', 'Sci-Fi Movie', 'Family Drama', 'Historical Film', 'Crime Movie', 'Biography', 'Documentary'],
+    music: ['Top Hits Playlist', 'Classical Music', 'Folk Song', 'Pop Music Video', 'Rock Anthem', 'Hip Hop Beat', 'Devotional Song', 'Love Ballad', 'Party Mix', 'Acoustic Cover', 'Live Concert', 'Remix'],
+    web_series: ['Episode 1 — Pilot', 'Episode 2 — Rising', 'Episode 3 — Secrets', 'Episode 4 — Conflict', 'Episode 5 — Cliffhanger', 'Behind the Scenes', 'Meet the Cast', 'Season Trailer', 'Season Finale', 'Bonus Scene', 'Interview', 'Teaser'],
+    livetv: ['News Channel Live', 'Sports Live 24/7', 'Entertainment Live', 'Kids Live TV', 'Music Live', 'Movies Live', 'Documentary Live', 'Cooking Live', 'Fitness Live', 'Talk Show Live', 'Weather Live', 'Business Live'],
+    radio: ['FM 90.4 Live', 'Classic Hits Radio', 'Talk Radio 24/7', 'Sports Radio', 'Music Radio FM', 'News Podcast', 'Morning Show', 'Evening Drive', 'Weekend Special', 'Late Night FM', 'Devotional Radio', 'Community FM'],
+    study: ['Physics — Chapter 1', 'Math — Algebra Basics', 'Chemistry — Reactions', 'Biology — Cells', 'English Grammar', 'History — Ancient', 'Geography — Climate', 'Programming 101', 'Web Development', 'Data Science Intro', 'Economics Basics', 'Spoken English'],
+    news: ['Breaking: Latest Update', 'Politics Today', 'Tech News Roundup', 'Sports News', 'Business Report', 'Weather Update', 'Entertainment Buzz', 'World News', 'Health News', 'Science Discoveries', 'Opinion Article', 'Editorial'],
+  };
+  const tList = titles[def.key] ?? Array(count).fill(`${def.label} — Coming Soon`);
+  const out: VideoCard[] = [];
+  const now = new Date().toISOString();
+  for (let i = 0; i < count; i++) {
+    out.push({
+      id: `dummy-${def.key}-${i}`,
+      title: tList[i % tList.length],
+      thumbnail_url: null,
+      channel_id: `ch-${def.key}`,
+      channel_name: def.label,
+      duration_seconds: 120 + i * 90,
+      view_count: 1000 * (i + 1) * 7,
+      created_at: now,
+      content_type: def.contentType,
+    });
+  }
+  return out;
+}
+
 // ============ Video card ============
 function VideoCardItem({ v }: { v: VideoCard }) {
   return (
@@ -257,7 +287,11 @@ export default function Home() {
           url = `/api/v1/videos/genre/${def.genre}?limit=24`;
         }
         const r = await fetch(url).then((res) => res.json()).catch(() => ({}));
-        const videos: VideoCard[] = r?.data?.videos ?? [];
+        let videos: VideoCard[] = r?.data?.videos ?? [];
+        // Fallback: if empty, use dummy placeholder cards so the section has content
+        if (videos.length === 0) {
+          videos = makeDummyVideos(def, 12);
+        }
         if (cancelled) return;
         setSections((s) => ({
           ...s,
@@ -269,9 +303,11 @@ export default function Home() {
         }));
       } catch {
         if (cancelled) return;
+        // Even on error, show dummy cards so the section has content
+        const dummies = makeDummyVideos(def, 12);
         setSections((s) => ({
           ...s,
-          [def.key]: { videos: [], loading: false, loaded: 0 },
+          [def.key]: { videos: dummies, loading: false, loaded: Math.min(12, dummies.length) },
         }));
       }
     }
