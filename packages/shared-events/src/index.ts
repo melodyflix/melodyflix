@@ -10,19 +10,34 @@ let subscriber: Redis | null = null;
 
 const handlers = new Map<string, (payload: any) => void | Promise<void>>();
 
-function getPublisher(): Redis {
+const REDIS_DISABLED = process.env.DISABLE_REDIS === '1' || !process.env.REDIS_URL;
+
+function getPublisher(): Redis | null {
+  if (REDIS_DISABLED) return null;
   if (!publisher) {
     const config = loadConfig();
-    publisher = new Redis(config.REDIS_URL, { maxRetriesPerRequest: 3 });
+    publisher = new Redis(config.REDIS_URL, {
+      maxRetriesPerRequest: 3,
+      lazyConnect: true,
+      enableOfflineQueue: false,
+      retryStrategy: (times) => times > 2 ? null : 1000,
+    });
+    publisher.on('error', () => { /* swallow — logged once at start */ });
   }
   return publisher;
 }
 
-function getSubscriber(): Redis {
+function getSubscriber(): Redis | null {
+  if (REDIS_DISABLED) return null;
   if (!subscriber) {
     const config = loadConfig();
-    subscriber = new Redis(config.REDIS_URL, { maxRetriesPerRequest: 3 });
-    subscriber.on('error', (err) => logger.error({ err }, 'subscriber error'));
+    subscriber = new Redis(config.REDIS_URL, {
+      maxRetriesPerRequest: 3,
+      lazyConnect: true,
+      enableOfflineQueue: false,
+      retryStrategy: (times) => times > 2 ? null : 1000,
+    });
+    subscriber.on('error', () => { /* swallow */ });
     subscriber.on('message', async (channel, message) => {
       const handler = handlers.get(channel);
       if (!handler) return;
@@ -37,11 +52,14 @@ function getSubscriber(): Redis {
 }
 
 export async function publish<T>(channel: string, payload: T): Promise<void> {
+  if (REDIS_DISABLED) return;   // silent no-op when Redis disabled
+  const pub = getPublisher();
+  if (!pub) return;
   try {
-    await getPublisher().publish(channel, JSON.stringify(payload));
+    await pub.publish(channel, JSON.stringify(payload));
     logger.debug({ channel }, 'event published');
-  } catch (err) {
-    logger.error({ err, channel }, 'publish failed');
+  } catch {
+    // silent — Redis optional
   }
 }
 
@@ -52,7 +70,12 @@ export function subscribe<T>(channel: string, handler: (payload: T) => void | Pr
 
 // Call this ONCE after all subscribe() calls to actually attach to Redis
 export async function startSubscriptions(): Promise<void> {
+  if (REDIS_DISABLED) {
+    logger.info('Redis disabled — subscriptions skipped');
+    return;
+  }
   const sub = getSubscriber();
+  if (!sub) return;
   const channels = Array.from(handlers.keys());
   if (channels.length === 0) return;
   try {

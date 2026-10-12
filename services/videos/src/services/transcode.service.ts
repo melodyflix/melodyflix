@@ -125,7 +125,7 @@ export interface TranscodeResult {
 
 function runFfmpeg(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const proc = spawn(resolveFfmpegBin(), args, { stdio: ['ignore', 'pipe', 'pipe'] });
     let stderr = '';
     proc.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
     proc.on('error', reject);
@@ -137,7 +137,39 @@ function runFfmpeg(args: string[]): Promise<void> {
 }
 
 function ffmpegAvailable(): boolean {
-  return existsSync('/usr/bin/ffmpeg');
+  const candidates = [
+    process.env.FFMPEG_PATH,
+    `${process.env.HOME}/bin/ffmpeg`,
+    '/usr/bin/ffmpeg',
+    '/usr/local/bin/ffmpeg',
+  ].filter(Boolean) as string[];
+  return candidates.some((p) => existsSync(p));
+}
+
+function resolveFfmpegBin(): string {
+  const candidates = [
+    process.env.FFMPEG_PATH,
+    `${process.env.HOME}/bin/ffmpeg`,
+    '/usr/bin/ffmpeg',
+    '/usr/local/bin/ffmpeg',
+  ].filter(Boolean) as string[];
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
+  }
+  return 'ffmpeg'; // fallback to PATH
+}
+
+function resolveFfprobeBin(): string {
+  const candidates = [
+    process.env.FFPROBE_PATH,
+    `${process.env.HOME}/bin/ffprobe`,
+    '/usr/bin/ffprobe',
+    '/usr/local/bin/ffprobe',
+  ].filter(Boolean) as string[];
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
+  }
+  return 'ffprobe';
 }
 
 export interface ProbeInfo {
@@ -148,7 +180,7 @@ export interface ProbeInfo {
 
 export function probeMedia(inputPath: string): Promise<ProbeInfo> {
   return new Promise((resolve) => {
-    const proc = spawn('ffprobe', [
+    const proc = spawn(resolveFfprobeBin(), [
       '-v', 'error',
       '-select_streams', 'v:0',
       '-show_entries', 'stream=width,height:format=duration',
@@ -389,7 +421,7 @@ export async function transcodeToHls(
   }
 
   if (!ffmpegAvailable()) {
-    throw new Error('ffmpeg binary not found at /usr/bin/ffmpeg');
+    throw new Error('ffmpeg binary not found. Checked: $FFMPEG_PATH, $HOME/bin/ffmpeg, /usr/bin/ffmpeg, /usr/local/bin/ffmpeg');
   }
 
   const outDir = processedDir(videoId);
@@ -402,7 +434,10 @@ export async function transcodeToHls(
   const thumbTime = Math.min(2, Math.max(0.1, durationSeconds * 0.1));
   const thumbnailPath = `${outDir}/thumbnail.jpg`;
   await runFfmpeg([
-    '-y', '-i', inputPath,
+    '-y',
+    '-threads', '1',
+    '-filter_threads', '1',
+    '-i', inputPath,
     '-ss', thumbTime.toString(),
     '-vframes', '1',
     '-vf', 'scale=-2:360',
@@ -416,7 +451,10 @@ export async function transcodeToHls(
     const segmentPattern = `${outDir}/${codec}_${q.name}_%03d.ts`;
     const crf = profile.crf[q.name] ?? 23;
     const args = [
-      '-y', '-i', inputPath,
+      '-y',
+      '-threads', '1',
+      '-filter_threads', '1',
+      '-i', inputPath,
       '-vf', `scale=-2:${q.height}`,
       '-c:v', profile.ffmpegEncoder,
       '-preset', profile.preset,
