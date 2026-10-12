@@ -85,11 +85,6 @@ const CATEGORIES: CategoryDef[] = [
   },
 ];
 
-const TOPIC_CHIPS = [
-  'All', 'Action Movies', 'Web Development', 'Classical Music',
-  'Tech News', 'Romantic Drama', 'Spoken English', 'Live Sports',
-  'Comedy Skits', 'Devotional', 'Documentary',
-];
 
 function formatDuration(sec: number): string {
   if (!sec) return '';
@@ -276,7 +271,6 @@ function CategorySection({ def, initial }: { def: CategoryDef; initial: SectionS
 // ============ Main Home ============
 export default function Home() {
   const [sections, setSections] = useState<Record<string, SectionState>>({});
-  const [activeChip, setActiveChip] = useState<string>('All');
 
   useEffect(() => {
     let cancelled = false;
@@ -332,19 +326,6 @@ export default function Home() {
 
   return (
     <main className="mf-content">
-      {/* TOPIC FILTER CHIPS */}
-      <div className="mf-topics-strip">
-        {TOPIC_CHIPS.map((c) => (
-          <button
-            key={c}
-            className={`mf-chip ${activeChip === c ? 'active' : ''}`}
-            onClick={() => setActiveChip(c)}
-          >
-            {c}
-          </button>
-        ))}
-      </div>
-
       {/* 7 CATEGORY SECTIONS */}
       {CATEGORIES.map((def) => {
         const st = sections[def.key] ?? { videos: [], loading: true, loaded: 0 };
