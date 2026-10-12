@@ -3161,3 +3161,35 @@ body.theme-light .mf-sb-item:hover { background: #f3e8ff; }
   .mf-nav-icon .lbl { font-size: 10px !important; }
   .mf-nav-icon .emoji { font-size: 17px !important; }
 }
+
+/* ===================================================== */
+/* TopBar fix #5 (2026-10-12) — icon-only nav with tooltip */
+/* ===================================================== */
+
+.mf-nav-icons {
+  gap: 2px !important;
+  margin: 0 8px !important;
+}
+
+.mf-nav-icon {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  padding: 6px 10px !important;
+  min-width: 40px !important;
+  height: 36px !important;
+  border-radius: 18px !important;
+}
+
+.mf-nav-icon .emoji {
+  font-size: 20px !important;
+  line-height: 1 !important;
+  display: block !important;
+}
+
+/* Hide any leftover labels */
+.mf-nav-icon .lbl {
+  display: none !important;
+}

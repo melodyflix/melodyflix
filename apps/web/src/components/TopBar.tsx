@@ -103,9 +103,8 @@ export default function TopBar({ user, onToggleSidebar, onOpenLogin, onLogout }:
         <nav className="mf-nav-icons">
           {NAV_ITEMS.map((it) => (
             <Link key={it.label} to={it.path} style={{ textDecoration: 'none' }}>
-              <button className="mf-nav-icon">
+              <button className="mf-nav-icon" title={it.label} aria-label={it.label}>
                 <span className="emoji">{it.icon}</span>
-                <span className="lbl">{it.label}</span>
               </button>
             </Link>
           ))}
