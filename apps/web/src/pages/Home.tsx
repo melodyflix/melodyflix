@@ -1,4 +1,4 @@
-// melodyflix web - Home page (YouTube-style, based on mockups/homepage.html)
+// melodyflix web - Home (7 categories × 6×2 grid, per master UI spec)
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -14,28 +14,81 @@ interface VideoCard {
   content_type?: string;
 }
 
-const CATEGORY_CHIPS = [
-  { icon: '🎓', label: 'Study' },
-  { icon: '🎬', label: 'Movies' },
-  { icon: '🎭', label: 'Drama' },
-  { icon: '📺', label: 'Web Series' },
-  { icon: '🎵', label: 'Video Song' },
-  { icon: '🎧', label: 'Audio Song' },
-  { icon: '📡', label: 'Live TV' },
-  { icon: '📻', label: 'Radio' },
-  { icon: '🔴', label: 'Live Streaming' },
-  { icon: '📰', label: 'Article' },
-  { icon: '🎵', label: 'Music' },
-  { icon: '⚽', label: 'Sports' },
-  { icon: '🎮', label: 'Gaming' },
-  { icon: '💎', label: 'Memberships' },
+interface CategoryDef {
+  key: string;
+  label: string;
+  icon: string;
+  path: string;
+  contentType?: string;
+  genre?: string;
+  subcats: string[];
+}
+
+// Order per spec: Movies & Dramas → Music & Videos → Web Series → Live TV → Radio → Study → Article & News
+const CATEGORIES: CategoryDef[] = [
+  {
+    key: 'movies',
+    label: 'Movies & Dramas',
+    icon: '🎬',
+    path: '/genre/movie',
+    contentType: 'movie',
+    subcats: ['Action', 'Romantic', 'Comedy', 'Thriller', 'Horror'],
+  },
+  {
+    key: 'music',
+    label: 'Music & Videos',
+    icon: '🎵',
+    path: '/genre/music',
+    contentType: 'music_video',
+    subcats: ['Pop', 'Rock', 'Folk', 'Classical', 'Hip Hop'],
+  },
+  {
+    key: 'web_series',
+    label: 'Web Series',
+    icon: '📺',
+    path: '/series',
+    contentType: 'web_series',
+    subcats: ['Drama', 'Thriller', 'Comedy', 'Documentary'],
+  },
+  {
+    key: 'livetv',
+    label: 'Live TV',
+    icon: '📡',
+    path: '/live-tv',
+    contentType: 'video',
+    subcats: ['News', 'Sports', 'Entertainment', 'Kids'],
+  },
+  {
+    key: 'radio',
+    label: 'Radio',
+    icon: '📻',
+    path: '/radio',
+    contentType: 'podcast',
+    subcats: ['FM', 'Podcast', 'Music', 'Talk'],
+  },
+  {
+    key: 'study',
+    label: 'Study',
+    icon: '📚',
+    path: '/genre/education',
+    contentType: 'video',
+    genre: 'education',
+    subcats: ['Courses', 'Tutorials', 'Science', 'Math', 'Language'],
+  },
+  {
+    key: 'news',
+    label: 'Article & News',
+    icon: '📰',
+    path: '/help',
+    contentType: 'news',
+    subcats: ['Breaking', 'Politics', 'Tech', 'Sports', 'Business'],
+  },
 ];
 
-const HERO_SLIDES = [
-  { emoji: '🎓', title: 'Study Room', sub: 'Featured course', cls: 's1' },
-  { emoji: '🎬', title: 'Movies', sub: 'Now trending', cls: 's2' },
-  { emoji: '📻', title: 'Radio', sub: 'Listen live', cls: 's3' },
-  { emoji: '📺', title: 'Live TV', sub: 'Broadcasting now', cls: 's4' },
+const TOPIC_CHIPS = [
+  'All', 'Action Movies', 'Web Development', 'Classical Music',
+  'Tech News', 'Romantic Drama', 'Spoken English', 'Live Sports',
+  'Comedy Skits', 'Devotional', 'Documentary',
 ];
 
 function formatDuration(sec: number): string {
@@ -48,9 +101,9 @@ function formatDuration(sec: number): string {
 }
 
 function formatViews(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M views`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K views`;
-  return `${n} views`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+  return String(n);
 }
 
 function formatAgo(iso: string): string {
@@ -62,286 +115,187 @@ function formatAgo(iso: string): string {
   const d = Math.floor(hr / 24);
   if (d < 30) return `${d} day${d > 1 ? 's' : ''} ago`;
   const mo = Math.floor(d / 30);
-  return `${mo} month${mo > 1 ? 's' : ''} ago`;
+  return `${mo} mo ago`;
 }
 
+// ============ Video card ============
+function VideoCardItem({ v }: { v: VideoCard }) {
+  return (
+    <Link to={`/watch/${v.id}`} className="mf-vcard" style={{ textDecoration: 'none' }}>
+      <div
+        className="mf-thumb"
+        style={v.thumbnail_url ? {
+          backgroundImage: `url(${v.thumbnail_url})`,
+          backgroundSize: 'cover',
+          color: 'transparent',
+        } : {}}
+      >
+        {!v.thumbnail_url && '🎬'}
+        {v.duration_seconds > 0 && (
+          <span className="mf-dur">{formatDuration(v.duration_seconds)}</span>
+        )}
+      </div>
+      <div className="mf-vmeta">
+        <div className="mf-vavatar">{(v.channel_name ?? 'V').charAt(0).toUpperCase()}</div>
+        <div style={{ minWidth: 0 }}>
+          <div className="mf-vtitle" title={v.title}>{v.title}</div>
+          <div className="mf-vchannel">{v.channel_name ?? 'Channel'}</div>
+          <div className="mf-vstats">
+            {formatViews(v.view_count ?? 0)} views · {formatAgo(v.created_at)}
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
 
+// ============ Category section (3 layers) ============
+interface SectionState {
+  videos: VideoCard[];
+  loading: boolean;
+  loaded: number;   // how many videos currently shown
+}
+
+function CategorySection({ def, initial }: { def: CategoryDef; initial: SectionState }) {
+  const [state, setState] = useState<SectionState>(initial);
+  const [subcat, setSubcat] = useState<string>(def.subcats[0] ?? '');
+
+  // Load more (adds 6 more cards)
+  function loadMore() {
+    if (state.loaded >= state.videos.length) return;
+    setState((s) => ({ ...s, loaded: Math.min(s.loaded + 6, s.videos.length) }));
+  }
+
+  const visible = state.videos.slice(0, state.loaded);
+  const hasMore = state.loaded < state.videos.length;
+
+  return (
+    <section className="mf-category-section">
+      {/* LAYER 1 — Upper sub-header */}
+      <div className="mf-cat-header">
+        <div className="mf-cat-title">
+          <span className="mf-cat-icon">{def.icon}</span>
+          <span className="mf-cat-name">{def.label}</span>
+        </div>
+        <div className="mf-cat-subcats">
+          {def.subcats.map((sc) => (
+            <button
+              key={sc}
+              className={`mf-subcat-chip ${subcat === sc ? 'active' : ''}`}
+              onClick={() => setSubcat(sc)}
+            >
+              {sc}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* LAYER 2 — 6×2 grid */}
+      {state.loading && visible.length === 0 ? (
+        <div className="mf-cat-empty">Loading…</div>
+      ) : visible.length === 0 ? (
+        <div className="mf-cat-empty">No videos yet in {def.label}</div>
+      ) : (
+        <div className="mf-grid mf-grid-6x2">
+          {visible.map((v) => <VideoCardItem key={v.id} v={v} />)}
+        </div>
+      )}
+
+      {/* LAYER 3 — Lower sub-header */}
+      <div className="mf-cat-footer">
+        <Link to={def.path} className="mf-cat-seeall-left">
+          <button className="mf-cat-catname-btn">
+            {def.label} <span className="arrow">→</span>
+          </button>
+        </Link>
+        <div className="mf-cat-footer-center">
+          {hasMore && (
+            <button className="mf-loadmore-btn" onClick={loadMore}>
+              Load More <span className="arrow">⬇</span>
+            </button>
+          )}
+        </div>
+        <Link to={def.path} className="mf-cat-seeall-right">
+          <button className="mf-seeall-btn">
+            See All <span className="arrow">→</span>
+          </button>
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+// ============ Main Home ============
 export default function Home() {
-  const [trending, setTrending] = useState<VideoCard[]>([]);
-  const [shorts, setShorts] = useState<VideoCard[]>([]);
-  const [liveNow, setLiveNow] = useState<VideoCard[]>([]);
-  const [music, setMusic] = useState<VideoCard[]>([]);
-  const [sports, setSports] = useState<VideoCard[]>([]);
-  const [news, setNews] = useState<VideoCard[]>([]);
-  const [study, setStudy] = useState<VideoCard[]>([]);
-  const [heroIdx, setHeroIdx] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
+  const [sections, setSections] = useState<Record<string, SectionState>>({});
+  const [activeChip, setActiveChip] = useState<string>('All');
 
-  // Auto-rotate hero
-  useEffect(() => {
-    const t = setInterval(() => setHeroIdx((i) => (i + 1) % HERO_SLIDES.length), 4000);
-    return () => clearInterval(t);
-  }, []);
-
-  // Fetch all sections in parallel
   useEffect(() => {
     let cancelled = false;
-    async function load() {
+
+    async function loadCategory(def: CategoryDef) {
       try {
-        const [tR, sR, lR, mR, spR, nR, stR] = await Promise.all([
-          fetch('/api/v1/videos/trending?limit=8').then((r) => r.json()).catch(() => ({})),
-          fetch('/api/v1/videos/content-type/short?limit=6').then((r) => r.json()).catch(() => ({})),
-          fetch('/api/v1/videos/live-tv/channels').then((r) => r.json()).catch(() => ({})),
-          fetch('/api/v1/videos/content-type/music_video?limit=6').then((r) => r.json()).catch(() => ({})),
-          fetch('/api/v1/videos/genres/sports/videos?limit=6').then((r) => r.json()).catch(() => ({})),
-          fetch('/api/v1/videos/content-type/news?limit=6').then((r) => r.json()).catch(() => ({})),
-          fetch('/api/v1/videos/content-type/video?limit=6').then((r) => r.json()).catch(() => ({})),
-        ]);
+        // Build API URL — prefer content-type filter, else genre, else trending
+        let url = '/api/v1/videos/trending?limit=24';
+        if (def.contentType) {
+          url = `/api/v1/videos/content-type/${def.contentType}?limit=24`;
+        }
+        if (def.genre) {
+          url = `/api/v1/videos/genre/${def.genre}?limit=24`;
+        }
+        const r = await fetch(url).then((res) => res.json()).catch(() => ({}));
+        const videos: VideoCard[] = r?.data?.videos ?? [];
         if (cancelled) return;
-        setTrending(tR?.data?.videos ?? []);
-        setShorts(sR?.data?.videos ?? []);
-        setLiveNow(lR?.data?.channels ?? []);
-        setMusic(mR?.data?.videos ?? []);
-        setSports(spR?.data?.videos ?? []);
-        setNews(nR?.data?.videos ?? []);
-        setStudy(stR?.data?.videos ?? []);
-      } catch (e: any) {
-        if (!cancelled) setErr(e.message || 'Failed to load');
-      } finally {
-        if (!cancelled) setLoading(false);
+        setSections((s) => ({
+          ...s,
+          [def.key]: {
+            videos,
+            loading: false,
+            loaded: Math.min(12, videos.length),
+          },
+        }));
+      } catch {
+        if (cancelled) return;
+        setSections((s) => ({
+          ...s,
+          [def.key]: { videos: [], loading: false, loaded: 0 },
+        }));
       }
     }
-    load();
+
+    // Initialize all sections with loading=true
+    const initial: Record<string, SectionState> = {};
+    for (const def of CATEGORIES) {
+      initial[def.key] = { videos: [], loading: true, loaded: 0 };
+    }
+    setSections(initial);
+
+    // Load all categories in parallel
+    Promise.all(CATEGORIES.map(loadCategory));
+
     return () => { cancelled = true; };
   }, []);
 
   return (
     <main className="mf-content">
-      {/* HERO CAROUSEL */}
-      <div className="mf-hero">
-        {HERO_SLIDES.map((s, i) => (
-          <div
-            key={i}
-            className={`mf-hero-slide ${s.cls} ${i === heroIdx ? 'active' : ''}`}
+      {/* TOPIC FILTER CHIPS */}
+      <div className="mf-topics-strip">
+        {TOPIC_CHIPS.map((c) => (
+          <button
+            key={c}
+            className={`mf-chip ${activeChip === c ? 'active' : ''}`}
+            onClick={() => setActiveChip(c)}
           >
-            {s.emoji} {s.title}<span className="sub">{s.sub}</span>
-          </div>
-        ))}
-        <div className="mf-hero-controls">
-          {HERO_SLIDES.map((_, i) => (
-            <button
-              key={i}
-              className={`mf-hero-dot ${i === heroIdx ? 'active' : ''}`}
-              onClick={() => setHeroIdx(i)}
-              aria-label={`Slide ${i + 1}`}
-            />
-          ))}
-        </div>
-      </div>
-
-      {err && <div style={{ padding: 16, color: '#b91c1c' }}>⚠️ {err}</div>}
-
-      {/* TRENDING */}
-      <h2 className="mf-grid-section-title">Trending</h2>
-      <div className="mf-grid">
-        {trending.length === 0 && !loading && (
-          <div className="mf-vcard">
-            <div className="mf-thumb">🎬<span className="mf-dur">—</span></div>
-            <div className="mf-vmeta"><div className="mf-vavatar">V</div><div>
-              <div className="mf-vtitle">No trending videos yet</div>
-              <div className="mf-vchannel">Be the first to upload</div>
-              <div className="mf-vstats">0 views</div>
-            </div></div>
-          </div>
-        )}
-        {trending.map((v) => (
-          <Link to={`/watch/${v.id}`} key={v.id} className="mf-vcard" style={{ textDecoration: 'none' }}>
-            <div
-              className="mf-thumb"
-              style={v.thumbnail_url ? { backgroundImage: `url(${v.thumbnail_url})`, backgroundSize: 'cover', color: 'transparent' } : {}}
-            >
-              {!v.thumbnail_url && '🎬'}
-              {v.duration_seconds > 0 && <span className="mf-dur">{formatDuration(v.duration_seconds)}</span>}
-            </div>
-            <div className="mf-vmeta">
-              <div className="mf-vavatar">{(v.channel_name ?? 'V').charAt(0).toUpperCase()}</div>
-              <div>
-                <div className="mf-vtitle">{v.title}</div>
-                <div className="mf-vchannel">{v.channel_name ?? 'Channel'}</div>
-                <div className="mf-vstats">{formatViews(v.view_count ?? 0)} · {formatAgo(v.created_at)}</div>
-              </div>
-            </div>
-          </Link>
-        ))}
-
-        <div className="mf-highlight-card">
-          <div className="mf-highlight-content">
-            <div className="mf-highlight-icon">🎓</div>
-            <div>
-              <div className="mf-highlight-title">Study Room — Explore More</div>
-              <div className="mf-highlight-sub">1000+ free courses, tutorials, and classes</div>
-            </div>
-          </div>
-          <Link to="/genre/education" className="mf-highlight-cta" style={{ textDecoration: 'none' }}>Explore →</Link>
-        </div>
-      </div>
-
-      {/* SHORTS */}
-      <h2 className="mf-grid-section-title">Shorts</h2>
-      <div className="mf-grid">
-        {shorts.length === 0 && !loading && (
-          <div className="mf-vcard">
-            <div className="mf-thumb" style={{ aspectRatio: '9/16' }}>⚡<span className="mf-dur">0:30</span></div>
-            <div className="mf-vmeta"><div className="mf-vavatar">S</div><div>
-              <div className="mf-vtitle">No shorts yet</div>
-              <div className="mf-vchannel">Upload your first short!</div>
-              <div className="mf-vstats">0 views</div>
-            </div></div>
-          </div>
-        )}
-        {shorts.map((v) => (
-          <Link to={`/watch/${v.id}`} key={v.id} className="mf-vcard" style={{ textDecoration: 'none' }}>
-            <div className="mf-thumb" style={{ aspectRatio: '9/16' }}>
-              ⚡
-              {v.duration_seconds > 0 && <span className="mf-dur">{formatDuration(v.duration_seconds)}</span>}
-            </div>
-            <div className="mf-vmeta"><div className="mf-vavatar">{(v.channel_name ?? 'S').charAt(0)}</div><div>
-              <div className="mf-vtitle">{v.title}</div>
-              <div className="mf-vchannel">{v.channel_name ?? 'Shorts Channel'}</div>
-              <div className="mf-vstats">{formatViews(v.view_count ?? 0)}</div>
-            </div></div>
-          </Link>
+            {c}
+          </button>
         ))}
       </div>
 
-      {/* LIVE NOW */}
-      <h2 className="mf-grid-section-title">Live Now</h2>
-      <div className="mf-grid">
-        {liveNow.length === 0 && !loading && (
-          <div className="mf-vcard">
-            <div className="mf-thumb" style={{ background: 'linear-gradient(135deg,#dc2626,#f87171)', color: '#fff' }}>🔴<span className="mf-dur">LIVE</span></div>
-            <div className="mf-vmeta"><div className="mf-vavatar">L</div><div>
-              <div className="mf-vtitle">No live channels</div>
-              <div className="mf-vchannel">Nothing broadcasting now</div>
-              <div className="mf-vstats">0 watching</div>
-            </div></div>
-          </div>
-        )}
-        {liveNow.map((c: any) => (
-          <Link to={`/live-tv/${c.id}`} key={c.id} className="mf-vcard" style={{ textDecoration: 'none' }}>
-            <div className="mf-thumb" style={{ background: 'linear-gradient(135deg,#dc2626,#f87171)', color: '#fff' }}>
-              🔴<span className="mf-dur">LIVE</span>
-            </div>
-            <div className="mf-vmeta"><div className="mf-vavatar">L</div><div>
-              <div className="mf-vtitle">{c.name ?? c.title}</div>
-              <div className="mf-vchannel">{c.region ?? 'Live Channel'}</div>
-              <div className="mf-vstats">{c.viewer_count ?? 0} watching</div>
-            </div></div>
-          </Link>
-        ))}
-      </div>
-
-
-      {/* STUDY ROOM */}
-      <h2 className="mf-grid-section-title">Study Room — Recommended</h2>
-      <div className="mf-grid">
-        {study.length === 0 && !loading && (
-          <div className="mf-vcard">
-            <div className="mf-thumb">🎓<span className="mf-dur">—</span></div>
-            <div className="mf-vmeta"><div className="mf-vavatar">E</div><div>
-              <div className="mf-vtitle">No courses yet</div>
-              <div className="mf-vchannel">Study Room</div>
-              <div className="mf-vstats">0 views</div>
-            </div></div>
-          </div>
-        )}
-        {study.slice(0, 4).map((v) => (
-          <Link to={`/watch/${v.id}`} key={v.id} className="mf-vcard" style={{ textDecoration: 'none' }}>
-            <div className="mf-thumb">🎓{v.duration_seconds > 0 && <span className="mf-dur">{formatDuration(v.duration_seconds)}</span>}</div>
-            <div className="mf-vmeta"><div className="mf-vavatar">E</div><div>
-              <div className="mf-vtitle">{v.title}</div>
-              <div className="mf-vchannel">{v.channel_name ?? 'Study Room'}</div>
-              <div className="mf-vstats">{formatViews(v.view_count ?? 0)}</div>
-            </div></div>
-          </Link>
-        ))}
-      </div>
-
-      {/* MUSIC */}
-      <h2 className="mf-grid-section-title">Music Videos</h2>
-      <div className="mf-grid">
-        {music.length === 0 && !loading && (
-          <div className="mf-vcard">
-            <div className="mf-thumb">🎵<span className="mf-dur">—</span></div>
-            <div className="mf-vmeta"><div className="mf-vavatar">M</div><div>
-              <div className="mf-vtitle">No music videos yet</div>
-              <div className="mf-vchannel">Music Label</div>
-              <div className="mf-vstats">0 views</div>
-            </div></div>
-          </div>
-        )}
-        {music.slice(0, 4).map((v) => (
-          <Link to={`/watch/${v.id}`} key={v.id} className="mf-vcard" style={{ textDecoration: 'none' }}>
-            <div className="mf-thumb">🎵{v.duration_seconds > 0 && <span className="mf-dur">{formatDuration(v.duration_seconds)}</span>}</div>
-            <div className="mf-vmeta"><div className="mf-vavatar">M</div><div>
-              <div className="mf-vtitle">{v.title}</div>
-              <div className="mf-vchannel">{v.channel_name ?? 'Music Label'}</div>
-              <div className="mf-vstats">{formatViews(v.view_count ?? 0)}</div>
-            </div></div>
-          </Link>
-        ))}
-      </div>
-
-      {/* SPORTS */}
-      <h2 className="mf-grid-section-title">Sports</h2>
-      <div className="mf-grid">
-        {sports.length === 0 && !loading && (
-          <div className="mf-vcard">
-            <div className="mf-thumb">⚽<span className="mf-dur">—</span></div>
-            <div className="mf-vmeta"><div className="mf-vavatar">S</div><div>
-              <div className="mf-vtitle">No sports videos yet</div>
-              <div className="mf-vchannel">Sports</div>
-              <div className="mf-vstats">0 views</div>
-            </div></div>
-          </div>
-        )}
-        {sports.slice(0, 4).map((v) => (
-          <Link to={`/watch/${v.id}`} key={v.id} className="mf-vcard" style={{ textDecoration: 'none' }}>
-            <div className="mf-thumb">⚽{v.duration_seconds > 0 && <span className="mf-dur">{formatDuration(v.duration_seconds)}</span>}</div>
-            <div className="mf-vmeta"><div className="mf-vavatar">S</div><div>
-              <div className="mf-vtitle">{v.title}</div>
-              <div className="mf-vchannel">{v.channel_name ?? 'Sports'}</div>
-              <div className="mf-vstats">{formatViews(v.view_count ?? 0)}</div>
-            </div></div>
-          </Link>
-        ))}
-      </div>
-
-      {/* NEWS */}
-      <h2 className="mf-grid-section-title">News &amp; Articles</h2>
-      <div className="mf-grid">
-        {news.length === 0 && !loading && (
-          <div className="mf-vcard">
-            <div className="mf-thumb">📰<span className="mf-dur">—</span></div>
-            <div className="mf-vmeta"><div className="mf-vavatar">N</div><div>
-              <div className="mf-vtitle">No news yet</div>
-              <div className="mf-vchannel">News</div>
-              <div className="mf-vstats">0 views</div>
-            </div></div>
-          </div>
-        )}
-        {news.slice(0, 4).map((v) => (
-          <Link to={`/watch/${v.id}`} key={v.id} className="mf-vcard" style={{ textDecoration: 'none' }}>
-            <div className="mf-thumb">📰{v.duration_seconds > 0 && <span className="mf-dur">{formatDuration(v.duration_seconds)}</span>}</div>
-            <div className="mf-vmeta"><div className="mf-vavatar">N</div><div>
-              <div className="mf-vtitle">{v.title}</div>
-              <div className="mf-vchannel">{v.channel_name ?? 'News'}</div>
-              <div className="mf-vstats">{formatViews(v.view_count ?? 0)}</div>
-            </div></div>
-          </Link>
-        ))}
-      </div>
+      {/* 7 CATEGORY SECTIONS */}
+      {CATEGORIES.map((def) => {
+        const st = sections[def.key] ?? { videos: [], loading: true, loaded: 0 };
+        return <CategorySection key={def.key} def={def} initial={st} />;
+      })}
     </main>
   );
 }
