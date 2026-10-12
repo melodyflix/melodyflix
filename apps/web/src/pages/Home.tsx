@@ -160,14 +160,22 @@ function CategorySection({ def, initial }: { def: CategoryDef; initial: SectionS
   const [state, setState] = useState<SectionState>(initial);
   const [subcat, setSubcat] = useState<string>(def.subcats[0] ?? '');
 
-  // Load more (adds 6 more cards)
+  // Load more (adds 6 more cards; if none left, says "no more")
   function loadMore() {
-    if (state.loaded >= state.videos.length) return;
+    if (state.loaded >= state.videos.length) {
+      // No more videos available for this category
+      return;
+    }
     setState((s) => ({ ...s, loaded: Math.min(s.loaded + 6, s.videos.length) }));
   }
 
+  // Are there more local videos to reveal?
+  const canReveal = state.loaded < state.videos.length;
+
   const visible = state.videos.slice(0, state.loaded);
-  const hasMore = state.loaded < state.videos.length;
+  // Always show Load More if there are any videos (for UX consistency);
+  // disabled/hidden only when we genuinely have 0 videos
+  const hasMore = state.videos.length > 0;
 
   return (
     <section className="mf-category-section">
@@ -210,8 +218,13 @@ function CategorySection({ def, initial }: { def: CategoryDef; initial: SectionS
         </Link>
         <div className="mf-cat-footer-center">
           {hasMore && (
-            <button className="mf-loadmore-btn" onClick={loadMore}>
-              Load More <span className="arrow">⬇</span>
+            <button
+              className="mf-loadmore-btn"
+              onClick={loadMore}
+              disabled={!canReveal}
+              title={canReveal ? 'Load 6 more videos' : 'No more videos'}
+            >
+              {canReveal ? 'Load More' : 'No More'} <span className="arrow">{canReveal ? '⬇' : '✓'}</span>
             </button>
           )}
         </div>

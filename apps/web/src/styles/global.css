@@ -3453,3 +3453,19 @@ body.theme-light .mf-sb-item:hover { background: #f3e8ff; }
   margin-left: 4px;
   font-weight: 700;
 }
+
+/* ===================================================== */
+/* Load More disabled state (2026-10-12)                  */
+/* ===================================================== */
+
+.mf-loadmore-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  background: #ebe8f0 !important;
+  color: #6d28d9 !important;
+  box-shadow: none !important;
+}
+.mf-loadmore-btn:disabled:hover {
+  background: #ebe8f0 !important;
+  color: #6d28d9 !important;
+}
