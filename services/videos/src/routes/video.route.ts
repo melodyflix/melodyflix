@@ -251,6 +251,49 @@ export async function videoRoutes(app: FastifyInstance) {
       return reply.code(403).send({ success: false, error: (err as Error).message });
     }
   });
+  app.post("/:id/retranscode", async (req, reply) => {
+    let user;
+    try { user = requireAuth(req.headers.authorization); }
+    catch (err) { return reply.code(401).send({ success: false, error: (err as Error).message }); }
+
+    const { id } = req.params as { id: string };
+    const video = getVideoById(id);
+    if (!video) return reply.code(404).send({ success: false, error: "Video not found" });
+
+    const ext = "mp4";
+    const inputPath = join(uploadsDir(), `${id}.${ext}`);
+    if (!existsSync(inputPath)) {
+      return reply.code(400).send({ success: false, error: "Original upload file missing" });
+    }
+
+    updateVideoStatus(id, "processing");
+    logger.info({ videoId: id, requestedBy: user.sub }, "retranscode requested");
+    reply.code(202).send({ success: true, data: { videoId: id, status: "processing" } });
+
+    (async () => {
+      try {
+        const result = await transcodeToHls(inputPath, id);
+        const masterRel = `/api/v1/videos/${id}/stream/master.m3u8`;
+        const thumbRel = `/api/v1/videos/${id}/thumbnail.jpg`;
+        updateVideoStatus(id, "ready", {
+          hls_master_url: masterRel,
+          thumbnail_url: thumbRel,
+          duration_seconds: result.durationSeconds,
+        });
+        logger.info({ videoId: id }, "retranscode done");
+        publish(CHANNELS.VIDEO_TRANSCODED, {
+          videoId: id, channelId: video.channel_id, ownerId: video.owner_id, status: "ready", title: video.title,
+        }).catch(() => {});
+      } catch (err) {
+        logger.error({ err, videoId: id }, "retranscode failed");
+        publish(CHANNELS.VIDEO_TRANSCODED, {
+          videoId: id, channelId: video.channel_id, ownerId: video.owner_id, status: "failed", title: video.title,
+        }).catch(() => {});
+        updateVideoStatus(id, "failed");
+      }
+    })();
+  });
+
 
   app.get('/:id/thumbnail.jpg', async (req, reply) => {
     const { id } = req.params as { id: string };

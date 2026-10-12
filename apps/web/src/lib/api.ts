@@ -98,16 +98,16 @@ export interface VideosListResponse {
 export const api = {
   // auth
   login: (email: string, password: string) =>
-    request<{ user: User; token: string }>('/api/auth/login', {
+    request<{ user: User; token: string }>('/api/v1/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
   signup: (email: string, username: string, password: string, displayName?: string) =>
-    request<User>('/api/auth/signup', {
+    request<User>('/api/v1/auth/signup', {
       method: 'POST',
       body: JSON.stringify({ email, username, password, displayName }),
     }),
-  me: () => request<User>('/api/auth/me'),
+  me: () => request<User>('/api/v1/auth/me'),
 
   // videos
   listVideos: (limit = 50, offset = 0) =>
@@ -117,11 +117,11 @@ export const api = {
 
   // channels
   getChannel: (id: string) =>
-    request<Channel>(`/api/channels/${id}`),
+    request<Channel>(`/api/v1/channels/${id}`),
   getChannelByHandle: (handle: string) =>
-    request<Channel>(`/api/channels/handle/${handle}`),
+    request<Channel>(`/api/v1/channels/handle/${handle}`),
   getMyChannel: () =>
-    request<Channel>('/api/channels/me'),
+    request<Channel>('/api/v1/channels/me'),
   listChannels: (limit = 50, offset = 0) =>
     request<Channel[]>(`/api/channels?limit=${limit}&offset=${offset}`),
   createChannel: (name: string, handle: string, description?: string) =>
@@ -130,7 +130,7 @@ export const api = {
       body: JSON.stringify({ name, handle, description }),
     }),
   updateChannel: (id: string, updates: { name?: string; description?: string; avatar_url?: string; banner_url?: string }) =>
-    request<Channel>(`/api/channels/${id}`, {
+    request<Channel>(`/api/v1/channels/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(updates),
     }),
@@ -185,19 +185,19 @@ export async function recordView(id: string): Promise<{ view_count: number }> {
 }
 
 export async function followChannel(channelId: string): Promise<{ following: boolean; subscriberCount: number }> {
-  return request<{ following: boolean; subscriberCount: number }>(`/api/channels/${channelId}/follow`, {
+  return request<{ following: boolean; subscriberCount: number }>(`/api/v1/channels/${channelId}/follow`, {
     method: 'POST',
   });
 }
 
 export async function unfollowChannel(channelId: string): Promise<{ following: boolean; subscriberCount: number }> {
-  return request<{ following: boolean; subscriberCount: number }>(`/api/channels/${channelId}/follow`, {
+  return request<{ following: boolean; subscriberCount: number }>(`/api/v1/channels/${channelId}/follow`, {
     method: 'DELETE',
   });
 }
 
 export async function isFollowing(channelId: string): Promise<{ following: boolean }> {
-  return request<{ following: boolean }>(`/api/channels/${channelId}/following`);
+  return request<{ following: boolean }>(`/api/v1/channels/${channelId}/following`);
 }
 
 // upload video (multipart with progress)
@@ -1724,7 +1724,7 @@ export async function listWatchLater(): Promise<{ videos: Video[]; total: number
 
 // Subscriptions (my following channels)
 export async function listMySubscriptions(): Promise<{ channels: Channel[]; total: number }> {
-  return request<{ channels: Channel[]; total: number }>('/api/channels/me/following');
+  return request<{ channels: Channel[]; total: number }>('/api/v1/channels/me/following');
 }
 
 // ============ Notifications ============
@@ -1759,19 +1759,19 @@ export async function listNotifications(limit = 20, offset = 0): Promise<Notific
 }
 
 export async function getUnreadCount(): Promise<{ count: number }> {
-  return request<{ count: number }>('/api/notifications/unread-count');
+  return request<{ count: number }>('/api/v1/notifications/unread-count');
 }
 
 export async function markNotificationRead(id: string): Promise<{ read: boolean }> {
-  return request<{ read: boolean }>(`/api/notifications/${id}/read`, { method: 'POST' });
+  return request<{ read: boolean }>(`/api/v1/notifications/${id}/read`, { method: 'POST' });
 }
 
 export async function markAllNotificationsRead(): Promise<{ marked: number }> {
-  return request<{ marked: number }>('/api/notifications/read-all', { method: 'POST' });
+  return request<{ marked: number }>('/api/v1/notifications/read-all', { method: 'POST' });
 }
 
 export async function deleteNotification(id: string): Promise<{ deleted: boolean }> {
-  return request<{ deleted: boolean }>(`/api/notifications/${id}`, { method: 'DELETE' });
+  return request<{ deleted: boolean }>(`/api/v1/notifications/${id}`, { method: 'DELETE' });
 }
 
 export async function clearAllNotifications(): Promise<{ deleted: number }> {
@@ -2117,35 +2117,35 @@ export interface CommunityPostsResponse {
 }
 
 export async function listChannelPosts(channelId: string, limit = 20, offset = 0): Promise<CommunityPostsResponse> {
-  return request<CommunityPostsResponse>(`/api/channels/${channelId}/posts?limit=${limit}&offset=${offset}`);
+  return request<CommunityPostsResponse>(`/api/v1/channels/${channelId}/posts?limit=${limit}&offset=${offset}`);
 }
 
 export async function createCommunityPost(channelId: string, content: string): Promise<CommunityPost> {
-  return request<CommunityPost>(`/api/channels/${channelId}/posts`, {
+  return request<CommunityPost>(`/api/v1/channels/${channelId}/posts`, {
     method: 'POST',
     body: JSON.stringify({ content }),
   });
 }
 
 export async function updateCommunityPost(postId: string, content: string): Promise<CommunityPost> {
-  return request<CommunityPost>(`/api/channels/posts/${postId}`, {
+  return request<CommunityPost>(`/api/v1/channels/posts/${postId}`, {
     method: 'PATCH',
     body: JSON.stringify({ content }),
   });
 }
 
 export async function deleteCommunityPost(postId: string): Promise<{ deleted: boolean }> {
-  return request<{ deleted: boolean }>(`/api/channels/posts/${postId}`, { method: 'DELETE' });
+  return request<{ deleted: boolean }>(`/api/v1/channels/posts/${postId}`, { method: 'DELETE' });
 }
 
 export async function toggleCommunityPostLike(postId: string): Promise<{ liked: boolean; likeCount: number }> {
-  return request<{ liked: boolean; likeCount: number }>(`/api/channels/posts/${postId}/like`, {
+  return request<{ liked: boolean; likeCount: number }>(`/api/v1/channels/posts/${postId}/like`, {
     method: 'POST',
   });
 }
 
 export async function getMyChannelPosts(): Promise<{ posts: CommunityPost[]; total: number; channel: Channel | null }> {
-  return request<{ posts: CommunityPost[]; total: number; channel: Channel | null }>('/api/channels/me/posts/own');
+  return request<{ posts: CommunityPost[]; total: number; channel: Channel | null }>('/api/v1/channels/me/posts/own');
 }
 
 // ============ Two-Factor Authentication (2FA) ============
@@ -2166,36 +2166,36 @@ export interface TwoFAConfirmResult {
 }
 
 export async function getTwoFAStatus(): Promise<TwoFAStatus> {
-  return request<TwoFAStatus>('/api/auth/2fa/status');
+  return request<TwoFAStatus>('/api/v1/auth/2fa/status');
 }
 
 export async function beginTwoFASetup(): Promise<TwoFASetupResult> {
-  return request<TwoFASetupResult>('/api/auth/2fa/setup', { method: 'POST' });
+  return request<TwoFASetupResult>('/api/v1/auth/2fa/setup', { method: 'POST' });
 }
 
 export async function confirmTwoFA(code: string): Promise<TwoFAConfirmResult> {
-  return request<TwoFAConfirmResult>('/api/auth/2fa/confirm', {
+  return request<TwoFAConfirmResult>('/api/v1/auth/2fa/confirm', {
     method: 'POST',
     body: JSON.stringify({ code }),
   });
 }
 
 export async function disableTwoFA(code: string): Promise<{ disabled: boolean }> {
-  return request<{ disabled: boolean }>('/api/auth/2fa/disable', {
+  return request<{ disabled: boolean }>('/api/v1/auth/2fa/disable', {
     method: 'POST',
     body: JSON.stringify({ code }),
   });
 }
 
 export async function regenerateBackupCodes(code: string): Promise<{ backup_codes: string[] }> {
-  return request<{ backup_codes: string[] }>('/api/auth/2fa/regenerate-backup-codes', {
+  return request<{ backup_codes: string[] }>('/api/v1/auth/2fa/regenerate-backup-codes', {
     method: 'POST',
     body: JSON.stringify({ code }),
   });
 }
 
 export async function completeTwoFALogin(tempToken: string, code: string): Promise<{ user: User; token: string }> {
-  return request<{ user: User; token: string }>('/api/auth/2fa/login', {
+  return request<{ user: User; token: string }>('/api/v1/auth/2fa/login', {
     method: 'POST',
     body: JSON.stringify({ temp_token: tempToken, code }),
   });
@@ -3218,7 +3218,7 @@ export async function sendTestPush(): Promise<{ sent: number; failed: number; re
 
 // ============ Email Verification ============
 export async function verifyEmailToken(token: string): Promise<{ verified: boolean; user_id: string; email: string }> {
-  return request<{ verified: boolean; user_id: string; email: string }>('/api/auth/email/verify', {
+  return request<{ verified: boolean; user_id: string; email: string }>('/api/v1/auth/email/verify', {
     method: 'POST',
     body: JSON.stringify({ token }),
   });
